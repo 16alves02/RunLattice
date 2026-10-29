@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum TriggerType {
+  MANUAL
+  WEBHOOK
+  SCHEDULE
+}
+
+model Workflow {
+  id          String         @id @default(cuid())
+  name        String
+  description String         @default("")
+  status      WorkflowStatus @default(DRAFT)
+  triggerType TriggerType    @default(MANUAL)
+  definition  Json
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  runs        WorkflowRun[]
+
+  @@index([status, updatedAt])
+}
+
+model WorkflowRun {
+  id          String      @id @default(cuid())
+  workflowId  String
+  status      RunStatus   @default(QUEUED)
+  input       Json        @default("{}")
+  output      Json?
+  error       String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  workflow    Workflow   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId, createdAt])
+  @@index([status, createdAt])
+}
