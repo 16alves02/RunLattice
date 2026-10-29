@@ -1,6 +1,6 @@
 # RunLattice
 
-**Workflow Automation & Orchestration** — build, connect, execute, and monitor workflows from one place.
+**Workflow Automation & Orchestration** - build, connect, execute, and monitor workflows from one place.
 
 RunLattice is an evolving full-stack workflow automation platform. The goal is to grow it into both a strong software-engineering portfolio project and a useful product, with production quality improved incrementally.
 
@@ -8,10 +8,10 @@ RunLattice is an evolving full-stack workflow automation platform. The goal is t
 
 RunLattice will support multiple real integrations, delivered in stages:
 
-1. **Webhooks and HTTP APIs** — receive events, make requests, and connect external services.
-2. **Email** — send workflow notifications.
-3. **GitHub** — react to repository events and automate development tasks.
-4. **Slack** — send workflow alerts and messages.
+1. **Webhooks and HTTP APIs** - receive events, make requests, and connect external services.
+2. **Email** - send workflow notifications.
+3. **GitHub** - react to repository events and automate development tasks.
+4. **Slack** - send workflow alerts and messages.
 
 The long-term aim is to let users compose these actions into workflows, run them asynchronously, inspect execution logs, and retry failed steps safely.
 
