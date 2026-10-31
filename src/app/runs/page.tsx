@@ -11,7 +11,12 @@ export const metadata: Metadata = {
   description: "Inspect workflow execution records stored in the RunLattice database.",
 };
 
-function getExecutionMode(output: unknown) {\n  if (output && typeof output === "object" && "executionMode" in output && typeof output.executionMode === "string") return output.executionMode;\n  return null;\n}\n\nfunction formatDuration(startedAt: Date | null, finishedAt: Date | null) {
+function getExecutionMode(output: unknown) {
+  if (output && typeof output === "object" && "executionMode" in output && typeof output.executionMode === "string") return output.executionMode;
+  return null;
+}
+
+function formatDuration(startedAt: Date | null, finishedAt: Date | null) {
   if (!startedAt || !finishedAt) return "—";
   const milliseconds = Math.max(0, finishedAt.getTime() - startedAt.getTime());
   return milliseconds < 1000 ? `${milliseconds} ms` : `${(milliseconds / 1000).toFixed(2)} s`;
