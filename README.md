@@ -150,3 +150,18 @@ This is an active learning and portfolio project, not a production-ready automat
 ## Author
 
 Built by [16alves02](https://github.com/16alves02) as a full-stack software engineering portfolio project.
+
+
+## Launch audit notes
+
+- The application interface is not a public marketing website. Fresha, contact forms and a marketing FAQ are not applicable to this product milestone.
+- No analytics or advertising scripts are included. Reassess cookie consent if analytics, advertising or other non-essential storage is introduced.
+- The app currently has no authentication or user accounts. Do not use it with personal or production data on a public deployment.
+- A privacy notice must be written from the actual data controller, hosting provider and integrations before collecting personal data from external users. This repository does not invent those legal details.
+- Open Graph metadata and a favicon are configured. A canonical URL and sitemap are intentionally deferred until a real production domain is selected.
+- `robots.ts` allows public app routes and disallows API routes from crawling. This is not access control.
+- The dashboard and execution history use sample records, which are labelled as demo content.
+- The mobile workspace navigation and custom 404 page are included.
+- External Google Fonts loading was removed in favour of system font fallbacks to avoid an unnecessary third-party request.
+
+The launch audit is a code-level review. Browser-based accessibility checks, Lighthouse, dependency installation, automated tests and a production build must still be run in the target environment.
