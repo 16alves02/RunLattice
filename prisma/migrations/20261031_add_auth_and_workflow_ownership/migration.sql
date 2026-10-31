@@ -60,3 +60,12 @@ CREATE INDEX "Verification_identifier_idx" ON "Verification"("identifier");
 ALTER TABLE "Workflow" ADD COLUMN "userId" TEXT;
 CREATE INDEX "Workflow_userId_status_updatedAt_idx" ON "Workflow"("userId", "status", "updatedAt");
 ALTER TABLE "Workflow" ADD CONSTRAINT "Workflow_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE TABLE "RateLimit" (
+  "id" TEXT NOT NULL,
+  "key" TEXT NOT NULL,
+  "count" INTEGER NOT NULL,
+  "lastRequest" BIGINT NOT NULL,
+  CONSTRAINT "RateLimit_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX "RateLimit_key_key" ON "RateLimit"("key");
