@@ -2,13 +2,19 @@ import { NextResponse } from "next/server";
 import { WorkflowStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { workflowDefinitionSchema } from "@/lib/validation";
+import { getCurrentUser } from "@/lib/session";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, context: RouteContext) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { id } = await context.params;
   try {
-    const workflow = await prisma.workflow.findUnique({ where: { id }, include: { runs: { orderBy: { createdAt: "desc" }, take: 20 } } });
+    const workflow = await prisma.workflow.findFirst({
+      where: { id, userId: user.id },
+      include: { runs: { orderBy: { createdAt: "desc" }, take: 20 } },
+    });
     if (!workflow) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
     return NextResponse.json({ data: workflow });
   } catch (error) {
@@ -18,6 +24,8 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { id } = await context.params;
   const body: unknown = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return NextResponse.json({ error: "A JSON object is required." }, { status: 400 });
@@ -43,22 +51,25 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (!Object.keys(data).length) return NextResponse.json({ error: "No supported fields were provided." }, { status: 400 });
 
   try {
-    const workflow = await prisma.workflow.update({ where: { id }, data });
+    const result = await prisma.workflow.updateMany({ where: { id, userId: user.id }, data });
+    if (result.count === 0) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
+    const workflow = await prisma.workflow.findFirst({ where: { id, userId: user.id } });
     return NextResponse.json({ data: workflow });
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "P2025") return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
     console.error("Unable to update workflow:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "The workflow could not be updated." }, { status: 503 });
   }
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { id } = await context.params;
   try {
-    await prisma.workflow.delete({ where: { id } });
+    const result = await prisma.workflow.deleteMany({ where: { id, userId: user.id } });
+    if (result.count === 0) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "P2025") return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
     console.error("Unable to delete workflow:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "The workflow could not be deleted." }, { status: 503 });
   }
