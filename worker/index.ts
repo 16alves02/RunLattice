@@ -25,7 +25,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
     const steps = definition.nodes ?? [];
     // This first worker version validates and records the path; action execution is deliberately not arbitrary code.
     const completedSteps = steps.map((step) => ({ id: step.id, type: step.kind, title: step.title, result: "simulated" }));
-    const output = { workflowId, runId, completedSteps, message: "Execution recorded. Connect supported action adapters to perform external side effects." };
+    const output = { workflowId, runId, executionMode: "SIMULATED", completedSteps, message: "Simulation completed. No external actions were executed." };
     await prisma.workflowRun.update({ where: { id: runId }, data: { status: "SUCCEEDED", output, finishedAt: new Date() } });
     return output;
   } catch (error) {
