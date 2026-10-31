@@ -26,10 +26,11 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   useEffect(() => {
     if (!workflowId) return;
     const controller = new AbortController();
+    const id = workflowId;
 
     async function loadWorkflow() {
       try {
-        const response = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}`, { signal: controller.signal });
+        const response = await fetch(`/api/workflows/${encodeURIComponent(id)}`, { signal: controller.signal });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(typeof result.error === "string" ? result.error : "Workflow could not be loaded.");
         const workflow = result.data;
