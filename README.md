@@ -18,17 +18,17 @@ A full-stack workflow automation platform built to explore visual workflow desig
 
 RunLattice is a portfolio project focused on the engineering behind automation tools. The first milestone includes a dark, responsive workspace, an interactive workflow draft editor, a PostgreSQL data model, validated REST endpoints and a Redis/BullMQ worker foundation.
 
-The interface uses sample data until the database and queue services are configured. Demo metrics are illustrative and are not presented as live production data.
+The dashboard, workflow list, editor and execution history read and write PostgreSQL records. Workflow runs are queued through Redis/BullMQ; the current worker records a simulated traversal and does not yet call external services.
 
 ## Features
 
 - **Workspace dashboard** with workflow summaries, activity and status indicators.
-- **Visual workflow draft builder** with trigger, condition and action nodes.
+- **Visual workflow builder** that loads, creates and updates saved trigger, condition and action node definitions.
 - **REST API** to list, create, update and delete workflow definitions.
 - **Schema validation** for node identifiers, connections and workflow fields.
 - **Execution queue foundation** using Redis and BullMQ with retries and exponential backoff.
-- **Worker process** that records execution state and handles graceful shutdown.
-- **Run history interface** with clear labels for illustrative data.
+- **Worker process** that records queued, running and completed simulation states and handles graceful shutdown.
+- **Execution history** with database-backed run records, statuses, timestamps and durations.
 - **Automated tests** for workflow graph validation.
 - **Docker Compose** for local PostgreSQL and Redis services.
 
@@ -84,7 +84,7 @@ npx prisma db push
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The dashboard and builder can be explored in demo mode.
+Open [http://localhost:3000](http://localhost:3000). Create a workflow, save it, reopen it from the workflow list, and update its definition.
 
 ### 6. Start the worker in a second terminal
 
@@ -117,7 +117,7 @@ docker compose down
 | `DELETE` | `/api/workflows/:id` | Delete a workflow |
 | `POST` | `/api/workflows/:id/runs` | Queue an execution for an active workflow |
 
-The run endpoint accepts an `x-runlattice-secret` header when `CRON_SECRET` is configured. Before deploying publicly, add user authentication, workspace-level authorization, rate limiting and stricter execution policies.
+The run endpoint requires the `x-runlattice-secret` header when `CRON_SECRET` is configured. The browser editor does not expose this secret; leave it unset for local UI testing. Production use requires proper user authentication, workspace-level authorization, rate limiting and stricter execution policies.
 
 ## Project structure
 
@@ -132,7 +132,7 @@ worker/                 Background job worker
 
 ## Project status
 
-This is an active learning and portfolio project, not a production-ready automation service. In this first milestone, the UI builder edits a local draft and the worker records a simulated path through workflow nodes. External action adapters, durable visual-editor persistence, authentication, tenant isolation, webhook verification and production observability remain planned work.
+This is an active learning and portfolio project, not a production-ready automation service. Workflow definitions and run records are persisted in PostgreSQL, and background jobs are processed through BullMQ. The worker currently records a simulated traversal of the graph; it does not send emails, call third-party APIs or perform external side effects. Authentication, workspace isolation, allow-listed action adapters, signed webhooks, scheduling and production observability remain to be implemented.
 
 ## Roadmap
 
@@ -140,11 +140,11 @@ This is an active learning and portfolio project, not a production-ready automat
 - [x] Workflow definition validation and tests
 - [x] PostgreSQL schema and CRUD API foundation
 - [x] Redis/BullMQ queue and worker foundation
-- [ ] Persist editor changes through the API
+- [x] Persist editor changes through the API
 - [ ] Implement safe, allow-listed action adapters
 - [ ] Add authentication and workspace permissions
 - [ ] Add signed webhook triggers and scheduling
-- [ ] Add integration tests and CI checks
+- [ ] Add integration tests for API and worker behaviour
 - [ ] Deploy a public demo with managed services
 
 ## Author
@@ -160,7 +160,7 @@ Built by [16alves02](https://github.com/16alves02) as a full-stack software engi
 - A privacy notice must be written from the actual data controller, hosting provider and integrations before collecting personal data from external users. This repository does not invent those legal details.
 - Open Graph metadata and a favicon are configured. A canonical URL and sitemap are intentionally deferred until a real production domain is selected.
 - `robots.ts` allows public app routes and disallows API routes from crawling. This is not access control.
-- The dashboard and execution history use sample records, which are labelled as demo content.
+- The dashboard, workflow list and execution history read database records. The worker's node traversal remains simulated and is identified as such.
 - The mobile workspace navigation and custom 404 page are included.
 - External Google Fonts loading was removed in favour of system font fallbacks to avoid an unnecessary third-party request.
 
