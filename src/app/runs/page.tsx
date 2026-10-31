@@ -57,7 +57,8 @@ export default async function RunsPage() {
       createdAt: run.createdAt,
       startedAt: run.startedAt,
       finishedAt: run.finishedAt,
-      error: run.error,\n      executionMode: getExecutionMode(run.output),
+      error: run.error,
+      executionMode: getExecutionMode(run.output),
     }));
     counts = { total, succeeded, failed, queued, running };
   } catch (error) {
