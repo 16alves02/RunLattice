@@ -110,7 +110,7 @@ docker compose down
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/health` | Basic application health response |
-| `GET` | `/api/workflows` | List workflows |
+| `GET` | `/api/workflows` | List workflows |\n| `GET` | `/api/runs` | List recent execution records |
 | `POST` | `/api/workflows` | Validate and create a workflow |
 | `GET` | `/api/workflows/:id` | Retrieve a workflow and recent runs |
 | `PATCH` | `/api/workflows/:id` | Update supported workflow fields |
