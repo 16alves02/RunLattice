@@ -84,7 +84,7 @@ export function TemplateGallery() {
     return matchesCategory && searchable.includes(query.toLowerCase());
   }), [category, query]);
 
-  async function useTemplate(template: Template) {
+  async function createFromTemplate(template: Template) {
     setCreating(template.id);
     setNotice("");
     const definition: WorkflowDefinition = {
@@ -136,7 +136,7 @@ export function TemplateGallery() {
           <h2>{template.name}</h2>
           <p>{template.description}</p>
           <div className="template-apps">{template.apps.map((app) => <span className="tag" key={app}>{app}</span>)}</div>
-          <div className="template-card-bottom"><span className="activity-meta">{template.nodes.length} steps · Draft</span><button className="btn btn-primary" onClick={() => void useTemplate(template)} disabled={creating !== ""}>{creating === template.id ? "Creating…" : "Use template"}{creating === template.id ? null : <ArrowRight size={13}/>}</button></div>
+          <div className="template-card-bottom"><span className="activity-meta">{template.nodes.length} steps · Draft</span><button className="btn btn-primary" onClick={() => void createFromTemplate(template)} disabled={creating !== ""}>{creating === template.id ? "Creating…" : "Use template"}{creating === template.id ? null : <ArrowRight size={13}/>}</button></div>
         </article>;
       })}
       {visibleTemplates.length === 0 && <div className="panel empty-state" style={{ gridColumn: "1 / -1" }}>No templates match this search.</div>}
