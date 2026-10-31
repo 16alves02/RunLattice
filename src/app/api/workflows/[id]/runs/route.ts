@@ -1,23 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getWorkflowQueue } from "@/lib/queue";
+import { getCurrentUser } from "@/lib/session";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, context: RouteContext) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { id } = await context.params;
+
   const secret = process.env.CRON_SECRET;
-  // Production must never accept unauthenticated execution requests.
   if (process.env.NODE_ENV === "production" && !secret) {
     return NextResponse.json({ error: "Workflow execution is not configured on this deployment." }, { status: 503 });
   }
-  // In local development, configure a secret when testing the protected execution endpoint.
   if (secret && request.headers.get("x-runlattice-secret") !== secret) {
     return NextResponse.json({ error: "Invalid execution secret." }, { status: 401 });
   }
 
   try {
-    const workflow = await prisma.workflow.findUnique({ where: { id } });
+    const workflow = await prisma.workflow.findFirst({ where: { id, userId: user.id } });
     if (!workflow) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
     if (workflow.status !== "ACTIVE") return NextResponse.json({ error: "Only active workflows can be run." }, { status: 409 });
 
