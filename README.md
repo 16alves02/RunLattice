@@ -88,7 +88,7 @@ docker compose up -d
 
 ```bash
 npx prisma generate
-npx prisma db push
+npx prisma migrate deploy
 ```
 
 ### 5. Start the web app
