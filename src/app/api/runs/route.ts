@@ -15,7 +15,8 @@ export async function GET() {
         workflow: run.workflow.name,
         status: run.status,
         createdAt: run.createdAt.toISOString(),
-        error: run.error,\n        executionMode: run.output && typeof run.output === "object" && !Array.isArray(run.output) && "executionMode" in run.output ? run.output.executionMode : null,
+        error: run.error,
+        executionMode: run.output && typeof run.output === "object" && !Array.isArray(run.output) && "executionMode" in run.output ? run.output.executionMode : null,
       })),
     });
   } catch (error) {
