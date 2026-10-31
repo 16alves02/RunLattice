@@ -10,14 +10,6 @@ export async function POST(request: Request, context: RouteContext) {
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const { id } = await context.params;
 
-  const secret = process.env.CRON_SECRET;
-  if (process.env.NODE_ENV === "production" && !secret) {
-    return NextResponse.json({ error: "Workflow execution is not configured on this deployment." }, { status: 503 });
-  }
-  if (secret && request.headers.get("x-runlattice-secret") !== secret) {
-    return NextResponse.json({ error: "Invalid execution secret." }, { status: 401 });
-  }
-
   try {
     const workflow = await prisma.workflow.findFirst({ where: { id, userId: user.id } });
     if (!workflow) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
