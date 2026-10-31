@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Clock3, GitBranch, Play, Plus, Radio, Workflow, Zap } from "lucide-react";
+import { Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Clock3, Command, GitBranch, Play, Plus, Radio, Workflow, Zap } from "lucide-react";
 import { demoWorkflows } from "@/lib/demo-data";
 import { AppShell } from "@/components/app-shell";
 
