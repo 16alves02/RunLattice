@@ -12,6 +12,7 @@ type RecentRun = {
   status: string;
   createdAt: string;
   error: string | null;
+  executionMode: string | null;
 };
 
 export function Dashboard() {
