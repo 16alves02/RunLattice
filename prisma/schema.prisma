@@ -7,9 +7,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum WorkflowStatus { DRAFT ACTIVE PAUSED }
-enum RunStatus { QUEUED RUNNING SUCCEEDED FAILED CANCELLED }
-enum TriggerType { MANUAL WEBHOOK SCHEDULE }
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum TriggerType {
+  MANUAL
+  WEBHOOK
+  SCHEDULE
+}
 
 model User {
   id            String     @id
