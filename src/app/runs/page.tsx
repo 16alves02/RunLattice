@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: "Inspect workflow execution records stored in the RunLattice database.",
 };
 
-function formatDuration(startedAt: Date | null, finishedAt: Date | null) {
+function getExecutionMode(output: unknown) {\n  if (output && typeof output === "object" && "executionMode" in output && typeof output.executionMode === "string") return output.executionMode;\n  return null;\n}\n\nfunction formatDuration(startedAt: Date | null, finishedAt: Date | null) {
   if (!startedAt || !finishedAt) return "—";
   const milliseconds = Math.max(0, finishedAt.getTime() - startedAt.getTime());
   return milliseconds < 1000 ? `${milliseconds} ms` : `${(milliseconds / 1000).toFixed(2)} s`;
@@ -52,7 +52,7 @@ export default async function RunsPage() {
       createdAt: run.createdAt,
       startedAt: run.startedAt,
       finishedAt: run.finishedAt,
-      error: run.error,
+      error: run.error,\n      executionMode: getExecutionMode(run.output),
     }));
     counts = { total, succeeded, failed, queued, running };
   } catch (error) {
@@ -74,7 +74,7 @@ export default async function RunsPage() {
         {runs.map((run) => <tr key={run.id}>
           <td style={{ fontFamily: "'DM Mono', monospace", color: "#a8adb4" }}>{run.id.slice(0, 12)}</td>
           <td style={{ color: "#f2f3f4", fontWeight: 700 }}><Link href={`/workflows/new?workflow=${encodeURIComponent(run.workflowId)}`}>{run.workflowName}</Link></td>
-          <td><span className={`status ${run.status === "SUCCEEDED" ? "status-active" : run.status === "FAILED" ? "status-paused" : "status-draft"}`}>{run.status.toLowerCase()}</span>{run.error && <div style={{ color: "var(--muted)", fontSize: 10, marginTop: 4 }}>{run.error}</div>}</td>
+          <td><span className={`status ${run.status === "SUCCEEDED" ? "status-active" : run.status === "FAILED" ? "status-paused" : "status-draft"}`}>{run.status.toLowerCase()}</span>{run.executionMode === "SIMULATED" && <span className="tag" style={{ marginLeft: 6 }}>simulation</span>}{run.error && <div style={{ color: "var(--muted)", fontSize: 10, marginTop: 4 }}>{run.error}</div>}</td>
           <td>{formatDuration(run.startedAt, run.finishedAt)}</td>
           <td>{run.createdAt.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</td>
         </tr>)}
