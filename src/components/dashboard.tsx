@@ -6,16 +6,18 @@ import { Activity, ArrowDownRight, ArrowRight, Clock3, Command, GitBranch, Plus,
 import { AppShell } from "@/components/app-shell";
 import type { WorkflowSummary } from "@/lib/types";
 
-const activityItems = [
-  { title: "Lead capture pipeline", detail: "Example run completed successfully", time: "2 min ago", color: "#83d3a1" },
-  { title: "Weekly report", detail: "Example scheduled run queued", time: "18 min ago", color: "#ffb86b" },
-  { title: "Support triage", detail: "Example workflow paused", time: "Yesterday", color: "#a0a7b0" },
-];
+type RecentRun = {
+  id: string;
+  workflow: string;
+  status: string;
+  createdAt: string;
+  error: string | null;
+};
 
 export function Dashboard() {
   const [query, setQuery] = useState("");
-  const [notice, setNotice] = useState("");
-  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);\n  const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
+  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
+  const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -26,26 +28,28 @@ export function Dashboard() {
       try {
         const response = await fetch("/api/workflows", { signal: controller.signal });
         const result = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(typeof result.error === "string" ? result.error : "Workflows could not be loaded.");
-        }
-
-        if (!Array.isArray(result.data)) {
-          throw new Error("The workflow API returned an unexpected response.");
-        }
-
+        if (!response.ok) throw new Error(typeof result.error === "string" ? result.error : "Workflows could not be loaded.");
+        if (!Array.isArray(result.data)) throw new Error("The workflow API returned an unexpected response.");
         setWorkflows(result.data as WorkflowSummary[]);
       } catch (error) {
-        if (!controller.signal.aborted) {
-          setLoadError(error instanceof Error ? error.message : "Workflows could not be loaded.");
-        }
+        if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : "Workflows could not be loaded.");
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
     }
 
+    async function loadRecentRuns() {
+      try {
+        const response = await fetch("/api/runs", { signal: controller.signal });
+        const result = await response.json().catch(() => ({}));
+        if (response.ok && Array.isArray(result.data)) setRecentRuns(result.data as RecentRun[]);
+      } catch {
+        // The execution history page reports database errors in detail.
+      }
+    }
+
     void loadWorkflows();
+    void loadRecentRuns();
     return () => controller.abort();
   }, []);
 
@@ -57,13 +61,8 @@ export function Dashboard() {
   const totalRuns = workflows.reduce((total, workflow) => total + workflow.runs, 0);
   const inactiveCount = workflows.length - activeCount;
 
-  function showRunNotice(name: string) {
-    setNotice(`Live execution is not available from the dashboard yet. “${name}” has not been started.`);
-  }
-
   return <AppShell><div className="page">
     <div className="page-heading"><div><div style={{ color: "var(--accent)", fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>Your workspace</div><h1>Your automation workspace.</h1><p className="subtitle">A clear view of your automations, activity and what needs attention.</p></div><Link className="btn btn-primary" href="/workflows/new"><Plus size={15}/> Create workflow</Link></div>
-    {notice && <div className="toast" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notification" style={{ float: "right", color: "inherit", background: "none", border: 0 }}>×</button></div>}
     {loadError && <div className="toast" role="alert">{loadError}</div>}
     <div className="stats-grid">
       <div className="stat-card"><div className="stat-label">Total workflows <Workflow size={15}/></div><div className="stat-value">{loading ? "…" : workflows.length}</div><div className="stat-foot">Saved in this workspace</div></div>
