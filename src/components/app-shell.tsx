@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Blocks, BookOpen, CircleHelp, Command, GitBranch, LayoutDashboard, Settings2, Workflow } from "lucide-react";
+import { Activity, Blocks, BookOpen, CircleHelp, GitBranch, LayoutDashboard, Settings2, Workflow } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
