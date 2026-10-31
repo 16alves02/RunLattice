@@ -22,9 +22,9 @@ export function Dashboard() {
   }
 
   return <AppShell><div className="page">
-    <div className="page-heading"><div><div style={{ color: "var(--accent)", fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>Your workspace</div><h1>Good evening, Leonardo.</h1><p className="subtitle">A clear view of your automations, activity and what needs attention.</p></div><Link className="btn btn-primary" href="/workflows/new"><Plus size={15}/> Create workflow</Link></div>
+    <div className="page-heading"><div><div style={{ color: "var(--accent)", fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>Your workspace</div><h1>Your automation workspace.</h1><p className="subtitle">A clear view of your automations, activity and what needs attention.</p></div><Link className="btn btn-primary" href="/workflows/new"><Plus size={15}/> Create workflow</Link></div>
     {notice && <div className="toast" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notification" style={{ float: "right", color: "inherit", background: "none", border: 0 }}>×</button></div>}
-    <div className="stats-grid">
+    <div className="demo-notice" role="note">Demo mode: dashboard metrics, activity and workflow records below are illustrative examples, not live production data.</div><div className="stats-grid">
       <div className="stat-card"><div className="stat-label">Total workflows <Workflow size={15}/></div><div className="stat-value">12</div><div className="stat-foot"><span className="positive"><ArrowUpRight size={12} style={{ verticalAlign: "middle" }}/> 3</span> compared with last month</div></div>
       <div className="stat-card"><div className="stat-label">Successful runs <Zap size={15}/></div><div className="stat-value">1,643</div><div className="stat-foot"><span className="positive"><ArrowUpRight size={12} style={{ verticalAlign: "middle" }}/> 12.8%</span> success rate trend</div></div>
       <div className="stat-card"><div className="stat-label">Success rate <Activity size={15}/></div><div className="stat-value">98.6<span style={{ fontSize: 15, color: "var(--muted)" }}>%</span></div><div className="stat-foot"><span className="positive">Healthy</span> across active workflows</div></div>
