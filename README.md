@@ -22,7 +22,8 @@ AI-generated workflows are drafts only. Users must review and save them; the ass
 
 ## Features
 
-- **Workspace dashboard** with workflow summaries, activity and status indicators.
+- **Personal accounts** with email/password sign-up, sign-in, sign-out and database-backed sessions.
+- **Account-scoped workspaces** so each account can only list, edit, delete and execute its own workflows.
 - **Visual workflow builder** that loads, creates and updates saved trigger, condition and action node definitions.
 - **Template library** with searchable, category-filtered starter workflows.
 - **Integration catalog** describing planned providers, authentication methods, triggers and actions.
@@ -37,11 +38,11 @@ AI-generated workflows are drafts only. Users must review and save them; the ass
 
 ## Integration status
 
-The integration library currently describes planned integrations for Gmail, Google Drive, Google Sheets, Discord, Slack, Shopify, Stripe, GitHub and generic HTTP APIs. It is a catalog only: OAuth flows, provider credentials, connected accounts and external action adapters are not implemented. Do not enter provider credentials into the prototype.
+The integration library currently describes planned integrations for Gmail, Google Drive, Google Sheets, Discord, Slack, Shopify, Stripe, GitHub and generic HTTP APIs. It is a catalog only: OAuth flows, provider credentials, connected accounts and external action adapters are not implemented. Do not enter provider credentials.
 
 ## AI assistant status
 
-The AI planning endpoint is disabled by default. It requires `AI_ASSISTANT_ENABLED=true` and a server-side `AI_API_KEY`. It uses structured JSON output followed by Zod validation. The endpoint must remain disabled on public deployments until authentication, workspace ownership and request rate limiting are implemented. A generated plan is not saved or executed until the user reviews and saves it.
+The AI planning endpoint is disabled by default. It requires `AI_ASSISTANT_ENABLED=true` and a server-side `AI_API_KEY`. It uses structured JSON output followed by Zod validation and requires a signed-in account. A generated plan is not saved or executed until the user reviews and saves it. Configure provider billing limits and application-level AI request quotas before enabling it publicly.
 
 ## Tech stack
 
@@ -75,7 +76,7 @@ npm install
 cp .env.example .env
 ```
 
-Review `DATABASE_URL`, `REDIS_URL` and `CRON_SECRET`. AI planning is disabled unless explicitly enabled. Never commit real credentials.
+Review `DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`. Generate a secret with `openssl rand -base64 32`. For local development, the auth module has a development-only fallback; production refuses to start without `BETTER_AUTH_SECRET`. Never commit real credentials.
 
 ### 3. Start PostgreSQL and Redis
 
@@ -131,7 +132,7 @@ docker compose down
 | `DELETE` | `/api/workflows/:id` | Delete a workflow |
 | `POST` | `/api/workflows/:id/runs` | Queue an execution for an active workflow |
 
-The run endpoint requires the `x-runlattice-secret` header when `CRON_SECRET` is configured. The browser editor does not expose this secret; leave it unset for local UI testing. Production use requires proper user authentication, workspace-level authorization, rate limiting and stricter execution policies.
+All workflow and run endpoints require a valid Better Auth session. Workflow reads and mutations are scoped to the signed-in user. `/api/health` remains public for deployment health checks.
 
 ## Project structure
 
@@ -146,7 +147,7 @@ worker/                Background job worker
 
 ## Project status
 
-This is an active portfolio project, not a production-ready automation service. Workflow definitions and run records are persisted in PostgreSQL, and background jobs are processed through BullMQ. The current worker records a simulated traversal of the graph; it does not send emails, call third-party APIs or perform external side effects. Authentication, workspace isolation, secure provider connections, real action adapters, signed webhooks, production rate limits and observability remain to be implemented.
+This is an active portfolio project and is not yet a production-ready automation service. Email/password authentication, database-backed sessions and per-account workflow ownership are implemented. Workflow definitions and run records are persisted in PostgreSQL, and background jobs are processed through BullMQ. The current worker records a simulated traversal of the graph; it does not send emails, call third-party APIs or perform external side effects. Secure provider connections, real action adapters, signed webhooks, scheduling, billing, production observability and a full security review remain outstanding.
 
 ## Roadmap
 
@@ -156,11 +157,12 @@ This is an active portfolio project, not a production-ready automation service. 
 - [x] Searchable template library
 - [x] Integration catalog foundation
 - [x] AI workflow planning endpoint and review interface (disabled by default)
-- [ ] Authentication and workspace permissions
+- [x] Email/password authentication and per-account workflow ownership
+- [ ] Multi-user workspaces, roles and invitations
 - [ ] Secure OAuth connection and credential storage
 - [ ] First real integration with end-to-end tests
 - [ ] Safe action adapters, signed webhooks and scheduling
-- [ ] AI workflow generation enabled behind authenticated access and rate limits
+- [ ] AI workflow generation enabled after quotas, abuse controls and security review
 - [ ] Production observability, security review and public demo
 
 ## Author
@@ -169,11 +171,11 @@ Built by [16alves02](https://github.com/16alves02).
 
 ## Launch audit notes
 
-- This is a logged-in workspace concept, but authentication has not yet been implemented. Do not use it with personal or production data on a public deployment.
+- Email/password authentication and per-account data isolation are implemented. Email verification and account recovery are not configured yet.
 - No analytics or advertising scripts are included. Reassess cookie consent if analytics or non-essential storage is introduced.
 - A privacy notice must be written from the actual data controller, hosting provider and integrations before collecting personal data from external users.
 - A canonical URL and sitemap should be configured after the production domain is selected.
-- The AI endpoint is disabled by default and must not be enabled publicly before authentication and rate limiting are in place.
+- The AI endpoint remains disabled by default. Configure spend limits and per-account quotas before enabling it publicly.
 - Provider cards describe planned capabilities only. No provider accounts are connected and no external actions are executed.
 - The worker simulates graph traversal and is not a production automation engine.
 - Browser-based accessibility checks, dependency installation, automated tests and a production build must be completed before deployment.
