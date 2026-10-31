@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
+import { WorkflowStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { workflowDefinitionSchema } from "@/lib/validation";
 
@@ -32,8 +32,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     data.description = input.description.trim();
   }
   if ("status" in input) {
-    if (!["DRAFT", "ACTIVE", "PAUSED"].includes(String(input.status))) return NextResponse.json({ error: "Invalid workflow status." }, { status: 400 });
-    data.status = input.status;
+    if (typeof input.status !== "string" || !Object.values(WorkflowStatus).includes(input.status as WorkflowStatus)) return NextResponse.json({ error: "Invalid workflow status." }, { status: 400 });
+    data.status = input.status as WorkflowStatus;
   }
   if ("definition" in input) {
     const definition = workflowDefinitionSchema.safeParse(input.definition);
