@@ -10,7 +10,7 @@ if (!secret && process.env.NODE_ENV === "production") {
 
 export const auth = betterAuth({
   secret: secret || "runlattice-local-development-secret-change-before-deploy",
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  ...(process.env.BETTER_AUTH_URL ? { baseURL: process.env.BETTER_AUTH_URL } : {}),
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   emailAndPassword: {
     enabled: true,
