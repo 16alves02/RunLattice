@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createWorkflowSchema } from "@/lib/validation";
+import { inferTriggerType } from "@/lib/trigger-type";
 
 export async function GET() {
   try {
@@ -25,7 +26,12 @@ export async function POST(request: Request) {
 
   try {
     const workflow = await prisma.workflow.create({
-      data: { name: parsed.data.name, description: parsed.data.description, definition: parsed.data.definition },
+      data: {
+        name: parsed.data.name,
+        description: parsed.data.description,
+        definition: parsed.data.definition,
+        triggerType: inferTriggerType(parsed.data.definition),
+      },
     });
     return NextResponse.json({ data: workflow }, { status: 201 });
   } catch (error) {
