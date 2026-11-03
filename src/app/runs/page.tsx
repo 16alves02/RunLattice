@@ -32,6 +32,7 @@ export default async function RunsPage() {
     startedAt: Date | null;
     finishedAt: Date | null;
     error: string | null;
+    executionMode: string | null;
   }> = [];
   let serviceUnavailable = false;
   let counts = { total: 0, succeeded: 0, failed: 0, queued: 0, running: 0 };
