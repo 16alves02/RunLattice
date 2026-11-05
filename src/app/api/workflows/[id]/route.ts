@@ -2,17 +2,18 @@ import { NextResponse } from "next/server";
 import { WorkflowStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { workflowDefinitionSchema } from "@/lib/validation";
-import { getCurrentUser } from "@/lib/session";
+import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(_request: Request, context: RouteContext) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+export async function GET(request: Request, context: RouteContext) {
+  const access = await getRequestWorkspace(request);
+  if (access.response) return access.response;
+
   const { id } = await context.params;
   try {
     const workflow = await prisma.workflow.findFirst({
-      where: { id, userId: user.id },
+      where: { id, organizationId: access.context.organizationId },
       include: { runs: { orderBy: { createdAt: "desc" }, take: 20 } },
     });
     if (!workflow) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
@@ -24,36 +25,60 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const access = await getRequestWorkspace(request);
+  if (access.response) return access.response;
+  if (!canManageWorkspace(access.context.role)) {
+    return NextResponse.json({ error: "Workspace administrator permission required." }, { status: 403 });
+  }
+
   const { id } = await context.params;
   const body: unknown = await request.json().catch(() => null);
-  if (!body || typeof body !== "object") return NextResponse.json({ error: "A JSON object is required." }, { status: 400 });
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "A JSON object is required." }, { status: 400 });
+  }
+
   const input = body as Record<string, unknown>;
-  const data: Prisma.WorkflowUpdateInput = {};
+  const data: Prisma.WorkflowUpdateManyMutationInput = {};
+
   if ("name" in input) {
-    if (typeof input.name !== "string" || input.name.trim().length < 2 || input.name.trim().length > 80) return NextResponse.json({ error: "Name must contain between 2 and 80 characters." }, { status: 400 });
+    if (typeof input.name !== "string" || input.name.trim().length < 2 || input.name.trim().length > 80) {
+      return NextResponse.json({ error: "Name must contain between 2 and 80 characters." }, { status: 400 });
+    }
     data.name = input.name.trim();
   }
   if ("description" in input) {
-    if (typeof input.description !== "string" || input.description.length > 300) return NextResponse.json({ error: "Description must be 300 characters or fewer." }, { status: 400 });
+    if (typeof input.description !== "string" || input.description.length > 300) {
+      return NextResponse.json({ error: "Description must be 300 characters or fewer." }, { status: 400 });
+    }
     data.description = input.description.trim();
   }
   if ("status" in input) {
-    if (typeof input.status !== "string" || !Object.values(WorkflowStatus).includes(input.status as WorkflowStatus)) return NextResponse.json({ error: "Invalid workflow status." }, { status: 400 });
+    if (typeof input.status !== "string" || !Object.values(WorkflowStatus).includes(input.status as WorkflowStatus)) {
+      return NextResponse.json({ error: "Invalid workflow status." }, { status: 400 });
+    }
     data.status = input.status as WorkflowStatus;
   }
   if ("definition" in input) {
     const definition = workflowDefinitionSchema.safeParse(input.definition);
-    if (!definition.success) return NextResponse.json({ error: "Invalid workflow definition.", issues: definition.error.issues }, { status: 400 });
+    if (!definition.success) {
+      return NextResponse.json({ error: "Invalid workflow definition.", issues: definition.error.issues }, { status: 400 });
+    }
     data.definition = definition.data as Prisma.InputJsonValue;
   }
-  if (!Object.keys(data).length) return NextResponse.json({ error: "No supported fields were provided." }, { status: 400 });
+  if (!Object.keys(data).length) {
+    return NextResponse.json({ error: "No supported fields were provided." }, { status: 400 });
+  }
 
   try {
-    const result = await prisma.workflow.updateMany({ where: { id, userId: user.id }, data });
+    const result = await prisma.workflow.updateMany({
+      where: { id, organizationId: access.context.organizationId },
+      data,
+    });
     if (result.count === 0) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
-    const workflow = await prisma.workflow.findFirst({ where: { id, userId: user.id } });
+
+    const workflow = await prisma.workflow.findFirst({
+      where: { id, organizationId: access.context.organizationId },
+    });
     return NextResponse.json({ data: workflow });
   } catch (error) {
     console.error("Unable to update workflow:", error instanceof Error ? error.message : "Unknown error");
@@ -61,12 +86,18 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+export async function DELETE(request: Request, context: RouteContext) {
+  const access = await getRequestWorkspace(request);
+  if (access.response) return access.response;
+  if (!canManageWorkspace(access.context.role)) {
+    return NextResponse.json({ error: "Workspace administrator permission required." }, { status: 403 });
+  }
+
   const { id } = await context.params;
   try {
-    const result = await prisma.workflow.deleteMany({ where: { id, userId: user.id } });
+    const result = await prisma.workflow.deleteMany({
+      where: { id, organizationId: access.context.organizationId },
+    });
     if (result.count === 0) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (error) {
