@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Blocks, BookOpen, Bot, CircleHelp, GitBranch, LayoutDashboard, LayoutTemplate, Plug, Settings2, Workflow } from "lucide-react";
+import { Activity, Blocks, BookOpen, Bot, CircleHelp, GitBranch, LayoutDashboard, LayoutTemplate, Plug, Workflow } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 
