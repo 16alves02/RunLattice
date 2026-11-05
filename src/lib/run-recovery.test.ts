@@ -18,6 +18,7 @@ describe("stale workflow run recovery", () => {
     expect(count).toBe(2);
     expect(updateMany).toHaveBeenCalledWith({
       where: {
+        id: { in: ["run-1", "run-2"] },
         status: "RUNNING",
         heartbeatAt: { lt: new Date(now.getTime() - STALE_RUN_HEARTBEAT_TIMEOUT_MS) },
       },
