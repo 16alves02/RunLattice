@@ -85,7 +85,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       if (!parsedDefinition.success) {
         return NextResponse.json({ error: "The workflow definition is invalid.", issues: parsedDefinition.error.issues }, { status: 400 });
       }
-      let executablePath;
+      let executablePath: WorkflowDefinition["nodes"];
       try {
         executablePath = validateExecutableWorkflow(parsedDefinition.data as WorkflowDefinition);
       } catch (error) {
