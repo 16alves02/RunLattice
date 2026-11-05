@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/session";
+import { getRequestWorkspace } from "@/lib/workspace";
 
-export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+export async function GET(request: Request) {
+  const access = await getRequestWorkspace(request);
+  if (access.response) return access.response;
+
   try {
     const runs = await prisma.workflowRun.findMany({
-      where: { workflow: { userId: user.id } },
+      where: { workflow: { organizationId: access.context.organizationId } },
       orderBy: { createdAt: "desc" },
       take: 8,
       include: { workflow: { select: { name: true } } },
@@ -19,7 +20,9 @@ export async function GET() {
         status: run.status,
         createdAt: run.createdAt.toISOString(),
         error: run.error,
-        executionMode: run.output && typeof run.output === "object" && !Array.isArray(run.output) && "executionMode" in run.output ? run.output.executionMode : null,
+        executionMode: run.output && typeof run.output === "object" && !Array.isArray(run.output) && "executionMode" in run.output
+          ? run.output.executionMode
+          : null,
       })),
     });
   } catch (error) {
