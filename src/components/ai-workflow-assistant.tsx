@@ -12,11 +12,14 @@ type Plan = {
   rationale: string;
   assumptions: string[];
   requiredIntegrations: string[];
+  requiredPermissions: string[];
   sideEffects: string[];
   missingIntegrations: string[];
   executionReadiness: "review_required" | "setup_required";
   definition: WorkflowDefinition;
 };
+
+type Usage = { requestsUsed: number; tokensUsed: number; monthlyRequestLimit: number; monthlyTokenLimit: number; provider: string; model: string; tokensThisRequest: number };
 
 type DryRun = {
   simulationOnly: true;
@@ -30,6 +33,7 @@ export function AIWorkflowAssistant() {
   const [prompt, setPrompt] = useState("");
   const [plan, setPlan] = useState<Plan | null>(null);
   const [dryRun, setDryRun] = useState<DryRun | null>(null);
+  const [usage, setUsage] = useState<Usage | null>(null);
   const [notice, setNotice] = useState("");
   const [generating, setGenerating] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -40,6 +44,7 @@ export function AIWorkflowAssistant() {
     setNotice("");
     setPlan(null);
     setDryRun(null);
+    setUsage(null);
     try {
       const response = await fetch("/api/ai/workflow-plan", {
         method: "POST",
@@ -49,6 +54,7 @@ export function AIWorkflowAssistant() {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? "The assistant could not create a plan.");
       setPlan(result.data);
+      setUsage(result.usage ?? null);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The assistant could not create a plan.");
     } finally {
@@ -120,9 +126,11 @@ export function AIWorkflowAssistant() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 18 }}>
         <div><div className="panel-subtitle">Assumptions</div>{plan.assumptions.length ? <ul>{plan.assumptions.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="activity-meta">No assumptions supplied.</p>}</div>
         <div><div className="panel-subtitle">Required integrations</div>{plan.requiredIntegrations.length ? <ul>{plan.requiredIntegrations.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="activity-meta">No external integrations declared.</p>}</div>
+        <div><div className="panel-subtitle">Required permissions</div>{plan.requiredPermissions.length ? <ul>{plan.requiredPermissions.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="activity-meta">No additional permissions declared.</p>}</div>
         <div><div className="panel-subtitle">External side effects</div>{plan.sideEffects.length ? <ul>{plan.sideEffects.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="activity-meta">No side effects declared.</p>}</div>
       </div>
       {plan.missingIntegrations.length > 0 && <div className="demo-notice" role="status" style={{ marginTop: 16 }}>Setup required: {plan.missingIntegrations.join(", ")}. These integrations are not connected and/or do not yet have a live adapter.</div>}
+      {usage && <div className="activity-meta" style={{ marginTop: 14 }}>Workspace AI usage this month: {usage.requestsUsed}/{usage.monthlyRequestLimit} requests · {usage.tokensUsed.toLocaleString()}/{usage.monthlyTokenLimit.toLocaleString()} tokens. This request: {usage.tokensThisRequest.toLocaleString()} tokens via {usage.provider}/{usage.model}.</div>}
       <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginTop: 20 }}><button className="btn btn-quiet" onClick={() => void simulatePlan()} disabled={testing}><FlaskConical size={14}/>{testing ? "Simulating…" : "Run safe simulation"}</button><button className="btn btn-primary" onClick={() => void saveDraft()} disabled={saving || plan.name.trim().length < 2}>{saving ? "Saving…" : "Save as draft"}<ArrowRight size={13}/></button><button className="btn btn-quiet" onClick={() => { setPlan(null); setDryRun(null); }}>Discard</button></div>
       {dryRun && <div className="demo-notice" role="status" style={{ marginTop: 16 }}><strong>Simulation only · no external side effects</strong><div>{dryRun.note}</div><ol>{dryRun.selectedPath.map((step) => <li key={step.nodeId}>{step.title} — {step.outcome}</li>)}</ol></div>}
     </div></section>}
