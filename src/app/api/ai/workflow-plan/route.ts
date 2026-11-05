@@ -117,10 +117,20 @@ export async function POST(request: Request) {
   }
 
   const required = new Set(plan.data.requiredIntegrations.map((name) => name.toLowerCase()));
-  const missingIntegrations = integrationCatalog
-    .filter((integration) => required.has(integration.id) || required.has(integration.name.toLowerCase()))
-    .filter((integration) => integration.status !== "available" || !connectedProviders.has(integration.id))
-    .map((integration) => integration.name);
+  for (const node of plan.data.definition.nodes) {
+    if (node.config && "integrationId" in node.config) required.add(node.config.integrationId);
+  }
+  const knownRequired = integrationCatalog.filter((integration) =>
+    required.has(integration.id) || required.has(integration.name.toLowerCase()),
+  );
+  const missingIntegrations = [
+    ...knownRequired
+      .filter((integration) => integration.status !== "available" || !connectedProviders.has(integration.id))
+      .map((integration) => integration.name),
+    ...[...required].filter((name) => !integrationCatalog.some((integration) =>
+      integration.id === name || integration.name.toLowerCase() === name,
+    )),
+  ];
 
   const periodStart = getUsagePeriodStart();
   const usage = await prisma.aiWorkspaceUsage.findUnique({
