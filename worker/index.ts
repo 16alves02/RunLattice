@@ -2,6 +2,7 @@ import { Worker, type Job } from "bullmq";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { decryptSecret } from "../src/lib/secrets";
 import { recoverStaleWorkflowRuns } from "../src/lib/run-recovery";
+import { renderInputTemplate } from "../src/lib/template";
 import { validateExecutableWorkflow } from "../src/lib/execution";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
 import type { DiscordActionConfig, WorkflowDefinition } from "../src/lib/types";
@@ -68,7 +69,7 @@ function getSafeWebhookUrl(ciphertext: string, connectionName: string, organizat
   return validated.data.webhookUrl;
 }
 
-async function executeDiscordAction(config: DiscordActionConfig, organizationId: string) {
+async function executeDiscordAction(config: DiscordActionConfig, organizationId: string, input: unknown) {
   if (!config.connectionId || !config.message?.trim()) throw new Error("The Discord action is missing its connection or message.");
 
   const integrationConnection = await prisma.integrationConnection.findFirst({
@@ -82,12 +83,13 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
   if (!integrationConnection) throw new Error("The Discord connection is unavailable in this workspace.");
 
   const webhookUrl = getSafeWebhookUrl(integrationConnection.credentialsCiphertext, integrationConnection.name, organizationId);
+  const message = renderInputTemplate(config.message, input);
   let response: Response;
   try {
     response = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: config.message }),
+      body: JSON.stringify({ content: message }),
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
     });
@@ -105,10 +107,10 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
   return { httpStatus: response.status };
 }
 
-async function executeAction(node: WorkflowDefinition["nodes"][number], organizationId: string) {
+async function executeAction(node: WorkflowDefinition["nodes"][number], organizationId: string, input: unknown) {
   if (!node.config?.connectionId || !node.config.message?.trim()) throw new Error(`Action "${node.title}" has not been configured.`);
   if (node.config.integrationId === "discord" && node.config.actionId === "send_message") {
-    return executeDiscordAction(node.config, organizationId);
+    return executeDiscordAction(node.config, organizationId, input);
   }
   throw new Error(`Action "${node.title}" is not supported by this worker version.`);
 }
@@ -170,7 +172,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
         } else if (node.kind === "condition") {
           throw new Error("Condition nodes are not supported by this execution version.");
         } else {
-          result = await executeAction(node, workflow.organizationId);
+          result = await executeAction(node, workflow.organizationId, run.input);
         }
 
         steps.push({
