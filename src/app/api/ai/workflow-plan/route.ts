@@ -3,20 +3,20 @@ import { prisma } from "@/lib/prisma";
 import {
   aiWorkflowPlanSchema,
   aiWorkflowRequestSchema,
-  findMissingIntegrations,
-  type AIIntegrationContext,
   buildWorkflowPrompt,
   buildWorkflowSystemPrompt,
+  findMissingIntegrations,
+  type AIIntegrationContext,
 } from "@/lib/ai-workflow";
-import { integrationCatalog } from "@/lib/integrations";
-import { generateAICompletion, getAIProviderSelection } from "@/lib/ai-provider";
+import { generateAICompletion, getAIProviderSelection, type AIProviderResult } from "@/lib/ai-provider";
 import {
   estimateReservedTokens,
   getAIUsageLimits,
   getUsagePeriodStart,
-  releaseAIUsage,
+  markAIUsageFailed,
   reserveAIUsage,
   settleAIUsage,
+  type AIUsageReservation,
 } from "@/lib/ai-usage";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 
@@ -38,9 +38,14 @@ export async function POST(request: Request) {
   if (new TextEncoder().encode(rawBody).byteLength > 10_000) {
     return NextResponse.json({ error: "AI planning requests must be 10 KB or smaller." }, { status: 413 });
   }
+
   let body: unknown;
-  try { body = JSON.parse(rawBody); }
-  catch { return NextResponse.json({ error: "Request body must contain valid JSON." }, { status: 400 }); }
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "Request body must contain valid JSON." }, { status: 400 });
+  }
+
   const parsed = aiWorkflowRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({
@@ -49,15 +54,38 @@ export async function POST(request: Request) {
   }
 
   const selection = getAIProviderSelection();
+  if (!selection.configured) {
+    return NextResponse.json({ error: "Configure a server-side AI provider key and model before enabling planning." }, { status: 503 });
+  }
+
+  let integrationContext: AIIntegrationContext[];
+  try {
+    const connections = await prisma.integrationConnection.findMany({
+      where: { organizationId: access.context.organizationId },
+      select: { provider: true },
+    });
+    const connectedProviders = new Set(connections.map((connection) => connection.provider));
+    integrationContext = integrationCatalog.map((integration) => ({
+      id: integration.id,
+      name: integration.name,
+      status: integration.status,
+      connected: connectedProviders.has(integration.id),
+      actions: integration.actions,
+    }));
+  } catch (error) {
+    console.error("Unable to read workspace integration metadata:", error instanceof Error ? error.message : "Unknown error");
+    return NextResponse.json({ error: "Workspace integration metadata is temporarily unavailable." }, { status: 503 });
+  }
+
   const limits = getAIUsageLimits();
   const reservedTokens = estimateReservedTokens(parsed.data.prompt);
-  let reservation;
+  let reservation: AIUsageReservation | null;
   try {
     reservation = await reserveAIUsage(prisma, {
       organizationId: access.context.organizationId,
       userId: access.context.userId,
       provider: selection.provider,
-      model: selection.model || "unconfigured",
+      model: selection.model,
       reservedTokens,
       limits,
     });
@@ -73,30 +101,16 @@ export async function POST(request: Request) {
     }, { status: 429 });
   }
 
-  let generated;
-  let integrationContext: AIIntegrationContext[] = [];
+  let generated: AIProviderResult;
   try {
-    const connections = await prisma.integrationConnection.findMany({
-      where: { organizationId: access.context.organizationId },
-      select: { provider: true },
-    });
-    const connectedProviders = new Set(connections.map((connection) => connection.provider));
-    integrationContext = integrationCatalog.map((integration) => ({
-      id: integration.id,
-      name: integration.name,
-      status: integration.status,
-      connected: connectedProviders.has(integration.id),
-      actions: integration.actions,
-    }));
-
     generated = await generateAICompletion(
       buildWorkflowSystemPrompt(),
       buildWorkflowPrompt(parsed.data.prompt, integrationContext),
-      { provider: selection.provider, model: selection.model || undefined, maxOutputTokens: 1_200 },
+      { provider: selection.provider, model: selection.model, maxOutputTokens: 1_200 },
     );
   } catch (error) {
-    await releaseAIUsage(prisma, reservation).catch((releaseError) => {
-      console.error("Unable to release failed AI reservation:", releaseError instanceof Error ? releaseError.message : "Unknown error");
+    await markAIUsageFailed(prisma, reservation).catch((markError) => {
+      console.error("Unable to record failed AI usage:", markError instanceof Error ? markError.message : "Unknown error");
     });
     console.error("AI workflow planning failed:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "The AI provider could not create a workflow plan. Check provider configuration and try again." }, { status: 502 });
@@ -163,4 +177,3 @@ export async function POST(request: Request) {
     },
   });
 }
-
