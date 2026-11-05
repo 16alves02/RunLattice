@@ -48,7 +48,7 @@ Names must contain 2–80 characters. A definition contains 1–100 nodes and up
 
 ## Queue a run
 
-`POST /api/workflows/:id/runs` queues a run for an active workflow. An optional JSON object can be supplied as the request body and is stored as the run input; the body is limited to 32 KB. An empty body remains valid and creates an empty input object. Arrays, primitives, malformed JSON and oversized bodies are rejected. The input is persisted on the run record; the current Discord action does not yet support input-variable interpolation or condition evaluation. The endpoint returns `202 Accepted` after Redis accepts the job. The worker then claims the run atomically, validates the stored workflow and persists step-level results.
+`POST /api/workflows/:id/runs` queues a run for an active workflow. An optional JSON object can be supplied as the request body and is stored as the run input; the body is limited to 32 KB. An empty body remains valid and creates an empty input object. Arrays, primitives, malformed JSON and oversized bodies are rejected. The input is persisted on the run record and is available to Discord message templates using `{{input.customer.name}}` path syntax. Only string, number and boolean values are inserted; missing paths, object values, prototype-related path segments and rendered messages over Discord’s 2,000-character limit fail the step. Templates do not evaluate JavaScript or arbitrary expressions. Condition evaluation and branching are not implemented yet. The endpoint returns `202 Accepted` after Redis accepts the job. The worker then claims the run atomically, validates the stored workflow and persists step-level results.
 
 ## Integration connections
 
