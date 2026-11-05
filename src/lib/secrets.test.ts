@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
 import { decryptSecret, encryptSecret } from "@/lib/secrets";
 
 const originalKey = process.env.INTEGRATION_ENCRYPTION_KEY;
