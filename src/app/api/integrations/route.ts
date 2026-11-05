@@ -20,6 +20,7 @@ export async function GET(request: Request) {
       data: integrationCatalog,
       connections,
       connectedCount: connections.length,
+      canManage: canManageWorkspace(access.context.role),
     });
   } catch (error) {
     console.error("Unable to list integration connections:", error instanceof Error ? error.message : "Unknown error");
