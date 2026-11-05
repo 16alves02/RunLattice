@@ -46,10 +46,10 @@ function serializeSteps(steps: ExecutionStep[]): Prisma.InputJsonArray {
   }));
 }
 
-function getSafeWebhookUrl(ciphertext: string, connectionName: string) {
+function getSafeWebhookUrl(ciphertext: string, connectionName: string, organizationId: string) {
   let credentials: unknown;
   try {
-    credentials = JSON.parse(decryptSecret(ciphertext));
+    credentials = JSON.parse(decryptSecret(ciphertext, `${organizationId}:discord`));
   } catch {
     throw new Error("The stored Discord connection could not be decrypted.");
   }
@@ -80,7 +80,7 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
   });
   if (!integrationConnection) throw new Error("The Discord connection is unavailable in this workspace.");
 
-  const webhookUrl = getSafeWebhookUrl(integrationConnection.credentialsCiphertext, integrationConnection.name);
+  const webhookUrl = getSafeWebhookUrl(integrationConnection.credentialsCiphertext, integrationConnection.name, organizationId);
   let response: Response;
   try {
     response = await fetch(webhookUrl, {
