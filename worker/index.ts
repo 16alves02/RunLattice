@@ -56,6 +56,8 @@ function getSafeWebhookUrl(ciphertext: string, connectionName: string) {
 }
 
 async function executeDiscordAction(config: DiscordActionConfig, organizationId: string) {
+  if (!config.connectionId || !config.message?.trim()) throw new Error("The Discord action is missing its connection or message.");
+
   const integrationConnection = await prisma.integrationConnection.findFirst({
     where: {
       id: config.connectionId,
