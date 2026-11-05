@@ -6,7 +6,7 @@ function getOutgoingEdges(definition: WorkflowDefinition, nodeId: string) {
 }
 
 export function validateWorkflowGraph(definition: WorkflowDefinition): WorkflowNode[] {
-  const triggers = definition.nodes.filter((node) => node.kind === "trigger");
+  if (definition.nodes.filter((node) => node.kind === "condition").length > 1) {\n    throw new Error("This execution version supports one condition node per workflow.");\n  }\n\n  const triggers = definition.nodes.filter((node) => node.kind === "trigger");
   if (triggers.length !== 1) {
     throw new Error("A workflow must contain exactly one trigger node.");
   }
