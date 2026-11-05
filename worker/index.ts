@@ -1,7 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import { PrismaClient } from "@prisma/client";
 import { decryptSecret } from "../src/lib/secrets";
-import { resolveExecutionPath } from "../src/lib/execution";
+import { validateExecutableWorkflow } from "../src/lib/execution";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
 import type { DiscordActionConfig, WorkflowDefinition } from "../src/lib/types";
 
@@ -55,7 +55,7 @@ function getSafeWebhookUrl(ciphertext: string, connectionName: string) {
   return validated.data.webhookUrl;
 }
 
-async function executeDiscordAction(config: DiscordActionConfig, organizationId: string, connectionName: string) {
+async function executeDiscordAction(config: DiscordActionConfig, organizationId: string) {
   const integrationConnection = await prisma.integrationConnection.findFirst({
     where: {
       id: config.connectionId,
@@ -93,7 +93,7 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
 async function executeAction(node: WorkflowDefinition["nodes"][number], organizationId: string) {
   if (!node.config) throw new Error(`Action "${node.title}" has not been configured.`);
   if (node.config.integrationId === "discord" && node.config.actionId === "send_message") {
-    return executeDiscordAction(node.config, organizationId, node.title);
+    return executeDiscordAction(node.config, organizationId);
   }
   throw new Error(`Action "${node.title}" is not supported by this worker version.`);
 }
@@ -131,7 +131,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
     const parsedDefinition = workflowDefinitionSchema.safeParse(workflow.definition);
     if (!parsedDefinition.success) throw new Error("The saved workflow definition is invalid.");
 
-    const path = resolveExecutionPath(parsedDefinition.data as WorkflowDefinition);
+    const path = validateExecutableWorkflow(parsedDefinition.data as WorkflowDefinition);
     for (const node of path) {
       const startedAt = new Date().toISOString();
       await job.updateProgress({ currentNode: node.id, completed: steps.length, total: path.length });
