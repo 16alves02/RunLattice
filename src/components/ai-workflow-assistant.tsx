@@ -15,6 +15,7 @@ type Plan = {
   requiredPermissions: string[];
   sideEffects: string[];
   missingIntegrations: string[];
+  setupRequiredActions: string[];
   executionReadiness: "review_required" | "setup_required";
   definition: WorkflowDefinition;
 };
@@ -129,7 +130,8 @@ export function AIWorkflowAssistant() {
         <div><div className="panel-subtitle">Required permissions</div>{plan.requiredPermissions.length ? <ul>{plan.requiredPermissions.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="activity-meta">No additional permissions declared.</p>}</div>
         <div><div className="panel-subtitle">External side effects</div>{plan.sideEffects.length ? <ul>{plan.sideEffects.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="activity-meta">No side effects declared.</p>}</div>
       </div>
-      {plan.missingIntegrations.length > 0 && <div className="demo-notice" role="status" style={{ marginTop: 16 }}>Setup required: {plan.missingIntegrations.join(", ")}. These integrations are not connected and/or do not yet have a live adapter.</div>}
+      {plan.executionReadiness === "setup_required" && <div className="demo-notice" role="status" style={{ marginTop: 16 }}>Setup required. {plan.missingIntegrations.length > 0 && <>Missing integrations: {plan.missingIntegrations.join(", ")}. </>}{plan.setupRequiredActions.length > 0 && <>Actions needing configuration: {plan.setupRequiredActions.join(", ")}.</>}</div>}
+      {plan.executionReadiness === "review_required" && <div className="demo-notice" role="status" style={{ marginTop: 16 }}>The plan has no known missing integrations or unconfigured actions. Review it carefully before saving or activating.</div>}
       {usage && <div className="activity-meta" style={{ marginTop: 14 }}>Workspace AI usage this month: {usage.requestsUsed}/{usage.monthlyRequestLimit} requests · {usage.tokensUsed.toLocaleString()}/{usage.monthlyTokenLimit.toLocaleString()} tokens. This request: {usage.tokensThisRequest.toLocaleString()} tokens via {usage.provider}/{usage.model}.</div>}
       <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginTop: 20 }}><button className="btn btn-quiet" onClick={() => void simulatePlan()} disabled={testing}><FlaskConical size={14}/>{testing ? "Simulating…" : "Run safe simulation"}</button><button className="btn btn-primary" onClick={() => void saveDraft()} disabled={saving || plan.name.trim().length < 2}>{saving ? "Saving…" : "Save as draft"}<ArrowRight size={13}/></button><button className="btn btn-quiet" onClick={() => { setPlan(null); setDryRun(null); }}>Discard</button></div>
       {dryRun && <div className="demo-notice" role="status" style={{ marginTop: 16 }}><strong>Simulation only · no external side effects</strong><div>{dryRun.note}</div><ol>{dryRun.selectedPath.map((step) => <li key={step.nodeId}>{step.title} — {step.outcome}</li>)}</ol></div>}
