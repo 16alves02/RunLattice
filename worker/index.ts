@@ -182,6 +182,9 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
       const startedAt = new Date().toISOString();
       if (!(await ownsLease())) throw new Error("Execution lease was lost; this worker stopped.");
       await job.updateProgress({ currentNode: node.id, completed: steps.length, total: path.length });
+      const ledgerStep = await prisma.workflowRunStep.create({
+        data: { runId, nodeId: node.id, title: node.title, kind: node.kind, status: "RUNNING" },
+      });
 
       try {
         let result: ExecutionStep["result"];
@@ -195,6 +198,10 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
           result = await executeAction(node, workflow.organizationId, run.input);
         }
 
+        await prisma.workflowRunStep.update({
+          where: { id: ledgerStep.id },
+          data: { status: "SUCCEEDED", finishedAt: new Date(), result: result ?? {} },
+        });
         steps.push({
           nodeId: node.id,
           title: node.title,
@@ -205,6 +212,14 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
         });
       } catch (error) {
         const safeMessage = error instanceof Error ? error.message : "The workflow step failed.";
+        await prisma.workflowRunStep.update({
+          where: { id: ledgerStep.id },
+          data: {
+            status: node.kind === "action" ? "OUTCOME_UNKNOWN" : "FAILED",
+            finishedAt: new Date(),
+            error: safeMessage,
+          },
+        });
         steps.push({
           nodeId: node.id,
           title: node.title,
