@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Circle, GitBranch, Play, Plus, Save, Settings2, Sparkles, Webhook, X } from "lucide-react";
+import { ArrowLeft, Circle, GitBranch, Plus, Save, Settings2, Sparkles, Webhook, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ManualRunInput } from "@/components/manual-run-input";
 import { demoDefinition } from "@/lib/demo-data";
