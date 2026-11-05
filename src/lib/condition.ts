@@ -30,6 +30,7 @@ function isScalar(value: unknown): value is Scalar {
 export function evaluateCondition(config: ConditionConfig, input: unknown): boolean {
   const actual = resolveInputPath(input, config.path);
   const expected = config.value;
+  if (actual === undefined && config.operator !== "exists") return false;
 
   switch (config.operator) {
     case "exists":
