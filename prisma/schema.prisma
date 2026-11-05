@@ -105,6 +105,8 @@ model Organization {
   invitations Invitation[]
   workflows   Workflow[]
   integrations IntegrationConnection[]
+  aiUsage      AIWorkspaceUsage[]
+  aiUsageEvents AIUsageEvent[]
 }
 
 model Member {
@@ -217,4 +219,35 @@ model WorkflowRunStep {
 
   @@unique([runId, nodeId, attempt])
   @@index([runId, status])
+}
+
+model AIWorkspaceUsage {
+  id             String       @id @default(cuid())
+  organizationId String
+  periodStart    DateTime
+  requestsUsed   Int          @default(0)
+  tokensUsed     Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, periodStart])
+  @@index([periodStart])
+}
+
+model AIUsageEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  provider       String
+  model          String
+  status         String       @default("RESERVED")
+  reservedTokens Int
+  promptTokens   Int          @default(0)
+  completionTokens Int        @default(0)
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([status, createdAt])
 }
