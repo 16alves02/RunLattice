@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import {
   aiWorkflowPlanSchema,
   aiWorkflowRequestSchema,
+  findMissingIntegrations,
+  type AIIntegrationContext,
   buildWorkflowPrompt,
   buildWorkflowSystemPrompt,
 } from "@/lib/ai-workflow";
@@ -63,14 +65,14 @@ export async function POST(request: Request) {
   }
 
   let generated;
-  let connectedProviders = new Set<string>();
+  let integrationContext: AIIntegrationContext[] = [];
   try {
     const connections = await prisma.integrationConnection.findMany({
       where: { organizationId: access.context.organizationId },
       select: { provider: true },
     });
-    connectedProviders = new Set(connections.map((connection) => connection.provider));
-    const integrationContext = integrationCatalog.map((integration) => ({
+    const connectedProviders = new Set(connections.map((connection) => connection.provider));
+    integrationContext = integrationCatalog.map((integration) => ({
       id: integration.id,
       name: integration.name,
       status: integration.status,
@@ -120,17 +122,7 @@ export async function POST(request: Request) {
   for (const node of plan.data.definition.nodes) {
     if (node.config && "integrationId" in node.config) required.add(node.config.integrationId);
   }
-  const knownRequired = integrationCatalog.filter((integration) =>
-    required.has(integration.id) || required.has(integration.name.toLowerCase()),
-  );
-  const missingIntegrations = [
-    ...knownRequired
-      .filter((integration) => integration.status !== "available" || !connectedProviders.has(integration.id))
-      .map((integration) => integration.name),
-    ...[...required].filter((name) => !integrationCatalog.some((integration) =>
-      integration.id === name || integration.name.toLowerCase() === name,
-    )),
-  ];
+  const missingIntegrations = findMissingIntegrations([...required], integrationContext);
 
   const periodStart = getUsagePeriodStart();
   const usage = await prisma.aiWorkspaceUsage.findUnique({
