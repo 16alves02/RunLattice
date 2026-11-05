@@ -151,3 +151,14 @@ h1 { font-size:27px; line-height:1.2; letter-spacing:-1px; margin:0 0 8px; }
 .auth-footer a { color:var(--accent);font-weight:700; }
 .sign-out-button { display:flex;align-items:center;gap:8px;width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:11px;cursor:pointer; }
 .sign-out-button:hover { color:var(--text);border-color:var(--accent); }
+
+
+/* Multi-organization workspace switcher */
+.workspace-switcher { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.workspace-switcher-label { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; }
+.workspace-select { min-width: 0; padding: 9px 10px; }
+.workspace-create { display: inline-flex; align-items: center; gap: 6px; justify-self: start; padding: 4px 0; border: 0; background: transparent; color: var(--accent); font-size: 10px; font-weight: 800; }
+.workspace-create-form { display: grid; gap: 8px; }
+.workspace-create-actions { display: flex; gap: 7px; }
+.workspace-create-actions .btn { padding: 7px 9px; }
+.workspace-error { color: #ef9999; font-size: 10px; line-height: 1.5; margin: 0; }
