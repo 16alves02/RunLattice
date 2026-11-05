@@ -50,7 +50,7 @@ export async function POST(request: Request) {
         organizationId: access.context.organizationId,
         provider: parsed.data.provider,
         name: parsed.data.name,
-        credentialsCiphertext: encryptSecret(JSON.stringify({ webhookUrl: parsed.data.webhookUrl })),
+        credentialsCiphertext: encryptSecret(JSON.stringify({ webhookUrl: parsed.data.webhookUrl }), `${access.context.organizationId}:${parsed.data.provider}`),
       },
       select: { id: true, provider: true, name: true, createdAt: true },
     });
