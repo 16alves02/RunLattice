@@ -1,5 +1,5 @@
 import { Worker, type Job } from "bullmq";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type Prisma } from "@prisma/client";
 import { decryptSecret } from "../src/lib/secrets";
 import { validateExecutableWorkflow } from "../src/lib/execution";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
@@ -32,6 +32,18 @@ interface ExecutionStep {
   finishedAt: string;
   result?: { httpStatus?: number };
   error?: string;
+}
+
+function serializeSteps(steps: ExecutionStep[]): Prisma.InputJsonArray {
+  return steps.map((step): Prisma.InputJsonObject => ({
+    nodeId: step.nodeId,
+    title: step.title,
+    status: step.status,
+    startedAt: step.startedAt,
+    finishedAt: step.finishedAt,
+    ...(step.result ? { result: { httpStatus: step.result.httpStatus ?? null } } : {}),
+    ...(step.error ? { error: step.error } : {}),
+  }));
 }
 
 function getSafeWebhookUrl(ciphertext: string, connectionName: string) {
@@ -171,13 +183,13 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
 
       await prisma.workflowRun.update({
         where: { id: runId },
-        data: { output: { executionMode: "LIVE", steps } },
+        data: { output: { executionMode: "LIVE", steps: serializeSteps(steps) } },
       });
     }
 
     const output = {
       executionMode: "LIVE",
-      steps,
+      steps: serializeSteps(steps),
       message: "Workflow actions completed successfully.",
     };
     await prisma.workflowRun.update({
@@ -189,7 +201,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
     const message = error instanceof Error ? error.message : "The workflow execution failed.";
     const output = {
       executionMode: "LIVE",
-      steps,
+      steps: serializeSteps(steps),
       message: "Workflow execution stopped after a failed step.",
     };
     await prisma.workflowRun.update({
