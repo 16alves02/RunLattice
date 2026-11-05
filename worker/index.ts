@@ -173,7 +173,8 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
         if (node.kind === "trigger") {
           result = {};
         } else if (node.kind === "condition") {
-          throw new Error("Condition nodes are not supported by this execution version.");
+          if (!node.config || !("operator" in node.config)) throw new Error(`Condition "${node.title}" has no valid rule.`);
+          result = { condition: evaluateCondition(node.config, run.input) };
         } else {
           result = await executeAction(node, workflow.organizationId, run.input);
         }
