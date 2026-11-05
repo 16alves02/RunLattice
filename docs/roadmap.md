@@ -24,7 +24,8 @@ RunLattice is evolving into an approachable automation platform for non-technica
 ## Security and usable automation core
 
 - [x] Email/password authentication and per-account workflow ownership
-- [ ] Multi-user workspaces, roles and invitations
+- [x] Organization-backed multi-user workspaces and owner/admin/member workflow permissions
+- [ ] Invitation delivery and member administration UI
 - [ ] Secure OAuth connection and encrypted credential storage
 - [ ] Request rate limiting and audit logs
 - [ ] Integration adapter interface and first real provider
@@ -57,4 +58,4 @@ RunLattice is evolving into an approachable automation platform for non-technica
 
 ## Current limitations
 
-Email/password authentication and per-account workflow ownership are implemented. The integration library is descriptive only: it does not connect provider accounts or execute external actions. The AI endpoint remains disabled by default pending usage quotas and a security review. The current worker simulates graph traversal.
+Email/password authentication, organization membership and workspace-scoped workflow access are implemented. Owners and admins can manage workflows; members are read-only. The integration library is descriptive only: it does not connect provider accounts or execute external actions. The AI endpoint remains disabled by default pending usage quotas and a security review. The current worker simulates graph traversal.
