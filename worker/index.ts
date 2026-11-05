@@ -33,7 +33,7 @@ interface ExecutionStep {
   status: "SUCCEEDED" | "FAILED";
   startedAt: string;
   finishedAt: string;
-  result?: { httpStatus?: number };
+  result?: { httpStatus?: number; condition?: boolean };
   error?: string;
 }
 
@@ -44,7 +44,7 @@ function serializeSteps(steps: ExecutionStep[]): Prisma.InputJsonArray {
     status: step.status,
     startedAt: step.startedAt,
     finishedAt: step.finishedAt,
-    ...(step.result ? { result: { httpStatus: step.result.httpStatus ?? null } } : {}),
+    ...(step.result ? { result: { httpStatus: step.result.httpStatus ?? null, condition: step.result.condition ?? null } } : {}),
     ...(step.error ? { error: step.error } : {}),
   }));
 }
