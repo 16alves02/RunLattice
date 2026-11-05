@@ -57,7 +57,7 @@ Before public launch:
 5. Add audit events for membership and permission changes.
 6. Test cross-workspace access denial against PostgreSQL and Redis.
 7. Review data retention, export/deletion and GDPR processes.
-8. Implement durable step checkpoints, stale-run recovery and safe retry policies.
+8. Implement durable step resumption, explicit operator handling for unknown external-action outcomes and provider-specific safe retry policies.
 9. Add provider-specific rate limits and integration end-to-end tests.
 
 This document describes the implemented foundation and remaining work. It is not a certification or a claim of completed compliance.
