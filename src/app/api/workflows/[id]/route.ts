@@ -94,7 +94,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
       const connectionIds = [...new Set(executablePath
         .filter((node) => node.kind === "action")
-        .map((node) => node.config?.connectionId)
+        .map((node) => node.config && "integrationId" in node.config ? node.config.connectionId : undefined)
         .filter((connectionId): connectionId is string => Boolean(connectionId)))];
       if (connectionIds.length > 0) {
         let availableConnections = 0;
