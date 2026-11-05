@@ -1,12 +1,28 @@
 import { z } from "zod";
 
+const discordActionConfigSchema = z.object({
+  integrationId: z.literal("discord"),
+  actionId: z.literal("send_message"),
+  connectionId: z.string().min(1).max(80),
+  message: z.string().trim().min(1).max(2000),
+});
+
 const nodeSchema = z.object({
   id: z.string().min(1).max(80),
   kind: z.enum(["trigger", "condition", "action"]),
   title: z.string().trim().min(1).max(100),
   detail: z.string().max(500).default(""),
+  config: discordActionConfigSchema.optional(),
   x: z.number().finite().min(0).max(5000),
   y: z.number().finite().min(0).max(5000),
+}).superRefine((node, context) => {
+  if (node.config && node.kind !== "action") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["config"],
+      message: "Only action nodes can contain an action configuration.",
+    });
+  }
 });
 
 const edgeSchema = z.object({
@@ -37,4 +53,20 @@ export const createWorkflowSchema = z.object({
   name: z.string().trim().min(2).max(80),
   description: z.string().trim().max(300).default(""),
   definition: workflowDefinitionSchema,
+});
+
+export const createIntegrationConnectionSchema = z.object({
+  provider: z.literal("discord"),
+  name: z.string().trim().min(2).max(60),
+  webhookUrl: z.string().url().max(1000).refine((value) => {
+    try {
+      const url = new URL(value);
+      const validHost = url.hostname === "discord.com" || url.hostname === "discordapp.com";
+      const validPath = /^\/api\/webhooks\/\d{10,25}\/[A-Za-z0-9._-]{20,200}\/?$/.test(url.pathname);
+      return url.protocol === "https:" && validHost && (!url.port || url.port === "443")
+        && !url.username && !url.password && !url.search && !url.hash && validPath;
+    } catch {
+      return false;
+    }
+  }, "Use a valid HTTPS Discord webhook URL."),
 });
