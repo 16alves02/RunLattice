@@ -24,6 +24,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const [saving, setSaving] = useState(false);
   const [connections, setConnections] = useState<IntegrationConnection[]>([]);
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selected), [nodes, selected]);
+  const selectedActionConfig = selectedNode?.config && "integrationId" in selectedNode.config ? selectedNode.config : undefined;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -118,8 +119,8 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
     const config: DiscordActionConfig = {
       integrationId: "discord",
       actionId: "send_message",
-      connectionId: selectedNode.config?.connectionId ?? "",
-      message: selectedNode.config?.message ?? "",
+      connectionId: selectedActionConfig?.connectionId ?? "",
+      message: selectedActionConfig?.message ?? "",
       ...selectedNode.config,
       ...patch,
     };
