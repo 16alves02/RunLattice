@@ -123,7 +123,9 @@ docker compose down
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/health` | Basic application health response |
-| `GET` | `/api/integrations` | List integrations and workspace connections |\n| `POST` | `/api/integrations` | Save an encrypted Discord webhook connection |\n| `DELETE` | `/api/integrations/:id` | Remove a workspace integration connection |
+| `GET` | `/api/integrations` | List integrations and workspace connections |
+| `POST` | `/api/integrations` | Save an encrypted Discord webhook connection |
+| `DELETE` | `/api/integrations/:id` | Remove a workspace integration connection |
 | `POST` | `/api/ai/workflow-plan` | Generate a validated workflow draft (disabled by default) |
 | `GET` | `/api/workflows` | List workflows |
 | `POST` | `/api/workflows` | Validate and create a workflow |
