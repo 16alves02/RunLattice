@@ -46,6 +46,9 @@ export function resolveExecutionPath(definition: WorkflowDefinition): WorkflowNo
 
 export function validateExecutableWorkflow(definition: WorkflowDefinition): WorkflowNode[] {
   const path = resolveExecutionPath(definition);
+  if (!path.some((node) => node.kind === "action")) {
+    throw new Error("A live workflow must contain at least one configured action.");
+  }
 
   for (const node of path) {
     if (node.kind === "condition") {
