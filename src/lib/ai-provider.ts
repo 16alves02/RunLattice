@@ -15,6 +15,12 @@ export interface AIProviderOptions {
   timeoutMs?: number;
 }
 
+export function getAIProviderSelection(options: Pick<AIProviderOptions, "provider" | "model"> = {}) {
+  const provider = options.provider ?? (process.env.AI_PROVIDER === "anthropic" ? "anthropic" : "openai");
+  const model = options.model ?? process.env.AI_MODEL ?? (provider === "openai" ? "gpt-4.1-mini" : "");
+  return { provider, model };
+}
+
 function resolveProviderConfig(provider?: AIProviderId, model?: string) {
   const selectedProvider = provider ?? (process.env.AI_PROVIDER === "anthropic" ? "anthropic" : "openai");
   const selectedModel = model ?? process.env.AI_MODEL ?? (selectedProvider === "openai" ? "gpt-4.1-mini" : "");
