@@ -18,7 +18,7 @@ import {
   reserveAIUsage,
   settleAIUsage,
 } from "@/lib/ai-usage";
-import { getRequestWorkspace } from "@/lib/workspace";
+import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -26,12 +26,21 @@ export const maxDuration = 30;
 export async function POST(request: Request) {
   const access = await getRequestWorkspace(request);
   if (access.response) return access.response;
+  if (!canManageWorkspace(access.context.role)) {
+    return NextResponse.json({ error: "Workspace administrator permission required to use AI planning." }, { status: 403 });
+  }
 
   if (process.env.AI_ASSISTANT_ENABLED !== "true") {
     return NextResponse.json({ error: "The AI assistant is not enabled on this deployment." }, { status: 503 });
   }
 
-  const body: unknown = await request.json().catch(() => null);
+  const rawBody = await request.text();
+  if (new TextEncoder().encode(rawBody).byteLength > 10_000) {
+    return NextResponse.json({ error: "AI planning requests must be 10 KB or smaller." }, { status: 413 });
+  }
+  let body: unknown;
+  try { body = JSON.parse(rawBody); }
+  catch { return NextResponse.json({ error: "Request body must contain valid JSON." }, { status: 400 }); }
   const parsed = aiWorkflowRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({
