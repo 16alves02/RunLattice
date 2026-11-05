@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Circle, GitBranch, Play, Plus, Save, Settings2, Sparkles, Webhook, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { ManualRunInput } from "@/components/manual-run-input";
 import { demoDefinition } from "@/lib/demo-data";
 import type { ConditionConfig, DiscordActionConfig, WorkflowDefinition, WorkflowNode } from "@/lib/types";
 
@@ -197,21 +198,6 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
     }
   }
 
-  async function runWorkflow() {
-    if (!workflowId || status !== "ACTIVE") {
-      setNotice("Save and activate this workflow before queueing a run.");
-      return;
-    }
-    try {
-      const response = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}/runs`, { method: "POST" });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error ?? "The workflow run could not be queued.");
-      setNotice("Run queued. Open execution history to follow its status.");
-      router.refresh();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "The workflow run could not be queued.");
-    }
-  }
 
   function removeSelected() {
     setNodes((current) => current.filter((node) => node.id !== selected));
@@ -221,8 +207,9 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   }
 
   return <AppShell active="Builder"><div className="page">
-    <div className="page-heading"><div><Link href="/workflows" style={{ color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11, marginBottom: 14 }}><ArrowLeft size={13}/> All workflows</Link><h1>{workflowId ? "Edit workflow" : "Workflow builder"}</h1><p className="subtitle">Build and maintain workflow definitions in your workspace.</p></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{workflowId && <><button className="btn btn-quiet" onClick={() => void runWorkflow()}><Play size={13}/> Queue run</button><button className="btn btn-quiet" onClick={() => void updateStatus(status === "ACTIVE" ? "PAUSED" : "ACTIVE")}>{status === "ACTIVE" ? "Pause" : "Activate"}</button></>}<button className="btn btn-primary" onClick={() => void saveWorkflow()} disabled={saving || loading}><Save size={14}/>{saving ? "Saving…" : "Save changes"}</button></div></div>
+    <div className="page-heading"><div><Link href="/workflows" style={{ color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11, marginBottom: 14 }}><ArrowLeft size={13}/> All workflows</Link><h1>{workflowId ? "Edit workflow" : "Workflow builder"}</h1><p className="subtitle">Build and maintain workflow definitions in your workspace.</p></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{workflowId && <><button className="btn btn-quiet" onClick={() => void updateStatus(status === "ACTIVE" ? "PAUSED" : "ACTIVE")}>{status === "ACTIVE" ? "Pause" : "Activate"}</button></>}<button className="btn btn-primary" onClick={() => void saveWorkflow()} disabled={saving || loading}><Save size={14}/>{saving ? "Saving…" : "Save changes"}</button></div></div>
     {notice && <div className="toast" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notification" style={{ float: "right", color: "inherit", background: "none", border: 0 }}><X size={13}/></button></div>}
+    {workflowId && !loading && <ManualRunInput workflowId={workflowId} disabled={status !== "ACTIVE"} />}
     {loading ? <div className="panel" style={{ padding: 24 }}>Loading workflow…</div> : <><div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}><span className="workflow-icon"><GitBranch size={16}/></span><input className="field-input" aria-label="Workflow name" value={name} onChange={(event) => setName(event.target.value)} style={{ maxWidth: 300, fontWeight: 800 }}/><input className="field-input" aria-label="Workflow description" placeholder="Description" value={description} onChange={(event) => setDescription(event.target.value)} style={{ maxWidth: 300 }}/><span className={`status status-${status.toLowerCase()}`}>{status.toLowerCase()}</span></div>
     <div className="workflow-layout"><section className="canvas" aria-label="Workflow canvas"><div className="canvas-inner">
       {edges.map((edge) => { const from = nodes.find((node) => node.id === edge.from); const to = nodes.find((node) => node.id === edge.to); if (!from || !to) return null; const x1 = from.x + 190; const y1 = from.y + 41; const x2 = to.x; const y2 = to.y + 41; const dx = x2 - x1; const dy = y2 - y1; const length = Math.sqrt(dx * dx + dy * dy); const angle = Math.atan2(dy, dx) * 180 / Math.PI; return <div key={edge.id} className="edge" style={{ left: x1, top: y1, width: length, transform: `rotate(${angle}deg)` }}>{edge.branch ? <span className="edge-label">{edge.branch.toUpperCase()}</span> : null}</div>; })}
