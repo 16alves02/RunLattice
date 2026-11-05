@@ -51,10 +51,11 @@ export const workflowDefinitionSchema = z.object({
 
 export const workflowRunInputSchema = z.record(z.string(), z.unknown()).superRefine((input, context) => {
   try {
-    if (Buffer.byteLength(JSON.stringify(input), "utf8") > 32_768) {
+    const serialized = JSON.stringify(input);
+    if (typeof serialized !== "string" || new TextEncoder().encode(serialized).byteLength > 32_768) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Workflow input must be 32 KB or smaller.",
+        message: "Workflow input must be valid JSON data of 32 KB or smaller.",
       });
     }
   } catch {
