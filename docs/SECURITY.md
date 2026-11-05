@@ -8,9 +8,9 @@ Required environment:
 - `BETTER_AUTH_SECRET`: unique high-entropy secret of at least 32 characters.
 - `BETTER_AUTH_URL`: canonical application origin.
 - `BETTER_AUTH_TRUSTED_ORIGINS`: comma-separated allowed browser origins.
-- `DATABASE_URL`: PostgreSQL connection string.
+- `DATABASE_URL`: PostgreSQL connection string.\n- `INTEGRATION_ENCRYPTION_KEY`: base64-encoded 32-byte key used for AES-256-GCM integration credential encryption.
 
-Generate the secret with `openssl rand -base64 32`. Use a different value per environment. Never expose it to client-side code.
+Generate each secret with `openssl rand -base64 32`. Use a different value per environment. Never expose them to client-side code. Back up the integration encryption key securely: losing it makes saved provider credentials undecryptable.
 
 ## Workspace isolation
 
@@ -38,7 +38,7 @@ Legacy workflows with no user owner remain unassigned and are not visible to nor
 - The Redis worker is an internal process and is not exposed as an HTTP endpoint.
 - No shared execution secret is sent to the browser.
 
-## Remaining production requirements
+## Integration credential handling\n\nThe first supported connection is a Discord webhook. Its URL is encrypted using AES-256-GCM with a random 96-bit nonce and authentication tag. The API returns connection metadata only; the webhook URL is never returned after creation. The worker revalidates the URL against the official Discord HTTPS hosts, blocks redirects and applies a 10-second timeout. Integration records are scoped to an organization and the worker verifies that scope before use.\n\nThe initial Discord action is non-idempotent. Automatic BullMQ retries are disabled, and each run is atomically claimed before execution to reduce duplicate side effects. If a worker crashes after claiming a run, it may remain RUNNING and needs an explicit recovery procedure. This is not an exactly-once guarantee.\n\n## Remaining production requirements
 
 Before public launch:
 1. Configure email verification, password-reset and invitation delivery through a transactional email provider.
@@ -47,6 +47,6 @@ Before public launch:
 4. Configure secure production origins and HTTPS.
 5. Add audit events for membership and permission changes.
 6. Test cross-workspace access denial against PostgreSQL and Redis.
-7. Review data retention, export/deletion and GDPR processes.
+7. Review data retention, export/deletion and GDPR processes.\n8. Implement durable step checkpoints, stale-run recovery and safe retry policies.\n9. Add provider-specific rate limits and integration end-to-end tests.
 
 This document describes the implemented foundation and remaining work. It is not a certification or a claim of completed compliance.
