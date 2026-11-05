@@ -3,7 +3,8 @@ import { PrismaClient, type Prisma } from "@prisma/client";
 import { decryptSecret } from "../src/lib/secrets";
 import { recoverStaleWorkflowRuns } from "../src/lib/run-recovery";
 import { renderInputTemplate } from "../src/lib/template";
-import { validateExecutableWorkflow } from "../src/lib/execution";
+import { resolveExecutionPath, validateExecutableWorkflow } from "../src/lib/execution";
+import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
 import type { DiscordActionConfig, WorkflowDefinition } from "../src/lib/types";
 
@@ -108,7 +109,7 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
 }
 
 async function executeAction(node: WorkflowDefinition["nodes"][number], organizationId: string, input: unknown) {
-  if (!node.config?.connectionId || !node.config.message?.trim()) throw new Error(`Action "${node.title}" has not been configured.`);
+  if (!node.config || !("integrationId" in node.config) || !node.config.connectionId || !node.config.message?.trim()) throw new Error(`Action "${node.title}" has not been configured.`);
   if (node.config.integrationId === "discord" && node.config.actionId === "send_message") {
     return executeDiscordAction(node.config, organizationId, input);
   }
@@ -160,7 +161,9 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
     const parsedDefinition = workflowDefinitionSchema.safeParse(workflow.definition);
     if (!parsedDefinition.success) throw new Error("The saved workflow definition is invalid.");
 
-    const path = validateExecutableWorkflow(parsedDefinition.data as WorkflowDefinition);
+    const definition = parsedDefinition.data as WorkflowDefinition;
+    validateExecutableWorkflow(definition);
+    const path = resolveExecutionPath(definition, run.input);
     for (const node of path) {
       const startedAt = new Date().toISOString();
       await job.updateProgress({ currentNode: node.id, completed: steps.length, total: path.length });
