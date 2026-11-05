@@ -47,12 +47,20 @@ The worker revalidates the URL against the official Discord HTTPS hosts, blocks 
 
 The initial Discord action is non-idempotent. Automatic BullMQ retries are disabled, and each run is atomically claimed before execution to reduce duplicate side effects. The worker refreshes `WorkflowRun.heartbeatAt` every 20 seconds. A recovery sweep runs at startup and every 60 seconds; runs whose heartbeat is older than five minutes are marked FAILED with an explicit unknown-outcome warning. Recovery never replays external actions. This reduces indefinitely stuck RUNNING records but does not resume a run or provide exactly-once delivery.
 
+## AI planning and usage controls
+
+The AI planning endpoint requires an authenticated workspace membership and is disabled unless `AI_ASSISTANT_ENABLED=true`. It supports server-side OpenAI and Anthropic adapters. Configure `AI_PROVIDER=openai` or `AI_PROVIDER=anthropic`, then set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` and `AI_MODEL` where required. `AI_API_KEY` remains a legacy fallback for OpenAI only. Provider keys are never sent to the browser.
+
+Each request reserves workspace monthly request and token budget atomically before contacting the provider. Defaults are 100 requests and 100,000 tokens per UTC calendar month; override with `AI_MONTHLY_REQUEST_LIMIT` and `AI_MONTHLY_TOKEN_LIMIT`. Provider-reported token usage reconciles the reservation. Requests are workspace-scoped and the endpoint does not accept a client-supplied organization ID.
+
+AI output is treated as untrusted text, validated against the workflow schema and returned as a proposal. Missing or unconnected integrations are identified from the workspace connection records and integration catalog. Saving a draft is a separate user action; activation remains separate. The dry-run endpoint simulates graph traversal only and never invokes integration adapters, reads credentials, enqueues jobs or performs external side effects. The feature remains disabled by default pending deployment-specific security and privacy review.
+
 ## Remaining production requirements
 
 Before public launch:
 1. Configure email verification, password-reset and invitation delivery through a transactional email provider.
 2. Add member administration and invitation acceptance UI.
-3. Add rate limiting and abuse monitoring for AI planning and other expensive endpoints.
+3. Add edge-level rate limiting and abuse monitoring for AI planning and other expensive endpoints; workspace quotas are not a substitute for network abuse protection.
 4. Configure secure production origins and HTTPS.
 5. Add audit events for membership and permission changes.
 6. Test cross-workspace access denial against PostgreSQL and Redis.
