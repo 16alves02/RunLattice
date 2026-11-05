@@ -29,6 +29,49 @@ describe("workflow definition validation", () => {
     expect(workflowDefinitionSchema.safeParse(invalid).success).toBe(false);
   });
 
+  it("requires condition rules and explicit true/false branch labels", () => {
+    const invalid = {
+      nodes: [
+        validDefinition.nodes[0],
+        { id: "condition", kind: "condition", title: "Check score", detail: "", x: 100, y: 0 },
+        validDefinition.nodes[1],
+      ],
+      edges: [
+        { id: "start", from: "trigger", to: "condition" },
+        { id: "branch", from: "condition", to: "action" },
+      ],
+    };
+    expect(workflowDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it("accepts a condition with safe rules and both labelled branches", () => {
+    const valid = {
+      nodes: [
+        validDefinition.nodes[0],
+        { id: "condition", kind: "condition", title: "Check score", detail: "", config: { path: "customer.score", operator: "greater_than", value: 50 }, x: 100, y: 0 },
+        { ...validDefinition.nodes[1], id: "true-action" },
+        { ...validDefinition.nodes[1], id: "false-action" },
+      ],
+      edges: [
+        { id: "start", from: "trigger", to: "condition" },
+        { id: "yes", from: "condition", to: "true-action", branch: "true" },
+        { id: "no", from: "condition", to: "false-action", branch: "false" },
+      ],
+    };
+    expect(workflowDefinitionSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("rejects prototype paths in condition rules", () => {
+    const invalid = {
+      nodes: [
+        validDefinition.nodes[0],
+        { id: "condition", kind: "condition", title: "Unsafe", detail: "", config: { path: "customer.__proto__.polluted", operator: "exists" }, x: 100, y: 0 },
+      ],
+      edges: [{ id: "start", from: "trigger", to: "condition" }],
+    };
+    expect(workflowDefinitionSchema.safeParse(invalid).success).toBe(false);
+  });
+
   it("validates workflow names before persistence", () => {
     expect(createWorkflowSchema.safeParse({ name: "A", definition: validDefinition }).success).toBe(false);
     expect(createWorkflowSchema.safeParse({ name: "Lead capture", definition: validDefinition }).success).toBe(true);
