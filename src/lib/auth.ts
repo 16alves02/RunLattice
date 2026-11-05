@@ -32,7 +32,7 @@ export const auth = betterAuth({
       "/sign-up/email": { window: 60, max: 5 },
     },
   },
-  plugins: [organization({ invitationExpiresIn: 60 * 60 * 24 * 7 })],
+  plugins: [organization({ requireEmailVerificationOnInvitation: true, invitationExpiresIn: 60 * 60 * 24 * 7 })],
   trustedOrigins: process.env.BETTER_AUTH_TRUSTED_ORIGINS
     ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean)
     : ["http://localhost:3000"],
