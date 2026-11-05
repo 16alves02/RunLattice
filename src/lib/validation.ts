@@ -49,6 +49,22 @@ export const workflowDefinitionSchema = z.object({
   });
 });
 
+export const workflowRunInputSchema = z.record(z.string(), z.unknown()).superRefine((input, context) => {
+  try {
+    if (Buffer.byteLength(JSON.stringify(input), "utf8") > 32_768) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Workflow input must be 32 KB or smaller.",
+      });
+    }
+  } catch {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Workflow input must be valid JSON data.",
+    });
+  }
+});
+
 export const createWorkflowSchema = z.object({
   name: z.string().trim().min(2).max(80),
   description: z.string().trim().max(300).default(""),
