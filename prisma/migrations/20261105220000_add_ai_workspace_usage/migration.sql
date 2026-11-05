@@ -1,4 +1,4 @@
-CREATE TABLE "AIWorkspaceUsage" (
+CREATE TABLE "AiWorkspaceUsage" (
   "id" TEXT NOT NULL,
   "organizationId" TEXT NOT NULL,
   "periodStart" TIMESTAMP(3) NOT NULL,
@@ -6,20 +6,20 @@ CREATE TABLE "AIWorkspaceUsage" (
   "tokensUsed" INTEGER NOT NULL DEFAULT 0,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL,
-  CONSTRAINT "AIWorkspaceUsage_pkey" PRIMARY KEY ("id")
+  CONSTRAINT "AiWorkspaceUsage_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "AIWorkspaceUsage_organizationId_periodStart_key"
-ON "AIWorkspaceUsage"("organizationId", "periodStart");
-CREATE INDEX "AIWorkspaceUsage_periodStart_idx"
-ON "AIWorkspaceUsage"("periodStart");
+CREATE UNIQUE INDEX "AiWorkspaceUsage_organizationId_periodStart_key"
+ON "AiWorkspaceUsage"("organizationId", "periodStart");
+CREATE INDEX "AiWorkspaceUsage_periodStart_idx"
+ON "AiWorkspaceUsage"("periodStart");
 
-ALTER TABLE "AIWorkspaceUsage"
-ADD CONSTRAINT "AIWorkspaceUsage_organizationId_fkey"
+ALTER TABLE "AiWorkspaceUsage"
+ADD CONSTRAINT "AiWorkspaceUsage_organizationId_fkey"
 FOREIGN KEY ("organizationId") REFERENCES "Organization"("id")
 ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE TABLE "AIUsageEvent" (
+CREATE TABLE "AiUsageEvent" (
   "id" TEXT NOT NULL,
   "organizationId" TEXT NOT NULL,
   "userId" TEXT NOT NULL,
@@ -30,15 +30,15 @@ CREATE TABLE "AIUsageEvent" (
   "promptTokens" INTEGER NOT NULL DEFAULT 0,
   "completionTokens" INTEGER NOT NULL DEFAULT 0,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "AIUsageEvent_pkey" PRIMARY KEY ("id")
+  CONSTRAINT "AiUsageEvent_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "AIUsageEvent_organizationId_createdAt_idx"
-ON "AIUsageEvent"("organizationId", "createdAt");
-CREATE INDEX "AIUsageEvent_status_createdAt_idx"
-ON "AIUsageEvent"("status", "createdAt");
+CREATE INDEX "AiUsageEvent_organizationId_createdAt_idx"
+ON "AiUsageEvent"("organizationId", "createdAt");
+CREATE INDEX "AiUsageEvent_status_createdAt_idx"
+ON "AiUsageEvent"("status", "createdAt");
 
-ALTER TABLE "AIUsageEvent"
-ADD CONSTRAINT "AIUsageEvent_organizationId_fkey"
+ALTER TABLE "AiUsageEvent"
+ADD CONSTRAINT "AiUsageEvent_organizationId_fkey"
 FOREIGN KEY ("organizationId") REFERENCES "Organization"("id")
 ON DELETE CASCADE ON UPDATE CASCADE;
