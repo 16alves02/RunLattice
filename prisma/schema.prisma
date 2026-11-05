@@ -104,6 +104,7 @@ model Organization {
   members     Member[]
   invitations Invitation[]
   workflows   Workflow[]
+  integrations IntegrationConnection[]
 }
 
 model Member {
@@ -168,4 +169,18 @@ model WorkflowRun {
 
   @@index([workflowId, createdAt])
   @@index([status, createdAt])
+}
+
+
+model IntegrationConnection {
+  id                    String       @id @default(cuid())
+  organizationId        String
+  provider              String
+  name                  String
+  credentialsCiphertext String
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, provider, createdAt])
 }
