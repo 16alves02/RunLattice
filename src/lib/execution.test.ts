@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveExecutionPath } from "@/lib/execution";
+import { resolveExecutionPath, validateExecutableWorkflow } from "@/lib/execution";
 import type { WorkflowDefinition } from "@/lib/types";
 
 const definition: WorkflowDefinition = {
@@ -50,5 +50,42 @@ describe("workflow execution path", () => {
       ],
     };
     expect(() => resolveExecutionPath(cyclic)).toThrow(/cycle/);
+  });
+});
+
+
+describe("workflow activation validation", () => {
+  it("rejects action nodes without a connection and message", () => {
+    expect(() => validateExecutableWorkflow(definition)).toThrow(/requires a connected integration/);
+  });
+
+  it("rejects condition nodes until condition evaluation is implemented", () => {
+    const withCondition: WorkflowDefinition = {
+      nodes: [
+        definition.nodes[0],
+        { id: "condition", kind: "condition", title: "Check value", detail: "", x: 50, y: 50 },
+      ],
+      edges: [{ id: "edge", from: "trigger", to: "condition" }],
+    };
+    expect(() => validateExecutableWorkflow(withCondition)).toThrow(/Condition nodes are not available/);
+  });
+
+  it("accepts a configured Discord action", () => {
+    const configured: WorkflowDefinition = {
+      nodes: [
+        definition.nodes[0],
+        {
+          ...definition.nodes[1],
+          config: {
+            integrationId: "discord",
+            actionId: "send_message",
+            connectionId: "connection-1",
+            message: "Workflow completed.",
+          },
+        },
+      ],
+      edges: [{ id: "edge", from: "trigger", to: "action-1" }],
+    };
+    expect(validateExecutableWorkflow(configured).map((node) => node.id)).toEqual(["trigger", "action-1"]);
   });
 });
