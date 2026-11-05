@@ -8,7 +8,9 @@ import {
 describe("stale workflow run recovery", () => {
   it("marks only RUNNING runs with expired heartbeats as failed", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 2 });
-    const database = { workflowRun: { updateMany } };
+    const findMany = vi.fn().mockResolvedValue([{ id: "run-1" }, { id: "run-2" }]);
+    const stepUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const database = { workflowRun: { findMany, updateMany }, workflowRunStep: { updateMany: stepUpdateMany } };
     const now = new Date("2026-11-05T16:00:00.000Z");
 
     const count = await recoverStaleWorkflowRuns(database as never, now);
@@ -27,11 +29,21 @@ describe("stale workflow run recovery", () => {
         leaseToken: null,
       },
     });
+    expect(stepUpdateMany).toHaveBeenCalledTimes(2);
+    expect(stepUpdateMany).toHaveBeenNthCalledWith(1, {
+      where: { runId: { in: ["run-1", "run-2"] }, status: "RUNNING", kind: "action" },
+      data: {
+        status: "OUTCOME_UNKNOWN",
+        finishedAt: now,
+        error: "The worker stopped during an external action; delivery may have occurred.",
+      },
+    });
   });
 
   it("does not replay interrupted runs", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 0 });
-    const database = { workflowRun: { updateMany } };
+    const findMany = vi.fn().mockResolvedValue([{ id: "run-1" }]);
+    const database = { workflowRun: { findMany, updateMany }, workflowRunStep: { updateMany: vi.fn() } };
 
     await recoverStaleWorkflowRuns(database as never);
 
