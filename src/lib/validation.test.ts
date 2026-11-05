@@ -58,6 +58,33 @@ describe("Discord integration connection validation", () => {
     }).success).toBe(false);
   });
 
+
+  it("rejects deceptive Discord hosts, credentials and non-standard ports", () => {
+    const invalidUrls = [
+      "https://discord.com.evil.example/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz",
+      "https://user:password@discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz",
+      "https://discord.com:8443/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz",
+      "https://127.0.0.1/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz",
+      "https://discord.com/api/webhooks/short/abcdefghijklmnopqrstuvwxyz",
+      "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz/extra",
+    ];
+
+    for (const webhookUrl of invalidUrls) {
+      expect(createIntegrationConnectionSchema.safeParse({
+        ...validConnection,
+        webhookUrl,
+      }).success).toBe(false);
+    }
+  });
+
+  it("accepts the official legacy discordapp.com webhook host", () => {
+    const webhookUrl = validConnection.webhookUrl.replace("discord.com", "discordapp.com");
+    expect(createIntegrationConnectionSchema.safeParse({
+      ...validConnection,
+      webhookUrl,
+    }).success).toBe(true);
+  });
+
   it("rejects URL query strings and fragments", () => {
     expect(createIntegrationConnectionSchema.safeParse({
       ...validConnection,
