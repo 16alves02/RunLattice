@@ -3,8 +3,8 @@ import { z } from "zod";
 const discordActionConfigSchema = z.object({
   integrationId: z.literal("discord"),
   actionId: z.literal("send_message"),
-  connectionId: z.string().min(1).max(80),
-  message: z.string().trim().min(1).max(2000),
+  connectionId: z.string().max(80).optional(),
+  message: z.string().max(2000).optional(),
 });
 
 const nodeSchema = z.object({
