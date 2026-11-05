@@ -32,9 +32,9 @@ RunLattice is evolving into an approachable automation platform for non-technica
 - [ ] Request rate limiting and audit logs
 - [x] First registered action adapter: Discord webhook message
 - [ ] General integration adapter interface and additional providers
-- [x] Restricted linear execution path, atomic run claiming, timeouts and step-level results
+- [x] Restricted graph execution with declarative true/false branches, atomic run claiming, timeouts and step-level results
 - [x] Bounded manual trigger input and safe scalar templates for Discord messages
-- [ ] Durable step checkpoints, stale-run recovery and safe retries
+- [x] Stale-run detection with heartbeat monitoring (does not resume or replay interrupted runs)\n- [ ] Durable step checkpoints, lease fencing and safe retries
 - [ ] Signed webhook triggers, schedules and replay protection
 
 ## AI-assisted workflow creation
@@ -64,4 +64,4 @@ RunLattice is evolving into an approachable automation platform for non-technica
 
 ## Current limitations
 
-Email/password authentication, organization membership and workspace-scoped workflow access are implemented. Owners and admins can manage workflows; members are read-only. Discord webhook connections are available with encrypted credentials and a live send-message action. Other provider entries remain catalog-only. The AI endpoint remains disabled by default pending usage quotas and a security review. The current worker supports a single linear path with a manual trigger and Discord send-message action. Branching, condition evaluation, arbitrary code, scheduled triggers and inbound webhooks are not implemented.
+Email/password authentication, organization membership and workspace-scoped workflow access are implemented. Owners and admins can manage workflows; members are read-only. Discord webhook connections are available with encrypted credentials and a live send-message action. Other provider entries remain catalog-only. The AI endpoint remains disabled by default pending usage quotas and a security review. The current worker supports manual triggers, Discord send-message actions, bounded run input, safe scalar templates and declarative condition nodes with true/false branches. Conditions support equals, not-equals, contains, greater-than, less-than and exists against run input paths. Only the selected branch executes; both branches must be structurally valid and all action nodes must be configured before activation. Arbitrary code, scheduled triggers and inbound webhooks are not implemented.
