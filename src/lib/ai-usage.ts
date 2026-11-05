@@ -122,15 +122,11 @@ export async function settleAIUsage(
   });
 }
 
-export async function releaseAIUsage(database: UsageDatabase, reservation: AIUsageReservation) {
-  await database.$transaction(async (transaction) => {
-    await transaction.aiWorkspaceUsage.updateMany({
-      where: { organizationId: reservation.organizationId, periodStart: reservation.periodStart },
-      data: { tokensUsed: { decrement: reservation.reservedTokens } },
-    });
-    await transaction.aiUsageEvent.update({
-      where: { id: reservation.eventId },
-      data: { status: "FAILED" },
-    });
+export async function markAIUsageFailed(database: UsageDatabase, reservation: AIUsageReservation) {
+  // Keep the reservation charged: a provider timeout can occur after the
+  // provider accepted and processed the request, so usage is ambiguous.
+  await database.aiUsageEvent.update({
+    where: { id: reservation.eventId },
+    data: { status: "FAILED" },
   });
 }
