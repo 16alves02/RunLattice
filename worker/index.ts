@@ -1,6 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { decryptSecret } from "../src/lib/secrets";
+import { recoverStaleWorkflowRuns } from "../src/lib/run-recovery";
 import { validateExecutableWorkflow } from "../src/lib/execution";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
 import type { DiscordActionConfig, WorkflowDefinition } from "../src/lib/types";
@@ -233,21 +234,9 @@ worker.on("failed", (job, error) => console.error(`[worker] queue job ${job?.id 
 worker.on("error", (error) => console.error(`[worker] worker error: ${error.message}`));
 
 async function recoverStaleRuns() {
-  const staleBefore = new Date(Date.now() - 5 * 60_000);
-  const recovered = await prisma.workflowRun.updateMany({
-    where: {
-      status: "RUNNING",
-      heartbeatAt: { lt: staleBefore },
-    },
-    data: {
-      status: "FAILED",
-      error: "Execution was interrupted after its worker heartbeat expired. The outcome of an external action may be unknown; the run was not retried automatically.",
-      finishedAt: new Date(),
-      heartbeatAt: null,
-    },
-  });
-  if (recovered.count > 0) {
-    console.warn(`[worker] marked ${recovered.count} stale run(s) as failed; no external action was retried`);
+  const recovered = await recoverStaleWorkflowRuns(prisma);
+  if (recovered > 0) {
+    console.warn(`[worker] marked ${recovered} stale run(s) as failed; no external action was retried`);
   }
 }
 
