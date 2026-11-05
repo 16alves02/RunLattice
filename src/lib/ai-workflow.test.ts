@@ -4,6 +4,7 @@ import {
   aiWorkflowRequestSchema,
   buildWorkflowPrompt,
   buildWorkflowSystemPrompt,
+  findMissingIntegrations,
 } from "@/lib/ai-workflow";
 
 const validPlan = {
@@ -48,6 +49,15 @@ describe("AI workflow planning validation", () => {
     expect(prompt).toContain('"connected":true');
     expect(prompt).toContain('"status":"planned"');
     expect(prompt).toContain("Do not invent a working adapter");
+  });
+
+
+  it("flags catalog-only, disconnected and unknown integrations", () => {
+    const missing = findMissingIntegrations(["Discord", "Gmail", "Acme CRM"], [
+      { id: "discord", name: "Discord", status: "available", connected: true, actions: ["Send message"] },
+      { id: "gmail", name: "Gmail", status: "planned", connected: false, actions: ["Send email"] },
+    ]);
+    expect(missing).toEqual(["Gmail", "acme crm"]);
   });
 
   it("treats user prompts as untrusted data and blocks secret/code generation", () => {
