@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getWorkflowQueue } from "@/lib/queue";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
+import { workflowRunInputSchema } from "@/lib/validation";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -13,6 +15,32 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  let input: Record<string, unknown> = {};
+  try {
+    const rawBody = await request.text();
+    if (rawBody.length > 32_768) {
+      return NextResponse.json({ error: "Workflow input must be 32 KB or smaller." }, { status: 413 });
+    }
+    if (rawBody.trim()) {
+      let body: unknown;
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        return NextResponse.json({ error: "Request body must contain valid JSON." }, { status: 400 });
+      }
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        return NextResponse.json({ error: "Workflow input must be a JSON object." }, { status: 400 });
+      }
+      const parsedInput = workflowRunInputSchema.safeParse(body);
+      if (!parsedInput.success) {
+        return NextResponse.json({ error: "Invalid workflow input.", issues: parsedInput.error.issues }, { status: 400 });
+      }
+      input = parsedInput.data;
+    }
+  } catch {
+    return NextResponse.json({ error: "The workflow input could not be read." }, { status: 400 });
+  }
+
   try {
     const workflow = await prisma.workflow.findFirst({
       where: { id, organizationId: access.context.organizationId },
@@ -22,7 +50,7 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Only active workflows can be run." }, { status: 409 });
     }
 
-    const run = await prisma.workflowRun.create({ data: { workflowId: workflow.id, input: {} } });
+    const run = await prisma.workflowRun.create({ data: { workflowId: workflow.id, input: input as Prisma.InputJsonValue } });
     try {
       await getWorkflowQueue().add(
         "execute-workflow",
