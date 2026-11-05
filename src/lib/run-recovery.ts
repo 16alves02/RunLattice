@@ -27,6 +27,7 @@ export async function recoverStaleWorkflowRuns(
       error: STALE_RUN_ERROR,
       finishedAt: now,
       heartbeatAt: null,
+      leaseToken: null,
     },
   });
 
