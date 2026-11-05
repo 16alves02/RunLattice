@@ -30,7 +30,6 @@ export async function POST(request: Request, context: RouteContext) {
         {
           jobId: run.id,
           attempts: 1,
-          backoff: { type: "exponential", delay: 1000 },
           removeOnComplete: 500,
           removeOnFail: 1000,
         },
