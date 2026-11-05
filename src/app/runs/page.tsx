@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Activity, ArrowRight, CheckCircle2, Clock3, XCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/prisma";
+import { requireServerWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ function formatDuration(startedAt: Date | null, finishedAt: Date | null) {
 }
 
 export default async function RunsPage() {
+  const workspace = await requireServerWorkspace();
   let runs: Array<{
     id: string;
     workflowId: string;
@@ -40,15 +42,16 @@ export default async function RunsPage() {
   try {
     const [records, total, succeeded, failed, queued, running] = await Promise.all([
       prisma.workflowRun.findMany({
+        where: { workflow: { organizationId: workspace.organizationId } },
         orderBy: { createdAt: "desc" },
         take: 100,
         include: { workflow: { select: { id: true, name: true } } },
       }),
-      prisma.workflowRun.count(),
-      prisma.workflowRun.count({ where: { status: "SUCCEEDED" } }),
-      prisma.workflowRun.count({ where: { status: "FAILED" } }),
-      prisma.workflowRun.count({ where: { status: "QUEUED" } }),
-      prisma.workflowRun.count({ where: { status: "RUNNING" } }),
+      prisma.workflowRun.count({ where: { workflow: { organizationId: workspace.organizationId } } }),
+      prisma.workflowRun.count({ where: { status: "SUCCEEDED", workflow: { organizationId: workspace.organizationId } } }),
+      prisma.workflowRun.count({ where: { status: "FAILED", workflow: { organizationId: workspace.organizationId } } }),
+      prisma.workflowRun.count({ where: { status: "QUEUED", workflow: { organizationId: workspace.organizationId } } }),
+      prisma.workflowRun.count({ where: { status: "RUNNING", workflow: { organizationId: workspace.organizationId } } }),
     ]);
     runs = records.map((run) => ({
       id: run.id,
