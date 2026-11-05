@@ -199,7 +199,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
         }
 
         await prisma.workflowRunStep.update({
-          where: { id: ledgerStep.id },
+          where: { id: ledgerStep.id, run: { is: { status: "RUNNING", leaseToken } } },
           data: { status: "SUCCEEDED", finishedAt: new Date(), result: result ?? {} },
         });
         steps.push({
@@ -213,7 +213,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
       } catch (error) {
         const safeMessage = error instanceof Error ? error.message : "The workflow step failed.";
         await prisma.workflowRunStep.update({
-          where: { id: ledgerStep.id },
+          where: { id: ledgerStep.id, run: { is: { status: "RUNNING", leaseToken } } },
           data: {
             status: node.kind === "action" ? "OUTCOME_UNKNOWN" : "FAILED",
             finishedAt: new Date(),
