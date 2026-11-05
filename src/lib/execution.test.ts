@@ -2,15 +2,44 @@ import { describe, expect, it } from "vitest";
 import { resolveExecutionPath, validateExecutableWorkflow } from "@/lib/execution";
 import type { WorkflowDefinition } from "@/lib/types";
 
+const actionConfig = {
+  integrationId: "discord" as const,
+  actionId: "send_message" as const,
+  connectionId: "connection-1",
+  message: "Workflow completed.",
+};
+
 const definition: WorkflowDefinition = {
   nodes: [
     { id: "trigger", kind: "trigger", title: "Manual start", detail: "", x: 0, y: 0 },
-    { id: "action-1", kind: "action", title: "Send message", detail: "", x: 100, y: 0 },
-    { id: "action-2", kind: "action", title: "Send follow-up", detail: "", x: 200, y: 0 },
+    { id: "action-1", kind: "action", title: "Send message", detail: "", config: actionConfig, x: 100, y: 0 },
+    { id: "action-2", kind: "action", title: "Send follow-up", detail: "", config: actionConfig, x: 200, y: 0 },
   ],
   edges: [
     { id: "edge-1", from: "trigger", to: "action-1" },
     { id: "edge-2", from: "action-1", to: "action-2" },
+  ],
+};
+
+const conditionalDefinition: WorkflowDefinition = {
+  nodes: [
+    definition.nodes[0],
+    {
+      id: "condition",
+      kind: "condition",
+      title: "Check score",
+      detail: "",
+      config: { path: "customer.score", operator: "greater_than", value: 50 },
+      x: 100,
+      y: 0,
+    },
+    { id: "true-action", kind: "action", title: "High score", detail: "", config: actionConfig, x: 300, y: -80 },
+    { id: "false-action", kind: "action", title: "Low score", detail: "", config: actionConfig, x: 300, y: 80 },
+  ],
+  edges: [
+    { id: "start-condition", from: "trigger", to: "condition" },
+    { id: "true-edge", from: "condition", to: "true-action", branch: "true" },
+    { id: "false-edge", from: "condition", to: "false-action", branch: "false" },
   ],
 };
 
@@ -23,17 +52,6 @@ describe("workflow execution path", () => {
   it("rejects workflows without exactly one trigger", () => {
     expect(() => resolveExecutionPath({ ...definition, nodes: definition.nodes.slice(1) }))
       .toThrow(/exactly one trigger/);
-  });
-
-  it("rejects branching paths", () => {
-    const branching: WorkflowDefinition = {
-      ...definition,
-      edges: [
-        { id: "edge-1", from: "trigger", to: "action-1" },
-        { id: "edge-2", from: "trigger", to: "action-2" },
-      ],
-    };
-    expect(() => resolveExecutionPath(branching)).toThrow(/Branching/);
   });
 
   it("rejects disconnected nodes", () => {
@@ -51,8 +69,22 @@ describe("workflow execution path", () => {
     };
     expect(() => resolveExecutionPath(cyclic)).toThrow(/incoming connection/);
   });
-});
 
+  it("follows the true branch when the condition matches", () => {
+    expect(resolveExecutionPath(conditionalDefinition, { customer: { score: 80 } }).map((node) => node.id))
+      .toEqual(["trigger", "condition", "true-action"]);
+  });
+
+  it("follows the false branch when the condition does not match", () => {
+    expect(resolveExecutionPath(conditionalDefinition, { customer: { score: 20 } }).map((node) => node.id))
+      .toEqual(["trigger", "condition", "false-action"]);
+  });
+
+  it("rejects a condition without both branch connections", () => {
+    const incomplete = { ...conditionalDefinition, edges: conditionalDefinition.edges.slice(0, 2) };
+    expect(() => resolveExecutionPath(incomplete)).toThrow(/exactly one true and one false/);
+  });
+});
 
 describe("workflow activation validation", () => {
   it("rejects a trigger-only workflow", () => {
@@ -60,37 +92,21 @@ describe("workflow activation validation", () => {
     expect(() => validateExecutableWorkflow(triggerOnly)).toThrow(/at least one configured action/);
   });
 
-  it("rejects action nodes without a connection and message", () => {
-    expect(() => validateExecutableWorkflow(definition)).toThrow(/requires a connected integration/);
-  });
-
-  it("rejects condition nodes until condition evaluation is implemented", () => {
-    const withCondition: WorkflowDefinition = {
-      nodes: [
-        definition.nodes[0],
-        { id: "condition", kind: "condition", title: "Check value", detail: "", x: 50, y: 50 },
-      ],
-      edges: [{ id: "edge", from: "trigger", to: "condition" }],
-    };
-    expect(() => validateExecutableWorkflow(withCondition)).toThrow(/Condition nodes are not available/);
-  });
-
   it("accepts a configured Discord action", () => {
-    const configured: WorkflowDefinition = {
-      nodes: [
-        definition.nodes[0],
-        {
-          ...definition.nodes[1],
-          config: {
-            integrationId: "discord",
-            actionId: "send_message",
-            connectionId: "connection-1",
-            message: "Workflow completed.",
-          },
-        },
-      ],
-      edges: [{ id: "edge", from: "trigger", to: "action-1" }],
+    expect(validateExecutableWorkflow(definition).map((node) => node.id))
+      .toEqual(["trigger", "action-1", "action-2"]);
+  });
+
+  it("validates actions on both condition branches before activation", () => {
+    const incomplete = {
+      ...conditionalDefinition,
+      nodes: conditionalDefinition.nodes.map((node) => node.id === "false-action" ? { ...node, config: undefined } : node),
     };
-    expect(validateExecutableWorkflow(configured).map((node) => node.id)).toEqual(["trigger", "action-1"]);
+    expect(() => validateExecutableWorkflow(incomplete)).toThrow(/requires a connected integration/);
+  });
+
+  it("accepts a configured conditional workflow", () => {
+    expect(validateExecutableWorkflow(conditionalDefinition).map((node) => node.id))
+      .toEqual(["trigger", "condition", "true-action", "false-action"]);
   });
 });
