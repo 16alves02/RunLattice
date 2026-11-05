@@ -2,6 +2,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/prisma";
+import { organization } from "better-auth/plugins";
 
 const secret = process.env.BETTER_AUTH_SECRET;
 // The fallback allows static builds to complete. Auth endpoints fail closed without a real secret.
@@ -31,6 +32,7 @@ export const auth = betterAuth({
       "/sign-up/email": { window: 60, max: 5 },
     },
   },
+  plugins: [organization({ requireEmailVerificationOnInvitation: true, invitationExpiresIn: 60 * 60 * 24 * 7 })],
   trustedOrigins: process.env.BETTER_AUTH_TRUSTED_ORIGINS
     ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean)
     : ["http://localhost:3000"],
