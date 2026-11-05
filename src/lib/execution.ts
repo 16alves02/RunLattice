@@ -51,7 +51,7 @@ export function validateExecutableWorkflow(definition: WorkflowDefinition): Work
     if (node.kind === "condition") {
       throw new Error("Condition nodes are not available in this execution version. Remove them before activating the workflow.");
     }
-    if (node.kind === "action" && (!node.config?.connectionId || !node.config.message.trim())) {
+    if (node.kind === "action" && (!node.config?.connectionId || !node.config.message?.trim())) {
       throw new Error(`Action "${node.title}" requires a connected integration and a message before activation.`);
     }
   }
