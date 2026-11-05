@@ -61,3 +61,20 @@ export function buildWorkflowPrompt(userRequest: string, integrations: AIIntegra
     "</user_request>",
   ].join("\n");
 }
+
+export function findMissingIntegrations(
+  requiredNames: string[],
+  integrations: AIIntegrationContext[],
+) {
+  const requested = new Set(requiredNames.map((name) => name.toLowerCase()));
+  const known = integrations.filter((integration) =>
+    requested.has(integration.id) || requested.has(integration.name.toLowerCase()),
+  );
+  const missing = known
+    .filter((integration) => integration.status !== "available" || !integration.connected)
+    .map((integration) => integration.name);
+  const unknown = [...requested].filter((name) => !integrations.some((integration) =>
+    integration.id === name || integration.name.toLowerCase() === name,
+  ));
+  return [...missing, ...unknown];
+}
