@@ -35,7 +35,7 @@ AI-generated workflows are drafts. They must be reviewed and saved by the user; 
 
 The worker currently supports manual runs with exactly one trigger and one linear path. The only live action is sending a static message to a connected Discord webhook. Conditions, branching, arbitrary code, inbound webhooks, scheduled triggers and other provider actions are not implemented.
 
-Automatic BullMQ retries are disabled for the Discord action because it is non-idempotent. A worker crash after claiming a run can leave it in RUNNING; durable checkpoints and stale-run recovery remain outstanding. This is not an exactly-once execution guarantee.
+Automatic BullMQ retries are disabled for the Discord action because it is non-idempotent. The worker refreshes a database heartbeat while a run is active; a separate recovery sweep marks runs with an expired five-minute heartbeat as FAILED. It does not replay the run because an external action may already have happened. Step checkpoints are persisted, but resuming from a checkpoint and exactly-once delivery are not supported.
 
 ## Integration security
 
