@@ -6,7 +6,13 @@ export async function POST(request: Request) {
   const access = await getRequestWorkspace(request);
   if (access.response) return access.response;
 
-  const body: unknown = await request.json().catch(() => null);
+  const rawBody = await request.text();
+  if (new TextEncoder().encode(rawBody).byteLength > 65_536) {
+    return NextResponse.json({ error: "Workflow simulations must be 64 KB or smaller." }, { status: 413 });
+  }
+  let body: unknown;
+  try { body = JSON.parse(rawBody); }
+  catch { return NextResponse.json({ error: "Request body must contain valid JSON." }, { status: 400 }); }
   const parsed = aiWorkflowDryRunRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({
