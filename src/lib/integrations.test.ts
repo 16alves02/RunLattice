@@ -12,12 +12,13 @@ describe("integration catalog", () => {
       expect(integration.name.length).toBeGreaterThan(0);
       expect(integration.auth.length).toBeGreaterThan(0);
       expect(integration.triggers.length + integration.actions.length).toBeGreaterThan(0);
-      expect(integration.status).toBe("planned");
+      expect(["available", "planned"]).toContain(integration.status);
     }
   });
 
   it("looks up a provider by its stable identifier", () => {
     expect(getIntegration("discord")?.name).toBe("Discord");
+    expect(getIntegration("discord")?.status).toBe("available");
     expect(getIntegration("unknown")).toBeUndefined();
   });
 });
