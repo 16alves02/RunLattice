@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Circle, GitBranch, Play, Plus, Save, Settings2, Sparkles, Webhook, X } from "lucide-react";
+import { ArrowLeft, Circle, GitBranch, Plus, Save, Settings2, Sparkles, Webhook, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { ManualRunInput } from "@/components/manual-run-input";
 import { demoDefinition } from "@/lib/demo-data";
-import type { WorkflowDefinition, WorkflowNode } from "@/lib/types";
+import type { ConditionConfig, DiscordActionConfig, WorkflowDefinition, WorkflowNode } from "@/lib/types";
 
 type WorkflowBuilderProps = { workflowId?: string };
+type IntegrationConnection = { id: string; provider: string; name: string };
 
 export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const router = useRouter();
@@ -21,7 +23,26 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(Boolean(workflowId));
   const [saving, setSaving] = useState(false);
+  const [connections, setConnections] = useState<IntegrationConnection[]>([]);
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selected), [nodes, selected]);
+  const selectedActionConfig = selectedNode?.config && "integrationId" in selectedNode.config ? selectedNode.config : undefined;
+  const selectedConditionConfig = selectedNode?.config && "operator" in selectedNode.config ? selectedNode.config : undefined;
+  const hasCondition = nodes.some((node) => node.kind === "condition");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadConnections() {
+      try {
+        const response = await fetch("/api/integrations", { signal: controller.signal });
+        const result = await response.json().catch(() => ({}));
+        if (response.ok && Array.isArray(result.connections)) setConnections(result.connections);
+      } catch {
+        if (!controller.signal.aborted) setNotice("Integration connections could not be loaded.");
+      }
+    }
+    void loadConnections();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (!workflowId) return;
@@ -55,23 +76,73 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   }, [workflowId]);
 
   function addNode(kind: WorkflowNode["kind"]) {
+    const timestamp = Date.now();
     const node: WorkflowNode = {
-      id: `${kind}-${Date.now()}`,
+      id: `${kind}-${timestamp}`,
       kind,
-      title: kind === "trigger" ? "New trigger" : kind === "condition" ? "New condition" : "New action",
-      detail: kind === "trigger" ? "Trigger · Manual" : kind === "condition" ? "Condition · Configure rule" : "Action · Configure step",
+      title: kind === "trigger" ? "New trigger" : kind === "condition" ? "Check input" : "New action",
+      detail: kind === "trigger" ? "Trigger · Manual" : kind === "condition" ? "Condition · True / false" : "Action · Configure step",
+      ...(kind === "condition" ? { config: { path: "customer.score", operator: "greater_than", value: 0 } as ConditionConfig } : {}),
       x: 70 + (nodes.length % 3) * 280,
       y: 90 + Math.floor(nodes.length / 3) * 140,
     };
     const previousNode = nodes[nodes.length - 1];
-    setNodes((current) => [...current, node]);
-    if (previousNode && kind !== "trigger") setEdges((current) => [...current, { id: `edge-${Date.now()}`, from: previousNode.id, to: node.id }]);
+    if (kind === "condition") {
+      const trueAction: WorkflowNode = {
+        id: `action-true-${timestamp}`, kind: "action", title: "If true", detail: "Action · True branch",
+        x: node.x + 300, y: node.y - 75,
+      };
+      const falseAction: WorkflowNode = {
+        id: `action-false-${timestamp}`, kind: "action", title: "If false", detail: "Action · False branch",
+        x: node.x + 300, y: node.y + 105,
+      };
+      setNodes((current) => [...current, node, trueAction, falseAction]);
+      setEdges((current) => [
+        ...current,
+        ...(previousNode ? [{ id: `edge-${timestamp}`, from: previousNode.id, to: node.id }] : []),
+        { id: `edge-true-${timestamp}`, from: node.id, to: trueAction.id, branch: "true" as const },
+        { id: `edge-false-${timestamp}`, from: node.id, to: falseAction.id, branch: "false" as const },
+      ]);
+    } else {
+      setNodes((current) => [...current, node]);
+      if (previousNode && kind !== "trigger") setEdges((current) => [...current, { id: `edge-${timestamp}`, from: previousNode.id, to: node.id }]);
+    }
     setSelected(node.id);
-    setNotice("Node added. Save your changes to update the workflow.");
+    setNotice(kind === "condition"
+      ? "Condition added with true and false action branches. Configure each branch before activation."
+      : "Node added. Save your changes to update the workflow.");
   }
 
   function updateSelected(patch: Partial<WorkflowNode>) {
     setNodes((current) => current.map((node) => node.id === selected ? { ...node, ...patch } : node));
+  }
+
+  function updateSelectedActionConfig(patch: Partial<DiscordActionConfig>) {
+    if (!selectedNode || selectedNode.kind !== "action") return;
+    const existingConfig = selectedNode.config && "integrationId" in selectedNode.config
+      ? selectedNode.config
+      : undefined;
+    const config: DiscordActionConfig = {
+      integrationId: "discord",
+      actionId: "send_message",
+      connectionId: existingConfig?.connectionId ?? "",
+      message: existingConfig?.message ?? "",
+      ...existingConfig,
+      ...patch,
+    };
+    updateSelected({ config });
+  }
+
+  function updateSelectedConditionConfig(patch: Partial<ConditionConfig>) {
+    if (!selectedNode || selectedNode.kind !== "condition") return;
+    const config: ConditionConfig = {
+      path: "customer.score",
+      operator: "greater_than",
+      value: 0,
+      ...(selectedNode.config && "operator" in selectedNode.config ? selectedNode.config : {}),
+      ...patch,
+    };
+    updateSelected({ config });
   }
 
   async function saveWorkflow() {
@@ -128,21 +199,6 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
     }
   }
 
-  async function runWorkflow() {
-    if (!workflowId || status !== "ACTIVE") {
-      setNotice("Save and activate this workflow before queueing a run.");
-      return;
-    }
-    try {
-      const response = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}/runs`, { method: "POST" });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error ?? "The workflow run could not be queued.");
-      setNotice("Run queued. Open execution history to follow its status.");
-      router.refresh();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "The workflow run could not be queued.");
-    }
-  }
 
   function removeSelected() {
     setNodes((current) => current.filter((node) => node.id !== selected));
@@ -152,15 +208,16 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   }
 
   return <AppShell active="Builder"><div className="page">
-    <div className="page-heading"><div><Link href="/workflows" style={{ color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11, marginBottom: 14 }}><ArrowLeft size={13}/> All workflows</Link><h1>{workflowId ? "Edit workflow" : "Workflow builder"}</h1><p className="subtitle">Build and maintain workflow definitions in your workspace.</p></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{workflowId && <><button className="btn btn-quiet" onClick={() => void runWorkflow()}><Play size={13}/> Queue run</button><button className="btn btn-quiet" onClick={() => void updateStatus(status === "ACTIVE" ? "PAUSED" : "ACTIVE")}>{status === "ACTIVE" ? "Pause" : "Activate"}</button></>}<button className="btn btn-primary" onClick={() => void saveWorkflow()} disabled={saving || loading}><Save size={14}/>{saving ? "Saving…" : "Save changes"}</button></div></div>
+    <div className="page-heading"><div><Link href="/workflows" style={{ color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11, marginBottom: 14 }}><ArrowLeft size={13}/> All workflows</Link><h1>{workflowId ? "Edit workflow" : "Workflow builder"}</h1><p className="subtitle">Build and maintain workflow definitions in your workspace.</p></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{workflowId && <><button className="btn btn-quiet" onClick={() => void updateStatus(status === "ACTIVE" ? "PAUSED" : "ACTIVE")}>{status === "ACTIVE" ? "Pause" : "Activate"}</button></>}<button className="btn btn-primary" onClick={() => void saveWorkflow()} disabled={saving || loading}><Save size={14}/>{saving ? "Saving…" : "Save changes"}</button></div></div>
     {notice && <div className="toast" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Dismiss notification" style={{ float: "right", color: "inherit", background: "none", border: 0 }}><X size={13}/></button></div>}
+    {workflowId && !loading && <ManualRunInput workflowId={workflowId} disabled={status !== "ACTIVE"} />}
     {loading ? <div className="panel" style={{ padding: 24 }}>Loading workflow…</div> : <><div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}><span className="workflow-icon"><GitBranch size={16}/></span><input className="field-input" aria-label="Workflow name" value={name} onChange={(event) => setName(event.target.value)} style={{ maxWidth: 300, fontWeight: 800 }}/><input className="field-input" aria-label="Workflow description" placeholder="Description" value={description} onChange={(event) => setDescription(event.target.value)} style={{ maxWidth: 300 }}/><span className={`status status-${status.toLowerCase()}`}>{status.toLowerCase()}</span></div>
     <div className="workflow-layout"><section className="canvas" aria-label="Workflow canvas"><div className="canvas-inner">
-      {edges.map((edge) => { const from = nodes.find((node) => node.id === edge.from); const to = nodes.find((node) => node.id === edge.to); if (!from || !to) return null; const x1 = from.x + 190; const y1 = from.y + 41; const x2 = to.x; const y2 = to.y + 41; const dx = x2 - x1; const dy = y2 - y1; const length = Math.sqrt(dx * dx + dy * dy); const angle = Math.atan2(dy, dx) * 180 / Math.PI; return <div key={edge.id} className="edge" style={{ left: x1, top: y1, width: length, transform: `rotate(${angle}deg)` }}/>; })}
+      {edges.map((edge) => { const from = nodes.find((node) => node.id === edge.from); const to = nodes.find((node) => node.id === edge.to); if (!from || !to) return null; const x1 = from.x + 190; const y1 = from.y + 41; const x2 = to.x; const y2 = to.y + 41; const dx = x2 - x1; const dy = y2 - y1; const length = Math.sqrt(dx * dx + dy * dy); const angle = Math.atan2(dy, dx) * 180 / Math.PI; return <div key={edge.id} className="edge" style={{ left: x1, top: y1, width: length, transform: `rotate(${angle}deg)` }}>{edge.branch ? <span className="edge-label">{edge.branch.toUpperCase()}</span> : null}</div>; })}
       {nodes.map((node) => <button key={node.id} className={`workflow-node ${selected === node.id ? "selected" : ""}`} style={{ left: node.x, top: node.y }} onClick={() => setSelected(node.id)} aria-pressed={selected === node.id}><span className="node-top"><span className="node-symbol">{node.kind === "trigger" ? <Webhook size={14}/> : node.kind === "condition" ? <Circle size={14}/> : <Sparkles size={14}/>}</span>{node.title}</span><span className="node-detail">{node.detail}</span></button>)}
       <div style={{ position: "absolute", left: 24, bottom: 20, color: "#707780", fontSize: 10 }}>Saved workflow canvas · Select a node to edit</div>
     </div></section>
-    <aside className="panel"><div className="panel-heading"><div><div className="panel-title">Node settings</div><div className="panel-subtitle">Configure the selected step</div></div><Settings2 size={15} color="var(--muted)"/></div><div className="editor-panel">{selectedNode ? <><div style={{ display: "flex", alignItems: "center", gap: 8 }}><span className="node-symbol">{selectedNode.kind === "trigger" ? <Webhook size={14}/> : selectedNode.kind === "condition" ? <Circle size={14}/> : <Sparkles size={14}/>}</span><div><div style={{ fontSize: 12, fontWeight: 800 }}>{selectedNode.kind[0].toUpperCase() + selectedNode.kind.slice(1)}</div><div style={{ color: "var(--muted)", fontSize: 10, marginTop: 3 }}>ID: {selectedNode.id.slice(0, 16)}</div></div></div><label className="field-label" htmlFor="node-title">Step name</label><input id="node-title" className="field-input" value={selectedNode.title} onChange={(event) => updateSelected({ title: event.target.value })}/><label className="field-label" htmlFor="node-detail">Description</label><input id="node-detail" className="field-input" value={selectedNode.detail} onChange={(event) => updateSelected({ detail: event.target.value })}/><div className="editor-help">Changes are stored when you save the workflow. External integrations are not configured in this version.</div><button className="btn" style={{ width: "100%", marginTop: 17 }} onClick={removeSelected}><X size={13}/> Remove node</button></> : <div className="empty-state">Select a node on the canvas to edit it.</div>}</div></aside></div>
-    <section className="panel" style={{ marginTop: 16 }}><div className="panel-heading"><div><div className="panel-title">Add a step</div><div className="panel-subtitle">Choose a node type to extend this workflow</div></div><span className="tag">{nodes.length} nodes</span></div><div style={{ padding: 14, display: "flex", gap: 10, flexWrap: "wrap" }}><button className="btn" onClick={() => addNode("trigger")}><Plus size={13}/> Trigger</button><button className="btn" onClick={() => addNode("condition")}><Plus size={13}/> Condition</button><button className="btn" onClick={() => addNode("action")}><Plus size={13}/> Action</button></div></section></>}
+    <aside className="panel"><div className="panel-heading"><div><div className="panel-title">Node settings</div><div className="panel-subtitle">Configure the selected step</div></div><Settings2 size={15} color="var(--muted)"/></div><div className="editor-panel">{selectedNode ? <><div style={{ display: "flex", alignItems: "center", gap: 8 }}><span className="node-symbol">{selectedNode.kind === "trigger" ? <Webhook size={14}/> : selectedNode.kind === "condition" ? <Circle size={14}/> : <Sparkles size={14}/>}</span><div><div style={{ fontSize: 12, fontWeight: 800 }}>{selectedNode.kind[0].toUpperCase() + selectedNode.kind.slice(1)}</div><div style={{ color: "var(--muted)", fontSize: 10, marginTop: 3 }}>ID: {selectedNode.id.slice(0, 16)}</div></div></div><label className="field-label" htmlFor="node-title">Step name</label><input id="node-title" className="field-input" value={selectedNode.title} onChange={(event) => updateSelected({ title: event.target.value })}/><label className="field-label" htmlFor="node-detail">Description</label><input id="node-detail" className="field-input" value={selectedNode.detail} onChange={(event) => updateSelected({ detail: event.target.value })}/>{selectedNode.kind === "condition" && selectedConditionConfig && <><label className="field-label" htmlFor="condition-path">Input field path</label><input id="condition-path" className="field-input" value={selectedConditionConfig.path} onChange={(event) => updateSelectedConditionConfig({ path: event.target.value })} placeholder="customer.score"/><label className="field-label" htmlFor="condition-operator">Comparison</label><select id="condition-operator" className="field-input" value={selectedConditionConfig.operator} onChange={(event) => updateSelectedConditionConfig({ operator: event.target.value as ConditionConfig["operator"], ...(event.target.value === "exists" ? { value: undefined } : {}) })}><option value="equals">Equals</option><option value="not_equals">Does not equal</option><option value="contains">Contains</option><option value="greater_than">Greater than</option><option value="less_than">Less than</option><option value="exists">Exists</option></select>{selectedConditionConfig.operator !== "exists" && <><label className="field-label" htmlFor="condition-value">Compare value</label><input id="condition-value" className="field-input" value={String(selectedConditionConfig.value ?? "")} onChange={(event) => updateSelectedConditionConfig({ value: ["greater_than", "less_than"].includes(selectedConditionConfig.operator) ? Number(event.target.value) : event.target.value })} placeholder="Value"/></>}<div className="editor-help">Only the matching true or false branch executes. Conditions read the manual run input and do not execute custom code.</div></>}{selectedNode.kind === "action" && <><label className="field-label" htmlFor="action-connection">Discord connection</label><select id="action-connection" className="field-input" value={selectedActionConfig?.connectionId ?? ""} onChange={(event) => updateSelectedActionConfig({ connectionId: event.target.value })}><option value="">Choose a connected Discord webhook</option>{connections.filter((connection) => connection.provider === "discord").map((connection) => <option key={connection.id} value={connection.id}>{connection.name}</option>)}</select><label className="field-label" htmlFor="action-message">Message</label><textarea id="action-message" className="field-input" rows={4} maxLength={2000} value={selectedActionConfig?.message ?? ""} onChange={(event) => updateSelectedActionConfig({ message: event.target.value })} placeholder="Write the message to send to Discord…"/><div className="editor-help">This action sends a real Discord message when the workflow runs. Keep the message under 2,000 characters.</div>{connections.filter((connection) => connection.provider === "discord").length === 0 && <Link href="/integrations" className="editor-help">Connect a Discord webhook in Integrations first.</Link>}</>}<div className="editor-help">Changes are stored when you save the workflow.</div><button className="btn" style={{ width: "100%", marginTop: 17 }} onClick={removeSelected}><X size={13}/> Remove node</button></> : <div className="empty-state">Select a node on the canvas to edit it.</div>}</div></aside></div>
+    <section className="panel" style={{ marginTop: 16 }}><div className="panel-heading"><div><div className="panel-title">Add a step</div><div className="panel-subtitle">Choose a node type to extend this workflow</div></div><span className="tag">{nodes.length} nodes</span></div><div style={{ padding: 14, display: "flex", gap: 10, flexWrap: "wrap" }}><button className="btn" onClick={() => addNode("trigger")}><Plus size={13}/> Trigger</button><button className="btn" onClick={() => addNode("condition")} disabled={hasCondition}><Plus size={13}/> {hasCondition ? "Condition added" : "Condition"}</button><button className="btn" onClick={() => addNode("action")}><Plus size={13}/> Action</button></div></section></>}
   </div></AppShell>;
 }

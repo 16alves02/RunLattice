@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { WorkflowStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { workflowDefinitionSchema } from "@/lib/validation";
+import { validateExecutableWorkflow } from "@/lib/execution";
+import type { WorkflowDefinition } from "@/lib/types";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -70,6 +72,49 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
+    const existing = await prisma.workflow.findFirst({
+      where: { id, organizationId: access.context.organizationId },
+      select: { status: true, definition: true },
+    });
+    if (!existing) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
+
+    const nextStatus = typeof input.status === "string" ? input.status : existing.status;
+    if (nextStatus === "ACTIVE") {
+      const candidateDefinition = "definition" in input ? input.definition : existing.definition;
+      const parsedDefinition = workflowDefinitionSchema.safeParse(candidateDefinition);
+      if (!parsedDefinition.success) {
+        return NextResponse.json({ error: "The workflow definition is invalid.", issues: parsedDefinition.error.issues }, { status: 400 });
+      }
+      let executablePath: WorkflowDefinition["nodes"];
+      try {
+        executablePath = validateExecutableWorkflow(parsedDefinition.data as WorkflowDefinition);
+      } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : "The workflow cannot be activated." }, { status: 400 });
+      }
+
+      const connectionIds = [...new Set(executablePath
+        .filter((node) => node.kind === "action")
+        .map((node) => node.config && "integrationId" in node.config ? node.config.connectionId : undefined)
+        .filter((connectionId): connectionId is string => Boolean(connectionId)))];
+      if (connectionIds.length > 0) {
+        let availableConnections = 0;
+        try {
+          availableConnections = await prisma.integrationConnection.count({
+            where: {
+              id: { in: connectionIds },
+              organizationId: access.context.organizationId,
+              provider: "discord",
+            },
+          });
+        } catch {
+          return NextResponse.json({ error: "Integration connections could not be verified." }, { status: 503 });
+        }
+        if (availableConnections !== connectionIds.length) {
+          return NextResponse.json({ error: "One or more workflow actions reference a connection outside this workspace or a connection that no longer exists." }, { status: 400 });
+        }
+      }
+    }
+
     const result = await prisma.workflow.updateMany({
       where: { id, organizationId: access.context.organizationId },
       data,

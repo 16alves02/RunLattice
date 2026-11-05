@@ -14,9 +14,10 @@ RunLattice is evolving into an approachable automation platform for non-technica
 
 - [x] Workspace dashboard and responsive layout
 - [x] Workflow definition validation and persistence
-- [x] Redis/BullMQ queue and simulated worker
+- [x] Redis/BullMQ queue and live Discord webhook worker
 - [x] Searchable template gallery
-- [x] Integration catalog with provider capabilities and auth requirements
+- [x] Integration catalog with provider capabilities and authentication requirements
+- [x] Workspace-scoped encrypted Discord webhook connections
 - [x] AI workflow planning endpoint with server-side key and schema validation
 - [x] AI review interface that saves drafts only
 - [ ] Improve visual builder configuration and graph editing
@@ -26,10 +27,14 @@ RunLattice is evolving into an approachable automation platform for non-technica
 - [x] Email/password authentication and per-account workflow ownership
 - [x] Organization-backed multi-user workspaces and owner/admin/member workflow permissions
 - [ ] Invitation delivery and member administration UI
-- [ ] Secure OAuth connection and encrypted credential storage
+- [x] Encrypted workspace-scoped Discord webhook credentials
+- [ ] OAuth connections for additional providers
 - [ ] Request rate limiting and audit logs
-- [ ] Integration adapter interface and first real provider
-- [ ] Safe execution adapters, timeouts, retries and step-level logs
+- [x] First registered action adapter: Discord webhook message
+- [ ] General integration adapter interface and additional providers
+- [x] Restricted graph execution with declarative true/false branches, atomic run claiming, timeouts and step-level results
+- [x] Bounded manual trigger input and safe scalar templates for Discord messages
+- [x] Stale-run detection with heartbeat monitoring (does not resume or replay interrupted runs)\n- [x] Durable step ledger, lease fencing and stale-run outcome classification (no automatic replay or exactly-once guarantee)
 - [ ] Signed webhook triggers, schedules and replay protection
 
 ## AI-assisted workflow creation
@@ -46,16 +51,17 @@ RunLattice is evolving into an approachable automation platform for non-technica
 
 - [x] Catalog definitions for Gmail, Google Drive, Google Sheets, Discord, Slack, Shopify, Stripe, GitHub and HTTP
 - [ ] OAuth and secure provider account connections
-- [ ] First end-to-end integration
+- [x] First live integration: Discord webhook message
+- [ ] Provider end-to-end tests
 - [ ] Community template publishing and versioning
 
 ## Launch
 
-- [ ] Integration tests for API, queue and worker
+- [ ] Full PostgreSQL/Redis crash-window and multi-worker integration tests
 - [ ] Security and privacy review
 - [ ] Production observability and health checks
 - [ ] Public demo with documented limitations
 
 ## Current limitations
 
-Email/password authentication, organization membership and workspace-scoped workflow access are implemented. Owners and admins can manage workflows; members are read-only. The integration library is descriptive only: it does not connect provider accounts or execute external actions. The AI endpoint remains disabled by default pending usage quotas and a security review. The current worker simulates graph traversal.
+Email/password authentication, organization membership and workspace-scoped workflow access are implemented. Owners and admins can manage workflows; members are read-only. Discord webhook connections are available with encrypted credentials and a live send-message action. Other provider entries remain catalog-only. The AI endpoint remains disabled by default pending usage quotas and a security review. The current worker supports manual triggers, Discord send-message actions, bounded run input, safe scalar templates and declarative condition nodes with true/false branches. Conditions support equals, not-equals, contains, greater-than, less-than and exists against run input paths. Only the selected branch executes; both branches must be structurally valid and all action nodes must be configured before activation. Arbitrary code, scheduled triggers and inbound webhooks are not implemented.
