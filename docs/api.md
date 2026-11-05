@@ -85,7 +85,7 @@ Provider configuration is server-side:
 - `AI_MODEL` selects the model. OpenAI defaults to `gpt-4.1-mini`.
 - `AI_MONTHLY_REQUEST_LIMIT` and `AI_MONTHLY_TOKEN_LIMIT` set per-workspace UTC monthly budgets (defaults: 100 requests and 100,000 tokens).
 
-Requests reserve budget atomically before provider calls. Provider-reported token usage reconciles the reservation and is stored in workspace usage records. The legacy `AI_API_KEY` variable is an OpenAI-only fallback.
+Requests reserve budget atomically before provider calls. Provider-reported token usage reconciles the reservation; if usage metadata is absent, the adapter estimates token counts from prompt and response length. Failed or timed-out provider calls keep their reservation charged because provider-side usage may be ambiguous. The legacy `AI_API_KEY` variable is an OpenAI-only fallback.
 
 `POST /api/ai/workflow-plan/test`
 
