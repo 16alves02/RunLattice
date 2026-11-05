@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, GitBranch, Plus, Workflow } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/prisma";
-import { requireServerWorkspace } from "@/lib/workspace";
+import { canManageWorkspace, requireServerWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +14,7 @@ export const metadata: Metadata = {
 
 export default async function WorkflowsPage() {
   const workspace = await requireServerWorkspace();
+  const canManage = canManageWorkspace(workspace.role);
 
   let workflows: Array<{
     id: string;
@@ -45,12 +46,12 @@ export default async function WorkflowsPage() {
   }
 
   return <AppShell active="Workflows"><div className="page">
-    <div className="page-heading"><div><h1>Workflows</h1><p className="subtitle">Review the automations in your workspace and open one in the builder.</p></div><Link href="/workflows/new" className="btn btn-primary"><Plus size={14}/> New workflow</Link></div>
+    <div className="page-heading"><div><h1>Workflows</h1><p className="subtitle">Review the automations in your workspace and open one in the builder.</p></div>{canManage && <Link href="/workflows/new" className="btn btn-primary"><Plus size={14}/> New workflow</Link>}</div>
     {serviceUnavailable && <div className="toast" role="alert">The workflow database is unavailable. Check your database configuration and try again.</div>}
     <section className="panel">
       <div className="panel-heading"><div><div className="panel-title">All workflows</div><div className="panel-subtitle">Saved workflow definitions</div></div><span className="tag">{workflows.length} workflows</span></div>
       <div style={{ overflowX: "auto" }}><table className="workflow-table"><thead><tr><th>Name</th><th>Status</th><th>Trigger</th><th>Runs</th><th>Open</th></tr></thead><tbody>
-        {workflows.map((workflow) => <tr key={workflow.id}><td><div className="workflow-name"><span className="workflow-icon"><GitBranch size={16}/></span><span>{workflow.name}<span style={{ display: "block", color: "var(--muted)", fontWeight: 500, fontSize: 10, marginTop: 4 }}>{workflow.description}</span></span></div></td><td><span className={`status status-${workflow.status.toLowerCase()}`}>{workflow.status.toLowerCase()}</span></td><td>{workflow.triggerType.toLowerCase()}</td><td>{workflow.runs.toLocaleString("en-GB")}</td><td><Link href={`/workflows/new?workflow=${encodeURIComponent(workflow.id)}`} className="btn" style={{ padding: 7 }}>Edit <ArrowRight size={12}/></Link></td></tr>)}
+        {workflows.map((workflow) => <tr key={workflow.id}><td><div className="workflow-name"><span className="workflow-icon"><GitBranch size={16}/></span><span>{workflow.name}<span style={{ display: "block", color: "var(--muted)", fontWeight: 500, fontSize: 10, marginTop: 4 }}>{workflow.description}</span></span></div></td><td><span className={`status status-${workflow.status.toLowerCase()}`}>{workflow.status.toLowerCase()}</span></td><td>{workflow.triggerType.toLowerCase()}</td><td>{workflow.runs.toLocaleString("en-GB")}</td><td>{canManage ? <Link href={`/workflows/new?workflow=${encodeURIComponent(workflow.id)}`} className="btn" style={{ padding: 7 }}>Edit <ArrowRight size={12}/></Link> : <span className="tag">Read only</span>}</td></tr>)}
         {workflows.length === 0 && <tr><td colSpan={5}><div className="empty-state">{serviceUnavailable ? "Workflows could not be loaded." : "No workflows yet. Create your first workflow to get started."}</div></td></tr>}
       </tbody></table></div>
     </section>
