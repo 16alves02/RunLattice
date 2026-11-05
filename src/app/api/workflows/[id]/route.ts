@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { WorkflowStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { workflowDefinitionSchema } from "@/lib/validation";
+import { validateExecutableWorkflow } from "@/lib/execution";
+import type { WorkflowDefinition } from "@/lib/types";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -70,6 +72,26 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
+    const existing = await prisma.workflow.findFirst({
+      where: { id, organizationId: access.context.organizationId },
+      select: { status: true, definition: true },
+    });
+    if (!existing) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
+
+    const nextStatus = typeof input.status === "string" ? input.status : existing.status;
+    if (nextStatus === "ACTIVE") {
+      const candidateDefinition = "definition" in input ? input.definition : existing.definition;
+      const parsedDefinition = workflowDefinitionSchema.safeParse(candidateDefinition);
+      if (!parsedDefinition.success) {
+        return NextResponse.json({ error: "The workflow definition is invalid.", issues: parsedDefinition.error.issues }, { status: 400 });
+      }
+      try {
+        validateExecutableWorkflow(parsedDefinition.data as WorkflowDefinition);
+      } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : "The workflow cannot be activated." }, { status: 400 });
+      }
+    }
+
     const result = await prisma.workflow.updateMany({
       where: { id, organizationId: access.context.organizationId },
       data,
