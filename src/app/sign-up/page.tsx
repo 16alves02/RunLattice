@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
+import { ensureActiveWorkspace } from "@/lib/auth-workspace-client";
 
 export default function SignUpPage() {
   const [name, setName] = useState("");
@@ -15,13 +16,15 @@ export default function SignUpPage() {
     event.preventDefault();
     setError("");
     setLoading(true);
-    const result = await authClient.signUp.email({ name, email, password, callbackURL: "/" });
-    setLoading(false);
-    if (result.error) {
-      setError(result.error.message || "Unable to create your account.");
-      return;
+    try {
+      const result = await authClient.signUp.email({ name, email, password, callbackURL: "/" });
+      if (result.error) throw new Error(result.error.message || "Unable to create your account.");
+      await ensureActiveWorkspace(`${name.trim()}'s workspace`);
+      window.location.assign("/");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to create your account.");
+      setLoading(false);
     }
-    window.location.assign("/");
   }
 
   return <main className="auth-page"><section className="panel auth-card">
