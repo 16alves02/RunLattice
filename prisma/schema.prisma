@@ -173,6 +173,18 @@ model WorkflowRun {
   @@index([status, createdAt])
 }
 
+ 
+model WorkflowRunOutbox {
+  id           String      @id @default(cuid())
+  runId        String      @unique
+  dispatchedAt DateTime?
+  attempts     Int         @default(0)
+  lastError    String?
+  createdAt    DateTime    @default(now())
+  run          WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([dispatchedAt, createdAt])
+}
 
 model IntegrationConnection {
   id                    String       @id @default(cuid())
