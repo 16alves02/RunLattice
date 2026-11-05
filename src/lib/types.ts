@@ -7,12 +7,20 @@ export interface DiscordActionConfig {
   message?: string;
 }
 
+export type ConditionOperator = "equals" | "not_equals" | "contains" | "greater_than" | "less_than" | "exists";
+
+export interface ConditionConfig {
+  path: string;
+  operator: ConditionOperator;
+  value?: string | number | boolean | null;
+}
+
 export interface WorkflowNode {
   id: string;
   kind: NodeKind;
   title: string;
   detail: string;
-  config?: DiscordActionConfig;
+  config?: DiscordActionConfig | ConditionConfig;
   x: number;
   y: number;
 }
@@ -21,6 +29,7 @@ export interface WorkflowEdge {
   id: string;
   from: string;
   to: string;
+  branch?: "true" | "false";
 }
 
 export interface WorkflowDefinition {
