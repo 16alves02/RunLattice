@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workflowDefinitionSchema, createWorkflowSchema } from "@/lib/validation";
+import { workflowDefinitionSchema, createWorkflowSchema, createIntegrationConnectionSchema } from "@/lib/validation";
 
 const validDefinition = {
   nodes: [
@@ -32,5 +32,36 @@ describe("workflow definition validation", () => {
   it("validates workflow names before persistence", () => {
     expect(createWorkflowSchema.safeParse({ name: "A", definition: validDefinition }).success).toBe(false);
     expect(createWorkflowSchema.safeParse({ name: "Lead capture", definition: validDefinition }).success).toBe(true);
+  });
+});
+
+
+describe("Discord integration connection validation", () => {
+  const validConnection = {
+    provider: "discord",
+    name: "Team alerts",
+    webhookUrl: "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz0123456789",
+  };
+
+  it("accepts a valid HTTPS Discord webhook", () => {
+    expect(createIntegrationConnectionSchema.safeParse(validConnection).success).toBe(true);
+  });
+
+  it("rejects non-Discord hosts and insecure URLs", () => {
+    expect(createIntegrationConnectionSchema.safeParse({
+      ...validConnection,
+      webhookUrl: "https://example.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz",
+    }).success).toBe(false);
+    expect(createIntegrationConnectionSchema.safeParse({
+      ...validConnection,
+      webhookUrl: validConnection.webhookUrl.replace("https:", "http:"),
+    }).success).toBe(false);
+  });
+
+  it("rejects URL query strings and fragments", () => {
+    expect(createIntegrationConnectionSchema.safeParse({
+      ...validConnection,
+      webhookUrl: `${validConnection.webhookUrl}?redirect=https://example.com`,
+    }).success).toBe(false);
   });
 });
