@@ -32,7 +32,7 @@ describe("integration credential encryption", () => {
     process.env.INTEGRATION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
     const encrypted = encryptSecret("secret");
     const parts = encrypted.split(".");
-    parts[3] = `${parts[3].slice(0, -1)}A`;
+    parts[3] = `${parts[3][0] === "A" ? "B" : "A"}${parts[3].slice(1)}`;
     expect(() => decryptSecret(parts.join("."))).toThrow();
   });
 });
