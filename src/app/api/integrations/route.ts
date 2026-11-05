@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: connection }, { status: 201 });
   } catch (error) {
-    console.error("Unable to save integration connection:", error instanceof Error ? error.message : "Unknown error");
+    console.error("Unable to save integration connection.");
     return NextResponse.json({ error: "The integration connection could not be saved. Check the encryption key configuration." }, { status: 503 });
   }
 }
