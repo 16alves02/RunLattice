@@ -22,8 +22,8 @@ AI-generated workflows are drafts only. Users must review and save them; the ass
 
 ## Features
 
-- **Personal accounts** with email/password sign-up, sign-in, sign-out and database-backed sessions.
-- **Account-scoped workspaces** so each account can only list, edit, delete and execute its own workflows.
+- **Accounts and organizations** with email/password sign-up, sign-in, sign-out and database-backed sessions.
+- **Multi-user workspaces** with organization membership, workspace switching, invitations foundation and owner/admin/member roles.
 - **Visual workflow builder** that loads, creates and updates saved trigger, condition and action node definitions.
 - **Template library** with searchable, category-filtered starter workflows.
 - **Integration catalog** describing planned providers, authentication methods, triggers and actions.
@@ -76,7 +76,7 @@ npm install
 cp .env.example .env
 ```
 
-Review `DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`. Generate a secret with `openssl rand -base64 32`. For local development, the auth module has a development-only fallback; production refuses to start without `BETTER_AUTH_SECRET`. Never commit real credentials.
+Review `DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` and `BETTER_AUTH_TRUSTED_ORIGINS`. Generate a secret with `openssl rand -base64 32`. For local development, the auth module has a development-only fallback; production refuses to start without `BETTER_AUTH_SECRET`. Never commit real credentials.
 
 ### 3. Start PostgreSQL and Redis
 
@@ -132,7 +132,7 @@ docker compose down
 | `DELETE` | `/api/workflows/:id` | Delete a workflow |
 | `POST` | `/api/workflows/:id/runs` | Queue an execution for an active workflow |
 
-All workflow and run endpoints require a valid Better Auth session. Workflow reads and mutations are scoped to the signed-in user. `/api/health` remains public for deployment health checks.
+All workflow and run endpoints require a valid Better Auth session and verified membership in the active organization. Reads are available to members; creating, editing, deleting and running workflows require the owner or admin role. `/api/health` remains public for deployment health checks.
 
 ## Project structure
 
@@ -147,7 +147,7 @@ worker/                Background job worker
 
 ## Project status
 
-This is an active portfolio project and is not yet a production-ready automation service. Email/password authentication, database-backed sessions and per-account workflow ownership are implemented. Workflow definitions and run records are persisted in PostgreSQL, and background jobs are processed through BullMQ. The current worker records a simulated traversal of the graph; it does not send emails, call third-party APIs or perform external side effects. Secure provider connections, real action adapters, signed webhooks, scheduling, billing, production observability and a full security review remain outstanding.
+This is an active portfolio project and is not yet a production-ready automation service. Email/password authentication, database-backed sessions and organization-based workspaces are implemented. Existing accounts receive a personal workspace during migration. Workflow access is scoped to the active organization; owners and admins can manage workflows while members are read-only. Workflow definitions and run records are persisted in PostgreSQL, and background jobs are processed through BullMQ. The current worker records a simulated traversal of the graph; it does not send emails, call third-party APIs or perform external side effects. Secure provider connections, real action adapters, signed webhooks, scheduling, billing, production observability and a full security review remain outstanding.
 
 ## Roadmap
 
@@ -171,7 +171,7 @@ Built by [16alves02](https://github.com/16alves02).
 
 ## Launch audit notes
 
-- Email/password authentication and per-account data isolation are implemented. Email verification and account recovery are not configured yet.
+- Email/password authentication, organization membership and workspace-scoped data access are implemented. Email verification, account recovery and invitation email delivery still require a transactional email provider.
 - No analytics or advertising scripts are included. Reassess cookie consent if analytics or non-essential storage is introduced.
 - A privacy notice must be written from the actual data controller, hosting provider and integrations before collecting personal data from external users.
 - A canonical URL and sitemap should be configured after the production domain is selected.
