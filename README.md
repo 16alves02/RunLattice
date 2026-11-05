@@ -33,7 +33,7 @@ AI-generated workflows are drafts only. Users must review and save them; the ass
 - **Background execution** using Redis and BullMQ, with atomic run claiming and step-level results. Automatic retries are disabled for non-idempotent external actions.
 - **Worker process** that executes validated linear workflows and sends real Discord webhook messages.
 - **Execution history** with database-backed run records, statuses, timestamps and durations.
-- **Automated tests** for workflow graph and trigger type validation.
+- **Automated tests** for workflow validation, execution path rules and credential encryption.
 - **Docker Compose** for local PostgreSQL and Redis services.
 
 ## Integration status
@@ -76,7 +76,7 @@ npm install
 cp .env.example .env
 ```
 
-Review `DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` and `BETTER_AUTH_TRUSTED_ORIGINS`. Generate a secret with `openssl rand -base64 32`. For local development, the auth module has a development-only fallback; production refuses to start without `BETTER_AUTH_SECRET`. Never commit real credentials.
+Review `DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS` and `INTEGRATION_ENCRYPTION_KEY`. Generate a secret with `openssl rand -base64 32`. For local development, the auth module has a development-only fallback; production refuses to start without `BETTER_AUTH_SECRET`. Never commit real credentials.
 
 ### 3. Start PostgreSQL and Redis
 
@@ -123,7 +123,7 @@ docker compose down
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/health` | Basic application health response |
-| `GET` | `/api/integrations` | List integrations and workspace connections |
+| `GET` | `/api/integrations` | List integrations and workspace connections |\n| `POST` | `/api/integrations` | Save an encrypted Discord webhook connection |\n| `DELETE` | `/api/integrations/:id` | Remove a workspace integration connection |
 | `POST` | `/api/ai/workflow-plan` | Generate a validated workflow draft (disabled by default) |
 | `GET` | `/api/workflows` | List workflows |
 | `POST` | `/api/workflows` | Validate and create a workflow |
@@ -153,17 +153,19 @@ This is an active portfolio project and is not yet a production-ready automation
 
 - [x] Responsive workspace and visual workflow editor
 - [x] Workflow validation and persistence
-- [x] Redis/BullMQ queue and live Discord webhook worker
-- [x] Searchable template library
-- [x] Integration catalog and first live Discord webhook action
+- [x] Redis/BullMQ queue and first live Discord webhook action
+- [x] Searchable template library and integration catalog
 - [x] AI workflow planning endpoint and review interface (disabled by default)
-- [x] Email/password authentication and per-account workflow ownership
-- [x] Multi-user workspaces and role-based workflow access
-- [x] Encrypted workspace-scoped Discord webhook credentials\n- [ ] OAuth connections for additional providers
-- [x] First real external action: Discord webhook message\n- [ ] Provider end-to-end tests
-- [ ] Safe action adapters, signed webhooks and scheduling
-- [ ] AI workflow generation enabled after quotas, abuse controls and security review
-- [ ] Production observability, security review and public demo
+- [x] Email/password authentication and organization-based workspace access
+- [x] Encrypted workspace-scoped Discord webhook credentials
+- [x] First live external action: Discord webhook message
+- [ ] OAuth connections for additional providers
+- [ ] General action adapter interface and additional integrations
+- [ ] Condition evaluation, branching and advanced graph execution
+- [ ] Durable step checkpoints, stale-run recovery and safe retry policies
+- [ ] Signed inbound webhooks and scheduled triggers
+- [ ] Provider end-to-end tests and security review
+- [ ] AI usage quotas, production observability and public launch
 
 ## Author
 
@@ -172,10 +174,12 @@ Built by [16alves02](https://github.com/16alves02).
 ## Launch audit notes
 
 - Email/password authentication, organization membership and workspace-scoped data access are implemented. Email verification, account recovery and invitation email delivery still require a transactional email provider.
+- Discord webhook URLs are encrypted at rest and never returned by the API. Configure and back up `INTEGRATION_ENCRYPTION_KEY` securely for every environment.
 - No analytics or advertising scripts are included. Reassess cookie consent if analytics or non-essential storage is introduced.
 - A privacy notice must be written from the actual data controller, hosting provider and integrations before collecting personal data from external users.
 - A canonical URL and sitemap should be configured after the production domain is selected.
 - The AI endpoint remains disabled by default. Configure spend limits and per-account quotas before enabling it publicly.
-- Provider cards describe planned capabilities only. No provider accounts are connected and no external actions are executed.
-- The worker simulates graph traversal and is not a production automation engine.
-- Browser-based accessibility checks, dependency installation, automated tests and a production build must be completed before deployment.
+- Discord is the only live provider action. Other integration cards remain planned.
+- The worker supports manual-triggered linear workflows only. Branching, conditions, arbitrary code, inbound webhooks and schedules are not implemented.
+- A worker crash after claiming a run can leave it in RUNNING; durable recovery is still outstanding.
+- Real Discord delivery, browser accessibility checks, automated tests and a production build must be validated before public deployment.
