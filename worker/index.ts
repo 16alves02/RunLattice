@@ -1,8 +1,9 @@
-import { Worker, type Job } from "bullmq";
+import { Queue, Worker, type Job } from "bullmq";
 import { randomUUID } from "node:crypto";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { decryptSecret } from "../src/lib/secrets";
 import { recoverStaleWorkflowRuns } from "../src/lib/run-recovery";
+import { dispatchPendingWorkflowRuns } from "../src/lib/outbox";
 import { renderInputTemplate } from "../src/lib/template";
 import { resolveExecutionPath, validateExecutableWorkflow } from "../src/lib/execution";
 import { evaluateCondition } from "../src/lib/condition";
@@ -116,6 +117,8 @@ async function executeAction(node: WorkflowDefinition["nodes"][number], organiza
   }
   throw new Error(`Action "${node.title}" is not supported by this worker version.`);
 }
+
+const dispatchQueue = new Queue<WorkflowJob>("workflow-runs", { connection });
 
 const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<WorkflowJob>) => {
   const { runId, workflowId } = job.data;
@@ -252,6 +255,19 @@ worker.on("completed", (job) => console.info(`[worker] run ${job.id} processed`)
 worker.on("failed", (job, error) => console.error(`[worker] queue job ${job?.id ?? "unknown"} failed: ${error.message}`));
 worker.on("error", (error) => console.error(`[worker] worker error: ${error.message}`));
 
+async function dispatchOutbox() {
+  try {
+    const count = await dispatchPendingWorkflowRuns(prisma, dispatchQueue);
+    if (count > 0) console.info(`[worker] dispatched ${count} workflow run(s) from outbox`);
+  } catch (error) {
+    console.error("[worker] Outbox dispatch failed:", error instanceof Error ? error.message : "Unknown error");
+  }
+}
+
+const outboxTimer = setInterval(() => void dispatchOutbox(), 2_000);
+outboxTimer.unref();
+void dispatchOutbox();
+
 async function recoverStaleRuns() {
   const recovered = await recoverStaleWorkflowRuns(prisma);
   if (recovered > 0) {
@@ -272,7 +288,9 @@ void recoverStaleRuns().catch((error: unknown) => {
 async function shutdown(signal: string) {
   console.info(`[worker] ${signal} received; closing gracefully`);
   clearInterval(recoveryTimer);
+  clearInterval(outboxTimer);
   await worker.close();
+  await dispatchQueue.close();
   await prisma.$disconnect();
   process.exit(0);
 }
