@@ -105,8 +105,8 @@ model Organization {
   invitations Invitation[]
   workflows   Workflow[]
   integrations IntegrationConnection[]
-  aiUsage      AIWorkspaceUsage[]
-  aiUsageEvents AIUsageEvent[]
+  aiUsage      AiWorkspaceUsage[]
+  aiUsageEvents AiUsageEvent[]
 }
 
 model Member {
@@ -221,7 +221,7 @@ model WorkflowRunStep {
   @@index([runId, status])
 }
 
-model AIWorkspaceUsage {
+model AiWorkspaceUsage {
   id             String       @id @default(cuid())
   organizationId String
   periodStart    DateTime
@@ -235,7 +235,7 @@ model AIWorkspaceUsage {
   @@index([periodStart])
 }
 
-model AIUsageEvent {
+model AiUsageEvent {
   id             String       @id @default(cuid())
   organizationId String
   userId         String
