@@ -63,7 +63,7 @@ npm install
 cp .env.example .env
 ```
 
-Review `DATABASE_URL`, `REDIS_URL` and `CRON_SECRET` in `.env`. Do not commit real credentials.
+Review `DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` in `.env`. Generate the auth secret with `openssl rand -base64 32`. Never commit real credentials.
 
 ### 3. Start PostgreSQL and Redis
 
@@ -77,6 +77,8 @@ docker compose up -d
 npx prisma generate
 npx prisma db push
 ```
+
+The current schema includes Better Auth users, sessions, organizations and memberships. The first registered account can create a personal workspace during sign-up. For an existing database, review the generated Prisma changes before applying them.
 
 ### 5. Start the web app
 
@@ -118,7 +120,7 @@ docker compose down
 | `DELETE` | `/api/workflows/:id` | Delete a workflow |
 | `POST` | `/api/workflows/:id/runs` | Queue an execution for an active workflow |
 
-The run endpoint requires the `x-runlattice-secret` header when `CRON_SECRET` is configured. The browser editor does not expose this secret; leave it unset for local UI testing. Production use requires proper user authentication, workspace-level authorization, rate limiting and stricter execution policies.
+All workflow and execution endpoints require a valid Better Auth session and an organization membership. Records are queried and mutated within the active workspace. The health endpoint remains public and exposes only service status.
 
 ## Project structure
 
@@ -143,7 +145,7 @@ This is an active learning and portfolio project, not a production-ready automat
 - [x] Redis/BullMQ queue and worker foundation
 - [x] Persist editor changes through the API
 - [ ] Implement safe, allow-listed action adapters
-- [ ] Add authentication and workspace permissions
+- [x] Add authentication and workspace permissions
 - [ ] Add signed webhook triggers and scheduling
 - [ ] Add integration tests for API and worker behaviour
 - [ ] Deploy a public demo with managed services
@@ -157,7 +159,7 @@ Built by [16alves02](https://github.com/16alves02) as a full-stack software engi
 
 - The application interface is not a public marketing website. Fresha, contact forms and a marketing FAQ are not applicable to this product milestone.
 - No analytics or advertising scripts are included. Reassess cookie consent if analytics, advertising or other non-essential storage is introduced.
-- The app currently has no authentication or user accounts. Do not use it with personal or production data on a public deployment.
+- Email/password authentication and organization-based workspace membership are implemented on the Phase 1 branch. Email verification and password-reset delivery still require a transactional email provider before public production launch.
 - A privacy notice must be written from the actual data controller, hosting provider and integrations before collecting personal data from external users. This repository does not invent those legal details.
 - Open Graph metadata and a favicon are configured. A canonical URL and sitemap are intentionally deferred until a real production domain is selected.
 - `robots.ts` allows public app routes and disallows API routes from crawling. This is not access control.
