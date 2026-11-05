@@ -33,6 +33,7 @@ RunLattice is evolving into an approachable automation platform for non-technica
 - [x] First registered action adapter: Discord webhook message
 - [ ] General integration adapter interface and additional providers
 - [x] Restricted linear execution path, atomic run claiming, timeouts and step-level results
+- [x] Bounded manual trigger input and safe scalar templates for Discord messages
 - [ ] Durable step checkpoints, stale-run recovery and safe retries
 - [ ] Signed webhook triggers, schedules and replay protection
 
