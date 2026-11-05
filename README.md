@@ -150,7 +150,8 @@ RunLattice is an active portfolio project, not a production-ready automation ser
 - [x] Visual workflow editor and template library
 - [x] Redis/BullMQ queue and first live Discord action
 - [x] Encrypted workspace-scoped integration credentials
-- [ ] Durable execution checkpoints and stale-run recovery
+- [x] Run heartbeats and conservative stale-run detection (no automatic replay)
+- [ ] Durable execution resumption and safe retry policies
 - [ ] Condition evaluation and branching
 - [ ] Additional integrations and OAuth connections
 - [ ] Signed inbound webhooks and scheduled triggers
