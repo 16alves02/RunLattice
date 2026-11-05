@@ -123,10 +123,21 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
   // Claim the run atomically so duplicate queue delivery cannot execute its side effects twice.
   const claimed = await prisma.workflowRun.updateMany({
     where: { id: runId, workflowId, status: "QUEUED" },
-    data: { status: "RUNNING", startedAt: new Date(), error: null },
+    data: { status: "RUNNING", startedAt: new Date(), heartbeatAt: new Date(), error: null },
   });
   if (claimed.count === 0) return { skipped: true, reason: "Run was already claimed or completed." };
 
+  const heartbeatTimer = setInterval(() => {
+    void prisma.workflowRun.updateMany({
+      where: { id: runId, status: "RUNNING" },
+      data: { heartbeatAt: new Date() },
+    }).catch((error: unknown) => {
+      console.error("[worker] Unable to refresh run heartbeat:", error instanceof Error ? error.message : "Unknown error");
+    });
+  }, 20_000);
+  heartbeatTimer.unref();
+
+  try {
   const workflow = await prisma.workflow.findUnique({ where: { id: workflowId } });
   if (!workflow || workflow.status !== "ACTIVE" || !workflow.organizationId) {
     await prisma.workflowRun.update({
@@ -135,6 +146,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
         status: "CANCELLED",
         error: "Workflow is unavailable, inactive or not assigned to a workspace.",
         finishedAt: new Date(),
+        heartbeatAt: null,
       },
     });
     return { skipped: true };
@@ -194,7 +206,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
     };
     await prisma.workflowRun.update({
       where: { id: runId },
-      data: { status: "SUCCEEDED", output, error: null, finishedAt: new Date() },
+      data: { status: "SUCCEEDED", output, error: null, finishedAt: new Date(), heartbeatAt: null },
     });
     return output;
   } catch (error) {
@@ -206,10 +218,13 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
     };
     await prisma.workflowRun.update({
       where: { id: runId },
-      data: { status: "FAILED", output, error: message, finishedAt: new Date() },
+      data: { status: "FAILED", output, error: message, finishedAt: new Date(), heartbeatAt: null },
     });
     console.error("[worker] Workflow execution failed:", message);
     return { success: false };
+  }
+  } finally {
+    clearInterval(heartbeatTimer);
   }
 }, { connection, concurrency: 5 });
 
@@ -217,8 +232,38 @@ worker.on("completed", (job) => console.info(`[worker] run ${job.id} processed`)
 worker.on("failed", (job, error) => console.error(`[worker] queue job ${job?.id ?? "unknown"} failed: ${error.message}`));
 worker.on("error", (error) => console.error(`[worker] worker error: ${error.message}`));
 
+async function recoverStaleRuns() {
+  const staleBefore = new Date(Date.now() - 5 * 60_000);
+  const recovered = await prisma.workflowRun.updateMany({
+    where: {
+      status: "RUNNING",
+      heartbeatAt: { lt: staleBefore },
+    },
+    data: {
+      status: "FAILED",
+      error: "Execution was interrupted after its worker heartbeat expired. The outcome of an external action may be unknown; the run was not retried automatically.",
+      finishedAt: new Date(),
+      heartbeatAt: null,
+    },
+  });
+  if (recovered.count > 0) {
+    console.warn(`[worker] marked ${recovered.count} stale run(s) as failed; no external action was retried`);
+  }
+}
+
+const recoveryTimer = setInterval(() => {
+  void recoverStaleRuns().catch((error: unknown) => {
+    console.error("[worker] Stale-run recovery failed:", error instanceof Error ? error.message : "Unknown error");
+  });
+}, 60_000);
+recoveryTimer.unref();
+void recoverStaleRuns().catch((error: unknown) => {
+  console.error("[worker] Initial stale-run recovery failed:", error instanceof Error ? error.message : "Unknown error");
+});
+
 async function shutdown(signal: string) {
   console.info(`[worker] ${signal} received; closing gracefully`);
+  clearInterval(recoveryTimer);
   await worker.close();
   await prisma.$disconnect();
   process.exit(0);
