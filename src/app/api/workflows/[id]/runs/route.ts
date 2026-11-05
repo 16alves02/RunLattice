@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getWorkflowQueue } from "@/lib/queue";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { workflowRunInputSchema } from "@/lib/validation";
 
@@ -50,28 +49,16 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Only active workflows can be run." }, { status: 409 });
     }
 
-    const run = await prisma.workflowRun.create({ data: { workflowId: workflow.id, input: input as Prisma.InputJsonValue } });
-    try {
-      await getWorkflowQueue().add(
-        "execute-workflow",
-        { runId: run.id, workflowId: workflow.id },
-        {
-          jobId: run.id,
-          attempts: 1,
-          removeOnComplete: 500,
-          removeOnFail: 1000,
-        },
-      );
-    } catch (queueError) {
-      await prisma.workflowRun.update({
-        where: { id: run.id },
-        data: { status: "FAILED", error: "The execution queue is unavailable.", finishedAt: new Date() },
-      });
-      throw queueError;
-    }
+    const run = await prisma.workflowRun.create({
+      data: {
+        workflowId: workflow.id,
+        input: input as Prisma.InputJsonValue,
+        outboxEvent: { create: {} },
+      },
+    });
     return NextResponse.json({ data: run }, { status: 202 });
   } catch (error) {
-    console.error("Unable to queue workflow run:", error instanceof Error ? error.message : "Unknown error");
-    return NextResponse.json({ error: "The workflow run could not be queued. Check Redis and database configuration." }, { status: 503 });
+    console.error("Unable to create workflow run:", error instanceof Error ? error.message : "Unknown error");
+    return NextResponse.json({ error: "The workflow run could not be created. Check database configuration." }, { status: 503 });
   }
 }
