@@ -34,7 +34,7 @@ RunLattice is evolving into an approachable automation platform for non-technica
 - [ ] General integration adapter interface and additional providers
 - [x] Restricted graph execution with declarative true/false branches, atomic run claiming, timeouts and step-level results
 - [x] Bounded manual trigger input and safe scalar templates for Discord messages
-- [x] Stale-run detection with heartbeat monitoring (does not resume or replay interrupted runs)\n- [ ] Durable step checkpoints, lease fencing and safe retries
+- [x] Stale-run detection with heartbeat monitoring (does not resume or replay interrupted runs)\n- [x] Durable step ledger, lease fencing and stale-run outcome classification (no automatic replay or exactly-once guarantee)
 - [ ] Signed webhook triggers, schedules and replay protection
 
 ## AI-assisted workflow creation
@@ -57,7 +57,7 @@ RunLattice is evolving into an approachable automation platform for non-technica
 
 ## Launch
 
-- [ ] Integration tests for API, queue and worker
+- [ ] Full PostgreSQL/Redis crash-window and multi-worker integration tests
 - [ ] Security and privacy review
 - [ ] Production observability and health checks
 - [ ] Public demo with documented limitations
