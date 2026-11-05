@@ -1,10 +1,18 @@
 export type NodeKind = "trigger" | "condition" | "action";
 
+export interface DiscordActionConfig {
+  integrationId: "discord";
+  actionId: "send_message";
+  connectionId: string;
+  message: string;
+}
+
 export interface WorkflowNode {
   id: string;
   kind: NodeKind;
   title: string;
   detail: string;
+  config?: DiscordActionConfig;
   x: number;
   y: number;
 }
