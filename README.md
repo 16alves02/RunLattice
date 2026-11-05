@@ -75,10 +75,10 @@ docker compose up -d
 
 ```bash
 npx prisma generate
-npx prisma db push
+npx prisma migrate deploy
 ```
 
-The current schema includes Better Auth users, sessions, organizations and memberships. The first registered account can create a personal workspace during sign-up. For an existing database, review the generated Prisma changes before applying them.
+The versioned baseline migration creates the Better Auth user/session tables and organization workspace tables, and adds a nullable organization reference to existing workflows. Existing unassigned workflows remain hidden until explicitly assigned.
 
 ### 5. Start the web app
 
