@@ -161,6 +161,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
         error: "Workflow is unavailable, inactive or not assigned to a workspace.",
         finishedAt: new Date(),
         heartbeatAt: null,
+        leaseToken: null,
       },
     });
     return { skipped: true };
@@ -225,7 +226,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
     };
     await prisma.workflowRun.updateMany({
       where: { id: runId, status: "RUNNING", leaseToken },
-      data: { status: "SUCCEEDED", output, error: null, finishedAt: new Date(), heartbeatAt: null },
+      data: { status: "SUCCEEDED", output, error: null, finishedAt: new Date(), heartbeatAt: null, leaseToken: null },
     });
     return output;
   } catch (error) {
@@ -235,9 +236,9 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
       steps: serializeSteps(steps),
       message: "Workflow execution stopped after a failed step.",
     };
-    await prisma.workflowRun.update({
-      where: { id: runId },
-      data: { status: "FAILED", output, error: message, finishedAt: new Date(), heartbeatAt: null },
+    await prisma.workflowRun.updateMany({
+      where: { id: runId, status: "RUNNING", leaseToken },
+      data: { status: "FAILED", output, error: message, finishedAt: new Date(), heartbeatAt: null, leaseToken: null },
     });
     console.error("[worker] Workflow execution failed:", message);
     return { success: false };
