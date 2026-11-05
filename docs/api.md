@@ -72,4 +72,4 @@ Only HTTPS webhook URLs on the official `discord.com` or `discordapp.com` hosts 
 
 The first live worker version supports a manual trigger and a single linear path. It supports one action: send a static message to a connected Discord webhook. Condition nodes, branching, arbitrary code, inbound webhooks, scheduled triggers and other integrations cannot be activated.
 
-External actions are not automatically retried because the Discord webhook action does not provide an idempotency key. A worker crash after claiming a run may leave it in `RUNNING`; automatic recovery is a later reliability milestone.
+External actions are not automatically retried because the Discord webhook action does not provide an idempotency key. The worker updates a run heartbeat every 20 seconds. A recovery sweep marks runs with no heartbeat for more than five minutes as `FAILED`, with a warning that the external action may already have occurred. It never automatically replays an interrupted run. This is stale-run detection, not durable resumption or exactly-once delivery.
