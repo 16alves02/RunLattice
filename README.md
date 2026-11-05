@@ -27,7 +27,7 @@ AI-generated workflows are drafts. They must be reviewed and saved by the user; 
 - Integration catalog, with Discord webhook as the first live provider.
 - AES-256-GCM encryption for Discord webhook credentials.
 - Redis/BullMQ background execution with atomic run claiming.
-- Real Discord message delivery from a supported linear workflow.
+- Real Discord message delivery from a supported linear workflow, including safe `{{input.path}}` message templates.
 - AI workflow planning foundation, disabled by default and returning reviewable drafts.
 - Vitest tests for workflow validation, execution-path validation and credential encryption.
 
