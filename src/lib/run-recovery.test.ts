@@ -24,6 +24,7 @@ describe("stale workflow run recovery", () => {
         error: STALE_RUN_ERROR,
         finishedAt: now,
         heartbeatAt: null,
+        leaseToken: null,
       },
     });
   });
