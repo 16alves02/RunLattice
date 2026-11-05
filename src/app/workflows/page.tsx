@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { ArrowRight, GitBranch, Plus, Workflow } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/session";
+import { requireServerWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function WorkflowsPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/sign-in");
+  const workspace = await requireServerWorkspace();
 
   let workflows: Array<{
     id: string;
@@ -29,7 +27,7 @@ export default async function WorkflowsPage() {
 
   try {
     const records = await prisma.workflow.findMany({
-      where: { userId: user.id },
+      where: { organizationId: workspace.organizationId },
       orderBy: { updatedAt: "desc" },
       include: { _count: { select: { runs: true } } },
     });
