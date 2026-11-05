@@ -28,28 +28,32 @@ enum TriggerType {
 }
 
 model User {
-  id            String     @id
+  id            String        @id
   name          String
-  email         String     @unique
-  emailVerified Boolean    @default(false)
+  email         String        @unique
+  emailVerified Boolean       @default(false)
   image         String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   sessions      Session[]
   accounts      Account[]
   workflows     Workflow[]
+  members       Member[]
+  invitations   Invitation[]  @relation("InvitationInviter")
 }
 
 model Session {
-  id        String   @id
-  expiresAt DateTime
-  token     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String   @id
+  expiresAt            DateTime
+  token                String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ipAddress            String?
+  userAgent            String?
+  userId               String
+  activeOrganizationId String?
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }
 
@@ -68,6 +72,7 @@ model Account {
   password              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+
   @@index([userId])
 }
 
@@ -78,6 +83,7 @@ model Verification {
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
   @@index([identifier])
 }
 
@@ -88,19 +94,64 @@ model RateLimit {
   lastRequest BigInt
 }
 
-model Workflow {
-  id          String         @id @default(cuid())
+model Organization {
+  id          String       @id
   name        String
-  description String         @default("")
-  status      WorkflowStatus @default(DRAFT)
-  triggerType TriggerType    @default(MANUAL)
-  definition  Json
-  userId      String?
-  user        User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  runs        WorkflowRun[]
+  slug        String       @unique
+  logo        String?
+  metadata    String?
+  createdAt   DateTime     @default(now())
+  members     Member[]
+  invitations Invitation[]
+  workflows   Workflow[]
+}
+
+model Member {
+  id             String       @id
+  organizationId String
+  userId         String
+  role           String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model Invitation {
+  id             String       @id
+  organizationId String
+  email          String
+  inviterId      String
+  role           String?
+  status         String
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter        User         @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([organizationId])
+}
+
+model Workflow {
+  id             String         @id @default(cuid())
+  name           String
+  description    String         @default("")
+  status         WorkflowStatus @default(DRAFT)
+  triggerType    TriggerType    @default(MANUAL)
+  definition     Json
+  userId         String?
+  user           User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  runs           WorkflowRun[]
+
   @@index([userId, status, updatedAt])
+  @@index([organizationId, updatedAt])
 }
 
 model WorkflowRun {
@@ -114,6 +165,7 @@ model WorkflowRun {
   finishedAt  DateTime?
   createdAt   DateTime    @default(now())
   workflow    Workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
   @@index([workflowId, createdAt])
   @@index([status, createdAt])
 }
