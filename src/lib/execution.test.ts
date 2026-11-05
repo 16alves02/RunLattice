@@ -55,6 +55,11 @@ describe("workflow execution path", () => {
 
 
 describe("workflow activation validation", () => {
+  it("rejects a trigger-only workflow", () => {
+    const triggerOnly: WorkflowDefinition = { nodes: [definition.nodes[0]], edges: [] };
+    expect(() => validateExecutableWorkflow(triggerOnly)).toThrow(/at least one configured action/);
+  });
+
   it("rejects action nodes without a connection and message", () => {
     expect(() => validateExecutableWorkflow(definition)).toThrow(/requires a connected integration/);
   });
