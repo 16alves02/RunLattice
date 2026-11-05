@@ -49,7 +49,7 @@ describe("workflow execution path", () => {
         { id: "edge-2", from: "action-1", to: "trigger" },
       ],
     };
-    expect(() => resolveExecutionPath(cyclic)).toThrow(/cycle/);
+    expect(() => resolveExecutionPath(cyclic)).toThrow(/incoming connection/);
   });
 });
 
