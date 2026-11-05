@@ -11,6 +11,7 @@ export const aiWorkflowPlanSchema = z.object({
   rationale: z.string().trim().min(10).max(1200),
   assumptions: z.array(z.string().trim().min(1).max(240)).max(8),
   requiredIntegrations: z.array(z.string().trim().min(1).max(80)).max(12),
+  requiredPermissions: z.array(z.string().trim().min(1).max(240)).max(12),
   sideEffects: z.array(z.string().trim().min(1).max(240)).max(8),
   definition: workflowDefinitionSchema,
 });
@@ -36,7 +37,7 @@ export function buildWorkflowSystemPrompt() {
     "Do not claim an integration is connected unless the supplied context says connected.",
     "Explain assumptions and external side effects explicitly. Prefer the least-privileged and least-destructive workflow.",
     "The user must review and approve the draft. Never claim that you saved, activated or executed anything.",
-    "Return keys: name, description, rationale, assumptions, requiredIntegrations, sideEffects and definition.",
+    "Return keys: name, description, rationale, assumptions, requiredIntegrations, requiredPermissions, sideEffects and definition.",
   ].join("\n");
 }
 
