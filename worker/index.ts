@@ -1,4 +1,5 @@
 import { Worker, type Job } from "bullmq";
+import { randomUUID } from "node:crypto";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { decryptSecret } from "../src/lib/secrets";
 import { recoverStaleWorkflowRuns } from "../src/lib/run-recovery";
@@ -124,16 +125,17 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
     return { skipped: true };
   }
 
-  // Claim the run atomically so duplicate queue delivery cannot execute its side effects twice.
+  // A fresh lease token fences every later write from this worker attempt.
+  const leaseToken = randomUUID();
   const claimed = await prisma.workflowRun.updateMany({
     where: { id: runId, workflowId, status: "QUEUED" },
-    data: { status: "RUNNING", startedAt: new Date(), heartbeatAt: new Date(), error: null },
+    data: { status: "RUNNING", startedAt: new Date(), heartbeatAt: new Date(), leaseToken, error: null },
   });
   if (claimed.count === 0) return { skipped: true, reason: "Run was already claimed or completed." };
 
   const heartbeatTimer = setInterval(() => {
     void prisma.workflowRun.updateMany({
-      where: { id: runId, status: "RUNNING" },
+      where: { id: runId, status: "RUNNING", leaseToken },
       data: { heartbeatAt: new Date() },
     }).catch((error: unknown) => {
       console.error("[worker] Unable to refresh run heartbeat:", error instanceof Error ? error.message : "Unknown error");
@@ -141,11 +143,19 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
   }, 20_000);
   heartbeatTimer.unref();
 
+  const ownsLease = async () => {
+    const current = await prisma.workflowRun.findFirst({
+      where: { id: runId, status: "RUNNING", leaseToken },
+      select: { id: true },
+    });
+    return Boolean(current);
+  };
+
   try {
   const workflow = await prisma.workflow.findUnique({ where: { id: workflowId } });
   if (!workflow || workflow.status !== "ACTIVE" || !workflow.organizationId) {
-    await prisma.workflowRun.update({
-      where: { id: runId },
+    await prisma.workflowRun.updateMany({
+      where: { id: runId, status: "RUNNING", leaseToken },
       data: {
         status: "CANCELLED",
         error: "Workflow is unavailable, inactive or not assigned to a workspace.",
@@ -166,6 +176,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
     const path = resolveExecutionPath(definition, run.input);
     for (const node of path) {
       const startedAt = new Date().toISOString();
+      if (!(await ownsLease())) throw new Error("Execution lease was lost; this worker stopped.");
       await job.updateProgress({ currentNode: node.id, completed: steps.length, total: path.length });
 
       try {
@@ -176,6 +187,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
           if (!node.config || !("operator" in node.config)) throw new Error(`Condition "${node.title}" has no valid rule.`);
           result = { condition: evaluateCondition(node.config, run.input) };
         } else {
+          if (!(await ownsLease())) throw new Error("Execution lease was lost before the external action.");
           result = await executeAction(node, workflow.organizationId, run.input);
         }
 
@@ -200,8 +212,8 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
         throw new Error(safeMessage);
       }
 
-      await prisma.workflowRun.update({
-        where: { id: runId },
+      await prisma.workflowRun.updateMany({
+        where: { id: runId, status: "RUNNING", leaseToken },
         data: { output: { executionMode: "LIVE", steps: serializeSteps(steps) } },
       });
     }
@@ -211,8 +223,8 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
       steps: serializeSteps(steps),
       message: "Workflow actions completed successfully.",
     };
-    await prisma.workflowRun.update({
-      where: { id: runId },
+    await prisma.workflowRun.updateMany({
+      where: { id: runId, status: "RUNNING", leaseToken },
       data: { status: "SUCCEEDED", output, error: null, finishedAt: new Date(), heartbeatAt: null },
     });
     return output;
