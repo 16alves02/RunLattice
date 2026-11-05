@@ -16,7 +16,7 @@ RunLattice is evolving into an approachable automation platform for non-technica
 - [x] Workflow definition validation and persistence
 - [x] Redis/BullMQ queue and live Discord webhook worker
 - [x] Searchable template gallery
-- [x] Integration catalog with provider capabilities and auth requirements
+- [x] Integration catalog with provider capabilities and auth requirements\n- [x] Workspace-scoped encrypted Discord webhook connections
 - [x] AI workflow planning endpoint with server-side key and schema validation
 - [x] AI review interface that saves drafts only
 - [ ] Improve visual builder configuration and graph editing
