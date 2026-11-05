@@ -42,13 +42,13 @@ Names must contain 2–80 characters. A definition contains 1–100 nodes and up
 
 `GET /api/workflows/:id` retrieves a workflow and up to 20 recent runs.
 
-`PATCH /api/workflows/:id` updates `name`, `description`, `status` or `definition`. Changing the status to ACTIVE validates that the workflow contains exactly one trigger, a single connected linear path and at least one configured supported action. All action connections must belong to the active workspace.
+`PATCH /api/workflows/:id` updates `name`, `description`, `status` or `definition`. Changing the status to ACTIVE validates that the workflow contains exactly one trigger, a connected workflow graph, valid condition rules with exactly one true and one false branch, and at least one configured supported action. Every action on either branch must be configured and connected to the active workspace. All action connections must belong to the active workspace.
 
 `DELETE /api/workflows/:id` deletes a workflow and its run records.
 
 ## Queue a run
 
-`POST /api/workflows/:id/runs` queues a run for an active workflow. An optional JSON object can be supplied as the request body and is stored as the run input; the body is limited to 32 KB. An empty body remains valid and creates an empty input object. Arrays, primitives, malformed JSON and oversized bodies are rejected. The input is persisted on the run record and is available to Discord message templates using `{{input.customer.name}}` path syntax. Only string, number and boolean values are inserted; missing paths, object values, prototype-related path segments and rendered messages over Discord’s 2,000-character limit fail the step. Templates do not evaluate JavaScript or arbitrary expressions. Condition evaluation and branching are not implemented yet. The endpoint returns `202 Accepted` after Redis accepts the job. The worker then claims the run atomically, validates the stored workflow and persists step-level results.
+`POST /api/workflows/:id/runs` queues a run for an active workflow. An optional JSON object can be supplied as the request body and is stored as the run input; the body is limited to 32 KB. An empty body remains valid and creates an empty input object. Arrays, primitives, malformed JSON and oversized bodies are rejected. The input is persisted on the run record and is available to Discord message templates using `{{input.customer.name}}` path syntax. Only string, number and boolean values are inserted; missing paths, object values, prototype-related path segments and rendered messages over Discord’s 2,000-character limit fail the step. Templates do not evaluate JavaScript or arbitrary expressions. Condition nodes evaluate the stored run input using a restricted operator set: equals, not_equals, contains, greater_than, less_than and exists. A condition node must have exactly one outgoing true edge and one outgoing false edge; only the matching branch executes. The endpoint returns `202 Accepted` after Redis accepts the job. The worker then claims the run atomically, validates the stored workflow and persists step-level results.
 
 ## Integration connections
 
@@ -70,6 +70,6 @@ Only HTTPS webhook URLs on the official `discord.com` or `discordapp.com` hosts 
 
 ## Live execution limits
 
-The first live worker version supports a manual trigger and a single linear path. It supports one action: send a static message to a connected Discord webhook. Condition nodes, branching, arbitrary code, inbound webhooks, scheduled triggers and other integrations cannot be activated.
+The live worker supports a manual trigger, Discord send-message actions and declarative condition nodes. Conditions read the persisted run input through safe own-property paths and never evaluate JavaScript. Operators are equals, not_equals, contains, greater_than, less_than and exists. A condition must connect to exactly one true and one false branch; only the selected branch executes. Both branches are validated before activation. Arbitrary code, inbound webhooks, scheduled triggers and other integrations cannot be activated.
 
 External actions are not automatically retried because the Discord webhook action does not provide an idempotency key. The worker updates a run heartbeat every 20 seconds. A recovery sweep marks runs with no heartbeat for more than five minutes as `FAILED`, with a warning that the external action may already have occurred. It never automatically replays an interrupted run. This is stale-run detection, not durable resumption or exactly-once delivery.
