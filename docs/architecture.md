@@ -2,31 +2,44 @@
 
 ## Current shape
 
-RunLattice is split into three responsibilities:
+RunLattice separates the web application, persistence and background execution:
 
 1. **Web application** — Next.js App Router serves the workspace interface and route handlers.
-2. **Persistence** — PostgreSQL stores workflow definitions and run records through Prisma.
-3. **Background worker** — BullMQ consumes queued runs from Redis, so the request handler does not perform a workflow inline.
+2. **Persistence** — PostgreSQL stores users, organizations, integration connections, workflow definitions and run records through Prisma.
+3. **Queue** — Redis/BullMQ accepts workflow run jobs without executing external actions inside the HTTP request.
+4. **Worker** — a separate Node.js process claims runs and dispatches registered action handlers.
 
 ```text
 Browser
-  | HTTP
+  | authenticated HTTP
   v
 Next.js UI + API ---- Prisma ---- PostgreSQL
   |                               ^
-  | enqueue run                   | update run state
+  | enqueue run                   | run state and step output
   v                               |
 Redis / BullMQ queue ---> Worker -+
+                              |
+                              | encrypted connection lookup
+                              v
+                         Discord webhook
 ```
 
-## Important boundaries
+## Execution boundary
 
-- API input is validated before data is written.
-- Database and queue errors return a generic response; details are logged server-side.
-- Workflow definitions are data, not executable JavaScript. Workflow definitions are data, not executable JavaScript. The worker validates a single linear path and dispatches only registered actions. The first live action sends a message through a workspace-scoped Discord webhook.
-- A queue job uses the run ID as its job ID to reduce duplicate enqueueing for the same run record.
-- The worker closes its queue consumer and database connection on `SIGINT` and `SIGTERM`.
+Workflow definitions are data, not executable JavaScript. Before activation, the API validates the graph and confirms that every referenced integration connection belongs to the active workspace. The worker repeats the important checks before dispatching the action.
+
+The current runtime accepts exactly one trigger and one connected linear path. It dispatches only the registered Discord send-message action. Conditions, branching, arbitrary code, inbound webhooks and schedules are not supported yet.
+
+## Credential boundary
+
+Discord webhook URLs are encrypted with AES-256-GCM before they are stored. The encryption context binds each credential to its organization and provider. The API returns connection metadata only. The worker decrypts a credential only after retrieving the matching connection from the workflow's organization. The destination is validated again, redirects are blocked and requests time out after 10 seconds.
+
+## Queue and side-effect semantics
+
+A queue job uses the database run ID as its BullMQ job ID. The worker claims a run through an atomic QUEUED-to-RUNNING update so duplicate delivery cannot normally execute the same run twice. Each completed step is persisted to the run output.
+
+The Discord webhook action is non-idempotent, so automatic queue retries are disabled. This reduces duplicate messages but does not provide exactly-once delivery. A process crash after claiming a run can leave it in RUNNING; durable checkpoints, stale-run recovery and a transactional outbox are future reliability work.
 
 ## Before production
 
-The current project intentionally does not claim to be production-ready. Conditions, branching, durable step checkpoints, stale-run recovery, signed inbound webhooks, scheduled triggers, provider OAuth, per-connection rate limits, audit retention and live provider integration tests remain outstanding. The current worker uses at-most-once claiming for each run; a worker crash can leave a run in RUNNING and requires recovery rather than an automatic retry that could duplicate an external side effect.
+The current project is not production-ready. Outstanding work includes durable step checkpoints, stale-run recovery, safe retry policies, transactional outbox, condition evaluation, branching, signed inbound webhooks, scheduled triggers, provider OAuth, provider rate limits, audit retention, end-to-end provider tests, AI request budgets and a security review.
