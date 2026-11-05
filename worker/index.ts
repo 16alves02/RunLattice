@@ -91,7 +91,7 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
 }
 
 async function executeAction(node: WorkflowDefinition["nodes"][number], organizationId: string) {
-  if (!node.config) throw new Error(`Action "${node.title}" has not been configured.`);
+  if (!node.config?.connectionId || !node.config.message?.trim()) throw new Error(`Action "${node.title}" has not been configured.`);
   if (node.config.integrationId === "discord" && node.config.actionId === "send_message") {
     return executeDiscordAction(node.config, organizationId);
   }
