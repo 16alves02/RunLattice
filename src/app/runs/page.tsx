@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Activity, ArrowRight, CheckCircle2, Clock3, XCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/session";
+import { requireServerWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -23,8 +22,7 @@ function formatDuration(startedAt: Date | null, finishedAt: Date | null) {
 }
 
 export default async function RunsPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/sign-in");
+  const workspace = await requireServerWorkspace();
 
   let runs: Array<{
     id: string; workflowId: string; workflowName: string; status: string;
@@ -35,7 +33,7 @@ export default async function RunsPage() {
   let counts = { total: 0, succeeded: 0, failed: 0, queued: 0, running: 0 };
 
   try {
-    const ownedRuns = { workflow: { userId: user.id } };
+    const ownedRuns = { workflow: { organizationId: workspace.organizationId } };
     const [records, total, succeeded, failed, queued, running] = await Promise.all([
       prisma.workflowRun.findMany({
         where: ownedRuns, orderBy: { createdAt: "desc" }, take: 100,
