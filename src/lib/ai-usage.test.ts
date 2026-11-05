@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   estimateReservedTokens,
   getUsagePeriodStart,
+  markAIUsageFailed,
   reserveAIUsage,
   settleAIUsage,
 } from "@/lib/ai-usage";
@@ -83,6 +84,18 @@ describe("workspace AI usage accounting", () => {
       where: { id: "event-1" },
       data: { status: "SUCCEEDED", promptTokens: 600, completionTokens: 400 },
     });
+  });
+
+  it("keeps reserved tokens charged when provider outcome is ambiguous", async () => {
+    const { database, transaction } = createDatabase();
+    await markAIUsageFailed(database as never, {
+      eventId: "event-1",
+      organizationId: "workspace-1",
+      periodStart: new Date("2026-11-01T00:00:00.000Z"),
+      reservedTokens: 2_000,
+    });
+    expect(transaction.aiWorkspaceUsage.updateMany).not.toHaveBeenCalled();
+    expect(transaction.aiUsageEvent.update).toHaveBeenCalledWith({ where: { id: "event-1" }, data: { status: "FAILED" } });
   });
 
   it("estimates a bounded reservation for prompts without provider tokenizers", () => {
