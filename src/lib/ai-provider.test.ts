@@ -53,6 +53,7 @@ describe("AI provider abstraction", () => {
   });
 
   it("reports provider configuration without exposing its key", () => {
+    vi.stubEnv("AI_PROVIDER", "openai");
     vi.stubEnv("OPENAI_API_KEY", "private-key");
     vi.stubEnv("AI_MODEL", "test-model");
     expect(getAIProviderSelection()).toEqual({ provider: "openai", model: "test-model", configured: true });
