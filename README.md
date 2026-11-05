@@ -30,7 +30,7 @@ AI-generated workflows are drafts only. Users must review and save them; the ass
 - **AI workflow assistant foundation** that sends natural-language requests to a server-side model and validates the returned workflow definition before presenting it for review.
 - **REST API** to list, create, update and delete workflow definitions.
 - **Schema validation** for node identifiers, connections and workflow fields.
-- **Execution queue foundation** using Redis and BullMQ with retries and exponential backoff.
+- **Background execution** using Redis and BullMQ, with atomic run claiming and step-level results. Automatic retries are disabled for non-idempotent external actions.
 - **Worker process** that executes validated linear workflows and sends real Discord webhook messages.
 - **Execution history** with database-backed run records, statuses, timestamps and durations.
 - **Automated tests** for workflow graph and trigger type validation.
@@ -123,7 +123,7 @@ docker compose down
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/health` | Basic application health response |
-| `GET` | `/api/integrations` | List planned integration definitions |
+| `GET` | `/api/integrations` | List integrations and workspace connections |
 | `POST` | `/api/ai/workflow-plan` | Generate a validated workflow draft (disabled by default) |
 | `GET` | `/api/workflows` | List workflows |
 | `POST` | `/api/workflows` | Validate and create a workflow |
@@ -153,14 +153,14 @@ This is an active portfolio project and is not yet a production-ready automation
 
 - [x] Responsive workspace and visual workflow editor
 - [x] Workflow validation and persistence
-- [x] Redis/BullMQ queue and simulated worker
+- [x] Redis/BullMQ queue and live Discord webhook worker
 - [x] Searchable template library
-- [x] Integration catalog foundation
+- [x] Integration catalog and first live Discord webhook action
 - [x] AI workflow planning endpoint and review interface (disabled by default)
 - [x] Email/password authentication and per-account workflow ownership
-- [ ] Multi-user workspaces, roles and invitations
-- [ ] Secure OAuth connection and credential storage
-- [ ] First real integration with end-to-end tests
+- [x] Multi-user workspaces and role-based workflow access
+- [x] Encrypted workspace-scoped Discord webhook credentials\n- [ ] OAuth connections for additional providers
+- [x] First real external action: Discord webhook message\n- [ ] Provider end-to-end tests
 - [ ] Safe action adapters, signed webhooks and scheduling
 - [ ] AI workflow generation enabled after quotas, abuse controls and security review
 - [ ] Production observability, security review and public demo
