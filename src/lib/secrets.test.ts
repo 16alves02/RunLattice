@@ -12,20 +12,20 @@ describe("integration credential encryption", () => {
   it("encrypts and decrypts secrets without storing plaintext", () => {
     process.env.INTEGRATION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
     const secret = "discord-webhook-secret";
-    const encrypted = encryptSecret(secret);
+    const encrypted = encryptSecret(secret, "org-1:discord");
 
     expect(encrypted).not.toContain(secret);
-    expect(decryptSecret(encrypted)).toBe(secret);
+    expect(decryptSecret(encrypted, "org-1:discord")).toBe(secret);
   });
 
   it("uses a unique nonce for each encryption", () => {
     process.env.INTEGRATION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
-    expect(encryptSecret("same-secret")).not.toBe(encryptSecret("same-secret"));
+    expect(encryptSecret("same-secret", "org-1:discord")).not.toBe(encryptSecret("same-secret"));
   });
 
   it("rejects an invalid encryption key", () => {
     process.env.INTEGRATION_ENCRYPTION_KEY = Buffer.alloc(16, 7).toString("base64");
-    expect(() => encryptSecret("secret")).toThrow(/32-byte key/);
+    expect(() => encryptSecret("secret", "org-1:discord")).toThrow(/32-byte key/);
   });
 
   it("rejects tampered ciphertext", () => {
@@ -33,6 +33,13 @@ describe("integration credential encryption", () => {
     const encrypted = encryptSecret("secret");
     const parts = encrypted.split(".");
     parts[3] = `${parts[3][0] === "A" ? "B" : "A"}${parts[3].slice(1)}`;
-    expect(() => decryptSecret(parts.join("."))).toThrow();
+    expect(() => decryptSecret(parts.join("."), "org-1:discord")).toThrow();
   });
 });
+
+  it("rejects credentials under a different workspace or provider context", () => {
+    process.env.INTEGRATION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
+    const encrypted = encryptSecret("secret", "org-1:discord");
+    expect(() => decryptSecret(encrypted, "org-2:discord")).toThrow();
+    expect(() => decryptSecret(encrypted, "org-1:slack")).toThrow();
+  });
