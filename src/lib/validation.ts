@@ -60,6 +60,9 @@ export const workflowDefinitionSchema = z.object({
   edges: z.array(edgeSchema).max(200),
 }).superRefine((definition, context) => {
   const ids = new Set(definition.nodes.map((node) => node.id));
+  if (definition.nodes.filter((node) => node.kind === "condition").length > 1) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "This execution version supports one condition node per workflow." });
+  }
   const nodesById = new Map(definition.nodes.map((node) => [node.id, node]));
   if (ids.size !== definition.nodes.length) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: "Node identifiers must be unique." });
