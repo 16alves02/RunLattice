@@ -38,7 +38,7 @@ Discord webhook URLs are encrypted with AES-256-GCM before they are stored. The 
 
 A queue job uses the database run ID as its BullMQ job ID. The worker claims a run through an atomic QUEUED-to-RUNNING update so duplicate delivery cannot normally execute the same run twice. Each completed step is persisted to the run output.
 
-The Discord webhook action is non-idempotent, so automatic queue retries are disabled. This reduces duplicate messages but does not provide exactly-once delivery. A process crash after claiming a run can leave it in RUNNING; durable checkpoints, stale-run recovery and a transactional outbox are future reliability work.
+The Discord webhook action is non-idempotent, so automatic queue retries are disabled. This reduces duplicate messages but does not provide exactly-once delivery. While a run is active, the worker refreshes its database heartbeat every 20 seconds. A recovery sweep runs at startup and every 60 seconds, marking runs with a heartbeat older than five minutes as FAILED and recording that the external-action outcome may be unknown. It deliberately does not replay them. This prevents indefinitely stuck RUNNING records without risking automatic duplicate side effects. It does not resume from checkpoints; durable resumption, operator-assisted reconciliation and a transactional outbox remain future reliability work.
 
 ## Before production
 
