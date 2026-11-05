@@ -74,8 +74,8 @@ export async function generateAICompletion(
       content,
       provider: config.provider,
       model: config.model,
-      promptTokens: payload.usage?.prompt_tokens ?? 0,
-      completionTokens: payload.usage?.completion_tokens ?? 0,
+      promptTokens: payload.usage?.prompt_tokens ?? Math.ceil((systemPrompt.length + userPrompt.length) / 3),
+      completionTokens: payload.usage?.completion_tokens ?? Math.ceil(content.length / 3),
     };
   }
 
@@ -106,7 +106,7 @@ export async function generateAICompletion(
     content,
     provider: config.provider,
     model: config.model,
-    promptTokens: payload.usage?.input_tokens ?? 0,
-    completionTokens: payload.usage?.output_tokens ?? 0,
+    promptTokens: payload.usage?.input_tokens ?? Math.ceil((systemPrompt.length + userPrompt.length) / 3),
+    completionTokens: payload.usage?.output_tokens ?? Math.ceil(content.length / 3),
   };
 }
