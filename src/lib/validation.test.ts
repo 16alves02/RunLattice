@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workflowDefinitionSchema, createWorkflowSchema, createIntegrationConnectionSchema } from "@/lib/validation";
+import { workflowDefinitionSchema, createWorkflowSchema, createIntegrationConnectionSchema, workflowRunInputSchema } from "@/lib/validation";
 
 const validDefinition = {
   nodes: [
@@ -90,5 +90,20 @@ describe("Discord integration connection validation", () => {
       ...validConnection,
       webhookUrl: `${validConnection.webhookUrl}?redirect=https://example.com`,
     }).success).toBe(false);
+  });
+});
+
+
+describe("workflow run input validation", () => {
+  it("accepts a bounded JSON object", () => {
+    expect(workflowRunInputSchema.safeParse({ customer: { email: "person@example.com" }, amount: 42 }).success).toBe(true);
+  });
+
+  it("rejects input larger than 32 KB", () => {
+    expect(workflowRunInputSchema.safeParse({ payload: "x".repeat(32_769) }).success).toBe(false);
+  });
+
+  it("accepts an empty input object for manual runs", () => {
+    expect(workflowRunInputSchema.safeParse({}).success).toBe(true);
   });
 });
