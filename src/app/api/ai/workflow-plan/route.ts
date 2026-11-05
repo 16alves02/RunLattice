@@ -147,6 +147,13 @@ export async function POST(request: Request) {
     if (node.config && "integrationId" in node.config) required.add(node.config.integrationId);
   }
   const missingIntegrations = findMissingIntegrations([...required], integrationContext);
+  const setupRequiredActions = plan.data.definition.nodes
+    .filter((node) => node.kind === "action" && (!node.config || !("integrationId" in node.config)
+      || !node.config.connectionId || !node.config.message?.trim()))
+    .map((node) => node.title);
+  const executionReadiness = missingIntegrations.length > 0 || setupRequiredActions.length > 0
+    ? "setup_required"
+    : "review_required";
 
   const periodStart = getUsagePeriodStart();
   const usage = await prisma.aiWorkspaceUsage.findUnique({
@@ -163,7 +170,8 @@ export async function POST(request: Request) {
     data: {
       ...plan.data,
       missingIntegrations,
-      executionReadiness: missingIntegrations.length === 0 ? "review_required" : "setup_required",
+      setupRequiredActions,
+      executionReadiness,
     },
     requiresReview: true,
     saved: false,
