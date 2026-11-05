@@ -14,7 +14,7 @@ RunLattice is evolving into an approachable automation platform for non-technica
 
 - [x] Workspace dashboard and responsive layout
 - [x] Workflow definition validation and persistence
-- [x] Redis/BullMQ queue and simulated worker
+- [x] Redis/BullMQ queue and live Discord webhook worker
 - [x] Searchable template gallery
 - [x] Integration catalog with provider capabilities and auth requirements
 - [x] AI workflow planning endpoint with server-side key and schema validation
@@ -26,10 +26,10 @@ RunLattice is evolving into an approachable automation platform for non-technica
 - [x] Email/password authentication and per-account workflow ownership
 - [x] Organization-backed multi-user workspaces and owner/admin/member workflow permissions
 - [ ] Invitation delivery and member administration UI
-- [ ] Secure OAuth connection and encrypted credential storage
+- [x] Encrypted workspace-scoped Discord webhook credentials\n- [ ] OAuth connections for additional providers
 - [ ] Request rate limiting and audit logs
-- [ ] Integration adapter interface and first real provider
-- [ ] Safe execution adapters, timeouts, retries and step-level logs
+- [x] First registered action adapter: Discord webhook message\n- [ ] General integration adapter interface and additional providers
+- [x] Restricted linear execution path, atomic run claiming, timeouts and step-level results\n- [ ] Durable step checkpoints, stale-run recovery and safe retries
 - [ ] Signed webhook triggers, schedules and replay protection
 
 ## AI-assisted workflow creation
@@ -46,7 +46,7 @@ RunLattice is evolving into an approachable automation platform for non-technica
 
 - [x] Catalog definitions for Gmail, Google Drive, Google Sheets, Discord, Slack, Shopify, Stripe, GitHub and HTTP
 - [ ] OAuth and secure provider account connections
-- [ ] First end-to-end integration
+- [x] First live integration: Discord webhook message\n- [ ] Provider end-to-end tests
 - [ ] Community template publishing and versioning
 
 ## Launch
@@ -58,4 +58,4 @@ RunLattice is evolving into an approachable automation platform for non-technica
 
 ## Current limitations
 
-Email/password authentication, organization membership and workspace-scoped workflow access are implemented. Owners and admins can manage workflows; members are read-only. The integration library is descriptive only: it does not connect provider accounts or execute external actions. The AI endpoint remains disabled by default pending usage quotas and a security review. The current worker simulates graph traversal.
+Email/password authentication, organization membership and workspace-scoped workflow access are implemented. Owners and admins can manage workflows; members are read-only. Discord webhook connections are available with encrypted credentials and a live send-message action. Other provider entries remain catalog-only. The AI endpoint remains disabled by default pending usage quotas and a security review. The current worker supports a single linear path with a manual trigger and Discord send-message action. Branching, condition evaluation, arbitrary code, scheduled triggers and inbound webhooks are not implemented.
