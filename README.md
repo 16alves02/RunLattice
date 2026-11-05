@@ -6,9 +6,7 @@
 
 Design, run and monitor workflows from one clear workspace.
 
-An evolving workflow automation platform designed for both non-technical users and developers.
-
-[Features](#features) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [Project status](#project-status)
+An evolving workflow automation platform for non-technical users, developers, teams and businesses.
 
 </div>
 
@@ -16,33 +14,38 @@ An evolving workflow automation platform designed for both non-technical users a
 
 ## Product direction
 
-RunLattice aims to make automation understandable without hiding advanced capabilities. Beginners should be able to start from templates or describe a task in plain language. Developers should be able to extend workflows with conditions, APIs and custom integrations.
+RunLattice combines approachable automation with advanced workflow controls. Users can start from templates or describe an automation in natural language; developers can extend workflows through typed actions and integrations.
 
-AI-generated workflows are drafts only. Users must review and save them; the assistant never activates or executes a workflow.
+AI-generated workflows are drafts. They must be reviewed and saved by the user; the assistant does not activate or execute them automatically.
 
-## Features
+## Implemented capabilities
 
-- **Accounts and organizations** with email/password sign-up, sign-in, sign-out and database-backed sessions.
-- **Multi-user workspaces** with organization membership, workspace switching, invitations foundation and owner/admin/member roles.
-- **Visual workflow builder** that loads, creates and updates saved trigger, condition and action node definitions.
-- **Template library** with searchable, category-filtered starter workflows.
-- **Integration catalog** with a first live Discord webhook connection and encrypted workspace-scoped credentials; additional providers remain planned.
-- **AI workflow assistant foundation** that sends natural-language requests to a server-side model and validates the returned workflow definition before presenting it for review.
-- **REST API** to list, create, update and delete workflow definitions.
-- **Schema validation** for node identifiers, connections and workflow fields.
-- **Background execution** using Redis and BullMQ, with atomic run claiming and step-level results. Automatic retries are disabled for non-idempotent external actions.
-- **Worker process** that executes validated linear workflows and sends real Discord webhook messages.
-- **Execution history** with database-backed run records, statuses, timestamps and durations.
-- **Automated tests** for workflow validation, execution path rules and credential encryption.
-- **Docker Compose** for local PostgreSQL and Redis services.
+- Email/password authentication and PostgreSQL-backed sessions through Better Auth.
+- Organization-based workspaces with owner, admin and member roles.
+- Workspace-scoped workflow CRUD and execution history.
+- Visual workflow builder and searchable workflow templates.
+- Integration catalog, with Discord webhook as the first live provider.
+- AES-256-GCM encryption for Discord webhook credentials.
+- Redis/BullMQ background execution with atomic run claiming.
+- Real Discord message delivery from a supported linear workflow.
+- AI workflow planning foundation, disabled by default and returning reviewable drafts.
+- Vitest tests for workflow validation, execution-path validation and credential encryption.
 
-## Integration status
+## Current execution limits
 
-Discord webhook delivery is the first live integration. Workspace owners/admins can save a Discord webhook URL; it is encrypted with AES-256-GCM using `INTEGRATION_ENCRYPTION_KEY` and is never returned by the API. The worker revalidates the destination, blocks redirects, applies a 10-second timeout and sends configured messages. Gmail, Google Drive, Google Sheets, Slack, Shopify, Stripe, GitHub and generic HTTP remain planned.
+The worker currently supports manual runs with exactly one trigger and one linear path. The only live action is sending a static message to a connected Discord webhook. Conditions, branching, arbitrary code, inbound webhooks, scheduled triggers and other provider actions are not implemented.
 
-## AI assistant status
+Automatic BullMQ retries are disabled for the Discord action because it is non-idempotent. A worker crash after claiming a run can leave it in RUNNING; durable checkpoints and stale-run recovery remain outstanding. This is not an exactly-once execution guarantee.
 
-The AI planning endpoint is disabled by default. It requires `AI_ASSISTANT_ENABLED=true` and a server-side `AI_API_KEY`. It uses structured JSON output followed by Zod validation and requires a signed-in account. A generated plan is not saved or executed until the user reviews and saves it. Configure provider billing limits and application-level AI request quotas before enabling it publicly.
+## Integration security
+
+Discord webhook URLs are accepted only for the official Discord HTTPS webhook hosts, encrypted at rest and never returned by the API. The worker revalidates the stored destination, blocks redirects and applies a 10-second timeout. Set `INTEGRATION_ENCRYPTION_KEY` to a unique base64-encoded 32-byte key in both the web and worker environments. Generate one with:
+
+```bash
+openssl rand -base64 32
+```
+
+Back up the key securely. Losing it makes existing integration credentials undecryptable.
 
 ## Tech stack
 
@@ -52,7 +55,8 @@ The AI planning endpoint is disabled by default. It requires `AI_ASSISTANT_ENABL
 | API | Next.js Route Handlers, Zod |
 | Data | PostgreSQL, Prisma ORM |
 | Background jobs | Redis, BullMQ |
-| AI planning | OpenAI API via server-side fetch |
+| Authentication | Better Auth |
+| AI planning | Server-side OpenAI API integration |
 | Tests | Vitest |
 | Local services | Docker Compose |
 
@@ -76,7 +80,7 @@ npm install
 cp .env.example .env
 ```
 
-Review `DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS` and `INTEGRATION_ENCRYPTION_KEY`. Generate a secret with `openssl rand -base64 32`. For local development, the auth module has a development-only fallback; production refuses to start without `BETTER_AUTH_SECRET`. Never commit real credentials.
+Configure `DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` and `BETTER_AUTH_TRUSTED_ORIGINS`. Configure `INTEGRATION_ENCRYPTION_KEY` before saving provider credentials. Never commit real credentials.
 
 ### 3. Start PostgreSQL and Redis
 
@@ -84,20 +88,20 @@ Review `DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `BE
 docker compose up -d
 ```
 
-### 4. Generate the Prisma client and apply the schema
+### 4. Apply database migrations
 
 ```bash
 npx prisma generate
 npx prisma migrate deploy
 ```
 
-### 5. Start the web app
+### 5. Start the web application
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open http://localhost:3000.
 
 ### 6. Start the worker in a second terminal
 
@@ -105,14 +109,15 @@ Open [http://localhost:3000](http://localhost:3000).
 npm run worker
 ```
 
-The worker expects the same `DATABASE_URL` and `REDIS_URL` as the web app. To connect Discord, also configure `INTEGRATION_ENCRYPTION_KEY` with a unique 32-byte base64 key generated by `openssl rand -base64 32`.
+The web application and worker require the same PostgreSQL and Redis configuration. The worker also needs the same integration encryption key to decrypt saved provider credentials.
 
 ## Useful commands
 
 ```bash
 npm run dev
 npm run typecheck
-npm run test
+npm run lint
+npm test
 npm run worker
 npm run build
 docker compose down
@@ -122,66 +127,37 @@ docker compose down
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/health` | Basic application health response |
-| `GET` | `/api/integrations` | List integrations and workspace connections |
-| `POST` | `/api/integrations` | Save an encrypted Discord webhook connection |
-| `DELETE` | `/api/integrations/:id` | Remove a workspace integration connection |
-| `POST` | `/api/ai/workflow-plan` | Generate a validated workflow draft (disabled by default) |
-| `GET` | `/api/workflows` | List workflows |
-| `POST` | `/api/workflows` | Validate and create a workflow |
-| `GET` | `/api/workflows/:id` | Retrieve a workflow and recent runs |
-| `PATCH` | `/api/workflows/:id` | Update supported workflow fields |
-| `DELETE` | `/api/workflows/:id` | Delete a workflow |
-| `POST` | `/api/workflows/:id/runs` | Queue an execution for an active workflow |
+| GET | `/api/health` | Basic application health response |
+| GET | `/api/integrations` | List the catalog and workspace connections |
+| POST | `/api/integrations` | Save an encrypted Discord webhook |
+| DELETE | `/api/integrations/:id` | Remove a workspace connection |
+| GET | `/api/workflows` | List workspace workflows |
+| POST | `/api/workflows` | Create a workflow |
+| GET | `/api/workflows/:id` | Retrieve a workflow and recent runs |
+| PATCH | `/api/workflows/:id` | Update workflow fields |
+| DELETE | `/api/workflows/:id` | Delete a workflow |
+| POST | `/api/workflows/:id/runs` | Queue an active workflow |
 
-All workflow and run endpoints require a valid Better Auth session and verified membership in the active organization. Reads are available to members; creating, editing, deleting and running workflows require the owner or admin role. `/api/health` remains public for deployment health checks.
-
-## Project structure
-
-```text
-src/
-  app/                 Next.js pages and API routes
-  components/          Workspace shell, galleries and builder
-  lib/                 Database, queue, integration catalog and validation
-prisma/                Database schema
-worker/                Background job worker
-```
+All workflow and integration endpoints require an authenticated session and verified membership in the active organization. Members can read; owners and admins can make changes and queue runs. The health endpoint is public and does not currently test PostgreSQL or Redis connectivity.
 
 ## Project status
 
-This is an active portfolio project and is not yet a production-ready automation service. Email/password authentication, database-backed sessions and organization-based workspaces are implemented. Existing accounts receive a personal workspace during migration. Workflow access is scoped to the active organization; owners and admins can manage workflows while members are read-only. Workflow definitions and run records are persisted in PostgreSQL, and background jobs are processed through BullMQ. The worker now executes a restricted linear path and supports sending messages through connected Discord webhooks. Branching, conditions, arbitrary code, other provider actions, inbound signed webhooks, scheduling, billing, production observability and a full security review remain outstanding. External side effects are not automatically retried because the initial Discord webhook action has no provider idempotency key.
+RunLattice is an active portfolio project, not a production-ready automation service. The authentication and workspace foundation is implemented, and the first real external action is available through Discord webhooks. Additional provider integrations, general-purpose action adapters, condition evaluation, branching, durable recovery, email delivery, invitation management, AI quotas, observability, billing and a full security review remain outstanding.
 
 ## Roadmap
 
-- [x] Responsive workspace and visual workflow editor
-- [x] Workflow validation and persistence
-- [x] Redis/BullMQ queue and first live Discord webhook action
-- [x] Searchable template library and integration catalog
-- [x] AI workflow planning endpoint and review interface (disabled by default)
-- [x] Email/password authentication and organization-based workspace access
-- [x] Encrypted workspace-scoped Discord webhook credentials
-- [x] First live external action: Discord webhook message
-- [ ] OAuth connections for additional providers
-- [ ] General action adapter interface and additional integrations
-- [ ] Condition evaluation, branching and advanced graph execution
-- [ ] Durable step checkpoints, stale-run recovery and safe retry policies
+- [x] Authentication and organization-based workspace isolation
+- [x] Visual workflow editor and template library
+- [x] Redis/BullMQ queue and first live Discord action
+- [x] Encrypted workspace-scoped integration credentials
+- [ ] Durable execution checkpoints and stale-run recovery
+- [ ] Condition evaluation and branching
+- [ ] Additional integrations and OAuth connections
 - [ ] Signed inbound webhooks and scheduled triggers
-- [ ] Provider end-to-end tests and security review
-- [ ] AI usage quotas, production observability and public launch
+- [ ] Member administration and transactional email
+- [ ] AI usage budgets, observability and billing
+- [ ] Security review and public launch readiness
 
 ## Author
 
 Built by [16alves02](https://github.com/16alves02).
-
-## Launch audit notes
-
-- Email/password authentication, organization membership and workspace-scoped data access are implemented. Email verification, account recovery and invitation email delivery still require a transactional email provider.
-- Discord webhook URLs are encrypted at rest and never returned by the API. Configure and back up `INTEGRATION_ENCRYPTION_KEY` securely for every environment.
-- No analytics or advertising scripts are included. Reassess cookie consent if analytics or non-essential storage is introduced.
-- A privacy notice must be written from the actual data controller, hosting provider and integrations before collecting personal data from external users.
-- A canonical URL and sitemap should be configured after the production domain is selected.
-- The AI endpoint remains disabled by default. Configure spend limits and per-account quotas before enabling it publicly.
-- Discord is the only live provider action. Other integration cards remain planned.
-- The worker supports manual-triggered linear workflows only. Branching, conditions, arbitrary code, inbound webhooks and schedules are not implemented.
-- A worker crash after claiming a run can leave it in RUNNING; durable recovery is still outstanding.
-- Real Discord delivery, browser accessibility checks, automated tests and a production build must be validated before public deployment.
