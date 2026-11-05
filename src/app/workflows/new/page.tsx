@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { WorkflowBuilder } from "@/components/workflow-builder";
-import { requireServerWorkspace } from "@/lib/workspace";
+import { canManageWorkspace, requireServerWorkspace } from "@/lib/workspace";
 
 export const metadata: Metadata = {
   title: "Workflow builder",
@@ -12,7 +13,8 @@ type PageProps = {
 };
 
 export default async function NewWorkflowPage({ searchParams }: PageProps) {
-  await requireServerWorkspace();
+  const workspace = await requireServerWorkspace();
+  if (!canManageWorkspace(workspace.role)) redirect("/workflows");
   const { workflow } = await searchParams;
   return <WorkflowBuilder workflowId={workflow} />;
 }
