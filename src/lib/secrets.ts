@@ -14,18 +14,21 @@ function getEncryptionKey() {
   return key;
 }
 
-export function encryptSecret(value: string) {
+export function encryptSecret(value: string, context: string) {
   if (!value) throw new Error("A non-empty secret is required.");
+  if (!context) throw new Error("An encryption context is required.");
 
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGORITHM, getEncryptionKey(), iv);
+  cipher.setAAD(Buffer.from(context, "utf8"));
   const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
 
   return ["v1", iv.toString("base64url"), tag.toString("base64url"), encrypted.toString("base64url")].join(".");
 }
 
-export function decryptSecret(payload: string) {
+export function decryptSecret(payload: string, context: string) {
+  if (!context) throw new Error("A decryption context is required.");
   const [version, encodedIv, encodedTag, encodedData, ...extra] = payload.split(".");
   if (version !== "v1" || !encodedIv || !encodedTag || !encodedData || extra.length > 0) {
     throw new Error("The stored integration credential has an unsupported format.");
@@ -39,6 +42,7 @@ export function decryptSecret(payload: string) {
   }
 
   const decipher = createDecipheriv(ALGORITHM, getEncryptionKey(), iv);
+  decipher.setAAD(Buffer.from(context, "utf8"));
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
 }
