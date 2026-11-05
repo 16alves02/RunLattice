@@ -13,6 +13,7 @@ const validPlan = {
   rationale: "The order event starts the process and the action prepares a notification.",
   assumptions: ["The store provides an order event."],
   requiredIntegrations: ["Shopify", "Gmail"],
+  requiredPermissions: ["Read orders", "Send email after approval"],
   sideEffects: ["A customer email may be sent after the Gmail connection is configured."],
   definition: {
     nodes: [
