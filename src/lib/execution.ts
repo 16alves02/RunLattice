@@ -46,14 +46,18 @@ export function resolveExecutionPath(definition: WorkflowDefinition): WorkflowNo
 
 export function validateExecutableWorkflow(definition: WorkflowDefinition): WorkflowNode[] {
   const path = resolveExecutionPath(definition);
-  if (!path.some((node) => node.kind === "action")) {
-    throw new Error("A live workflow must contain at least one configured action.");
-  }
 
   for (const node of path) {
     if (node.kind === "condition") {
       throw new Error("Condition nodes are not available in this execution version. Remove them before activating the workflow.");
     }
+  }
+
+  if (!path.some((node) => node.kind === "action")) {
+    throw new Error("A live workflow must contain at least one configured action.");
+  }
+
+  for (const node of path) {
     if (node.kind === "action" && (!node.config?.connectionId || !node.config.message?.trim())) {
       throw new Error(`Action "${node.title}" requires a connected integration and a message before activation.`);
     }
