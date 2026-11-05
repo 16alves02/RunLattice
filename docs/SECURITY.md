@@ -45,7 +45,7 @@ The first supported connection is a Discord webhook. Its URL is encrypted using 
 
 The worker revalidates the URL against the official Discord HTTPS hosts, blocks redirects and applies a 10-second timeout. Integration records are scoped to an organization and the worker verifies that scope before use.
 
-The initial Discord action is non-idempotent. Automatic BullMQ retries are disabled, and each run is atomically claimed before execution to reduce duplicate side effects. If a worker crashes after claiming a run, it may remain RUNNING and needs an explicit recovery procedure. This is not an exactly-once guarantee.
+The initial Discord action is non-idempotent. Automatic BullMQ retries are disabled, and each run is atomically claimed before execution to reduce duplicate side effects. The worker refreshes `WorkflowRun.heartbeatAt` every 20 seconds. A recovery sweep runs at startup and every 60 seconds; runs whose heartbeat is older than five minutes are marked FAILED with an explicit unknown-outcome warning. Recovery never replays external actions. This reduces indefinitely stuck RUNNING records but does not resume a run or provide exactly-once delivery.
 
 ## Remaining production requirements
 
