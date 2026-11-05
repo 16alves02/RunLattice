@@ -13,7 +13,7 @@ export interface IntegrationDefinition {
 
 export const integrationCatalog: IntegrationDefinition[] = [
   { id: "gmail", name: "Gmail", category: "Communication", description: "React to incoming messages and prepare email actions.", auth: "OAuth 2.0", triggers: ["New email", "New attachment"], actions: ["Send email", "Add label"] , status: "planned" },
-  { id: "discord", name: "Discord", category: "Communication", description: "Send messages to a Discord channel when an event occurs.", auth: "Webhook", triggers: [], actions: ["Send message"], status: "available" },
+  { id: "discord", name: "Discord", category: "Communication", description: "Send messages to a Discord channel through an incoming webhook.", auth: "Webhook", triggers: [], actions: ["Send message"], status: "available" },
   { id: "slack", name: "Slack", category: "Communication", description: "Connect team notifications and message events.", auth: "OAuth 2.0", triggers: ["New message"], actions: ["Send message"], status: "planned" },
   { id: "google-sheets", name: "Google Sheets", category: "Productivity", description: "Read and write rows in spreadsheets.", auth: "OAuth 2.0", triggers: ["New row"], actions: ["Append row", "Update row", "Read rows"], status: "planned" },
   { id: "google-drive", name: "Google Drive", category: "Productivity", description: "Organise files and react to new uploads.", auth: "OAuth 2.0", triggers: ["New file"], actions: ["Upload file", "Move file"], status: "planned" },
