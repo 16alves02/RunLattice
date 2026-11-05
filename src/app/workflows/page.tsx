@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, GitBranch, Plus, Workflow } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/prisma";
+import { requireServerWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function WorkflowsPage() {
+  const workspace = await requireServerWorkspace();
   let workflows: Array<{
     id: string;
     name: string;
@@ -24,6 +26,7 @@ export default async function WorkflowsPage() {
 
   try {
     const records = await prisma.workflow.findMany({
+      where: { organizationId: workspace.organizationId },
       orderBy: { updatedAt: "desc" },
       include: { _count: { select: { runs: true } } },
     });
