@@ -16,7 +16,8 @@ RunLattice is evolving into an approachable automation platform for non-technica
 - [x] Workflow definition validation and persistence
 - [x] Redis/BullMQ queue and live Discord webhook worker
 - [x] Searchable template gallery
-- [x] Integration catalog with provider capabilities and auth requirements\n- [x] Workspace-scoped encrypted Discord webhook connections
+- [x] Integration catalog with provider capabilities and authentication requirements
+- [x] Workspace-scoped encrypted Discord webhook connections
 - [x] AI workflow planning endpoint with server-side key and schema validation
 - [x] AI review interface that saves drafts only
 - [ ] Improve visual builder configuration and graph editing
@@ -26,10 +27,13 @@ RunLattice is evolving into an approachable automation platform for non-technica
 - [x] Email/password authentication and per-account workflow ownership
 - [x] Organization-backed multi-user workspaces and owner/admin/member workflow permissions
 - [ ] Invitation delivery and member administration UI
-- [x] Encrypted workspace-scoped Discord webhook credentials\n- [ ] OAuth connections for additional providers
+- [x] Encrypted workspace-scoped Discord webhook credentials
+- [ ] OAuth connections for additional providers
 - [ ] Request rate limiting and audit logs
-- [x] First registered action adapter: Discord webhook message\n- [ ] General integration adapter interface and additional providers
-- [x] Restricted linear execution path, atomic run claiming, timeouts and step-level results\n- [ ] Durable step checkpoints, stale-run recovery and safe retries
+- [x] First registered action adapter: Discord webhook message
+- [ ] General integration adapter interface and additional providers
+- [x] Restricted linear execution path, atomic run claiming, timeouts and step-level results
+- [ ] Durable step checkpoints, stale-run recovery and safe retries
 - [ ] Signed webhook triggers, schedules and replay protection
 
 ## AI-assisted workflow creation
@@ -46,7 +50,8 @@ RunLattice is evolving into an approachable automation platform for non-technica
 
 - [x] Catalog definitions for Gmail, Google Drive, Google Sheets, Discord, Slack, Shopify, Stripe, GitHub and HTTP
 - [ ] OAuth and secure provider account connections
-- [x] First live integration: Discord webhook message\n- [ ] Provider end-to-end tests
+- [x] First live integration: Discord webhook message
+- [ ] Provider end-to-end tests
 - [ ] Community template publishing and versioning
 
 ## Launch
