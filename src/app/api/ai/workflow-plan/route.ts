@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { integrationCatalog } from "@/lib/integrations";
 import {
   aiWorkflowPlanSchema,
   aiWorkflowRequestSchema,
