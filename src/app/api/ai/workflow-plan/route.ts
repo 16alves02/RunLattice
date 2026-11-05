@@ -63,12 +63,13 @@ export async function POST(request: Request) {
   }
 
   let generated;
+  let connectedProviders = new Set<string>();
   try {
     const connections = await prisma.integrationConnection.findMany({
       where: { organizationId: access.context.organizationId },
       select: { provider: true },
     });
-    const connectedProviders = new Set(connections.map((connection) => connection.provider));
+    connectedProviders = new Set(connections.map((connection) => connection.provider));
     const integrationContext = integrationCatalog.map((integration) => ({
       id: integration.id,
       name: integration.name,
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
   const required = new Set(plan.data.requiredIntegrations.map((name) => name.toLowerCase()));
   const missingIntegrations = integrationCatalog
     .filter((integration) => required.has(integration.id) || required.has(integration.name.toLowerCase()))
-    .filter((integration) => integration.status !== "available" || !connectedProvidersHasIntegration(integration.id, integrationCatalog, plan.data.requiredIntegrations, access.context.organizationId))
+    .filter((integration) => integration.status !== "available" || !connectedProviders.has(integration.id))
     .map((integration) => integration.name);
 
   const periodStart = getUsagePeriodStart();
@@ -152,16 +153,3 @@ export async function POST(request: Request) {
   });
 }
 
-function connectedProvidersHasIntegration(
-  integrationId: string,
-  catalog: typeof integrationCatalog,
-  requestedNames: string[],
-  organizationId: string,
-) {
-  // The provider context is checked separately in the route; this helper keeps
-  // planned catalog entries explicitly unavailable in this runtime version.
-  const integration = catalog.find((item) => item.id === integrationId);
-  return Boolean(integration && integration.status === "available" && requestedNames.some((name) =>
-    name.toLowerCase() === integration.name.toLowerCase() || name.toLowerCase() === integration.id,
-  ) && organizationId);
-}
