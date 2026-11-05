@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { generateAICompletion } from "@/lib/ai-provider";
+import { generateAICompletion, getAIProviderSelection } from "@/lib/ai-provider";
 
 describe("AI provider abstraction", () => {
   afterEach(() => {
@@ -52,8 +52,16 @@ describe("AI provider abstraction", () => {
     );
   });
 
+  it("reports provider configuration without exposing its key", () => {
+    vi.stubEnv("OPENAI_API_KEY", "private-key");
+    vi.stubEnv("AI_MODEL", "test-model");
+    expect(getAIProviderSelection()).toEqual({ provider: "openai", model: "test-model", configured: true });
+  });
+
   it("fails clearly when a provider key is missing", async () => {
     vi.stubEnv("AI_PROVIDER", "openai");
+    vi.stubEnv("OPENAI_API_KEY", "");
+    vi.stubEnv("AI_API_KEY", "");
     await expect(generateAICompletion("system", "user")).rejects.toThrow("OPENAI_API_KEY is not configured.");
   });
 });
