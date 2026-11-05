@@ -86,7 +86,23 @@ export async function PATCH(request: Request, context: RouteContext) {
         return NextResponse.json({ error: "The workflow definition is invalid.", issues: parsedDefinition.error.issues }, { status: 400 });
       }
       try {
-        validateExecutableWorkflow(parsedDefinition.data as WorkflowDefinition);
+        const executablePath = validateExecutableWorkflow(parsedDefinition.data as WorkflowDefinition);
+        const connectionIds = [...new Set(executablePath
+          .filter((node) => node.kind === "action")
+          .map((node) => node.config?.connectionId)
+          .filter((connectionId): connectionId is string => Boolean(connectionId)))];
+        if (connectionIds.length > 0) {
+          const availableConnections = await prisma.integrationConnection.count({
+            where: {
+              id: { in: connectionIds },
+              organizationId: access.context.organizationId,
+              provider: "discord",
+            },
+          });
+          if (availableConnections !== connectionIds.length) {
+            return NextResponse.json({ error: "One or more workflow actions reference a connection outside this workspace or a connection that no longer exists." }, { status: 400 });
+          }
+        }
       } catch (error) {
         return NextResponse.json({ error: error instanceof Error ? error.message : "The workflow cannot be activated." }, { status: 400 });
       }
