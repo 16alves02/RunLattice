@@ -32,11 +32,12 @@ AI-generated workflows are drafts. They must be reviewed and saved by the user; 
 - Cron-based scheduled triggers managed by BullMQ with IANA timezone support and worker-side reconciliation.
 - AI workflow planning with OpenAI and Anthropic adapters, disabled by default and returning reviewable drafts.
 - Workspace monthly AI request/token budgets and atomic per-user/per-workspace request throttling.
-- Vitest tests for workflow validation, execution-path validation and credential encryption.
+- Vitest unit tests for workflow validation, execution paths, credential encryption, trigger configuration and webhook signatures.
+- PostgreSQL/Redis integration tests covering signed webhook acceptance, invalid signatures, replay rejection, scheduler lifecycle and the real worker's failure handling.
 
 ## Current execution limits
 
-The worker currently supports manual, signed-webhook and cron-scheduled runs with exactly one trigger and at most one condition node. Condition nodes evaluate input data and route execution through an explicit true or false branch; only the selected path runs. The only live external action is sending a message to a connected Discord webhook. Arbitrary code, inbound webhooks, scheduled triggers and other provider actions are not implemented.
+The worker currently supports manual, signed-webhook and cron-scheduled runs with exactly one trigger and at most one condition node. Condition nodes evaluate input data and route execution through an explicit true or false branch; only the selected path runs. The only live external action is sending a message to a connected Discord webhook. Arbitrary code execution and additional provider actions are not implemented.
 
 Automatic BullMQ retries are disabled for the Discord action because it is non-idempotent. The worker refreshes a database heartbeat while a run is active; a separate recovery sweep marks runs with an expired five-minute heartbeat as FAILED. It does not replay the run because an external action may already have happened. Step checkpoints are persisted, but resuming from a checkpoint and exactly-once delivery are not supported.
 
@@ -153,7 +154,7 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the required web/worker topolog
 
 ## Project status
 
-RunLattice is an active portfolio project, not a production-ready automation service. The authentication and workspace foundation is implemented, and the first real external action is available through Discord webhooks. AI planning now has provider adapters, workspace budgets, request throttling and review-only proposals, but remains disabled by default. Additional provider integrations, general-purpose action adapters, durable recovery, email delivery, invitation management, deployment-edge abuse protection, observability, billing, managed public-demo infrastructure and a full security review remain outstanding.
+RunLattice is an active portfolio project, not a production-ready automation service. The authentication and workspace foundation is implemented, and the first real external action is available through Discord webhooks. AI planning now has provider adapters, workspace budgets, request throttling and review-only proposals, but remains disabled by default. Additional provider integrations, general-purpose action adapters, durable step resumption, email delivery, invitation management, deployment-edge abuse protection, production observability, billing, managed public-demo infrastructure and a full security review remain outstanding. Signed inbound webhooks, cron scheduling and the PostgreSQL/Redis API-worker integration suite are implemented and pass CI.
 
 ## Roadmap
 
@@ -163,13 +164,14 @@ RunLattice is an active portfolio project, not a production-ready automation ser
 - [x] Encrypted workspace-scoped integration credentials
 - [x] Run heartbeats and conservative stale-run detection (no automatic replay)
 - [ ] Durable execution resumption and safe retry policies
-- [ ] Condition evaluation and branching
+- [x] Condition evaluation and branching
 - [ ] Additional integrations and OAuth connections
 - [x] Signed inbound webhooks and scheduled triggers
 - [ ] Member administration and transactional email
 - [x] AI workflow planning foundation, workspace usage budgets and application request throttling
 - [ ] Deployment-edge abuse protection, observability and billing
-- [ ] API/worker integration test coverage and managed public demo
+- [x] PostgreSQL/Redis API and worker integration test coverage
+- [ ] Managed public demo with provisioned PostgreSQL, Redis and a persistent worker
 - [ ] Security review and public launch readiness
 
 ## Author
