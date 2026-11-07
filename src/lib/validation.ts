@@ -34,7 +34,7 @@ const triggerConfigSchema = z.object({
   timezone: z.string().trim().min(1).max(100).optional(),
 }).superRefine((config, context) => {
   if (config.triggerType === "SCHEDULE") {
-    if (!config.cronExpression || config.cronExpression.trim().split(/\\s+/).length !== 5 || !/^[0-9*/?,\\-]+(?:\\s+[0-9*/?,\\-]+){4}$/.test(config.cronExpression.trim())) {
+    if (!config.cronExpression || config.cronExpression.trim().split(/\s+/).length !== 5 || !/^[0-9*/?,\\-]+(?:\s+[0-9*/?,\\-]+){4}$/.test(config.cronExpression.trim())) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["cronExpression"], message: "Use a valid five-field cron expression." });
     }
     if (config.timezone) {
@@ -59,8 +59,11 @@ const nodeSchema = z.object({
   if (node.kind === "action" && node.config && !("integrationId" in node.config)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Action nodes require an action configuration." });
   }
-  if (node.kind === "trigger" && node.config) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Trigger nodes cannot contain a configuration." });
+  if (node.kind === "trigger" && node.config && !("triggerType" in node.config)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Trigger nodes require valid trigger settings." });
+  }
+  if (node.kind !== "trigger" && node.config && "triggerType" in node.config) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Only trigger nodes can contain trigger settings." });
   }
 });
 
