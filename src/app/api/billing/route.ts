@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       if (!customer) return NextResponse.json({ error: "No Stripe customer exists for this workspace yet." }, { status: 404 });
       const session = await stripe.billingPortal.sessions.create({
         customer: customer.stripeCustomerId,
-        return_url: \`\${origin}/billing\`,
+        return_url: `${origin}/billing`,
       });
       return NextResponse.json({ url: session.url });
     }
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
         ...(user?.email ? { email: user.email } : {}),
         name: organization.name,
         metadata: { organizationId: access.context.organizationId },
-      }, { idempotencyKey: \`runlattice-customer-\${access.context.organizationId}\` });
+      }, { idempotencyKey: `runlattice-customer-${access.context.organizationId}` });
       customer = await prisma.billingCustomer.upsert({
         where: { organizationId: access.context.organizationId },
         create: { organizationId: access.context.organizationId, stripeCustomerId: stripeCustomer.id },
@@ -73,8 +73,8 @@ export async function POST(request: Request) {
       customer: customer.stripeCustomerId,
       client_reference_id: access.context.organizationId,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: \`\${origin}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}\`,
-      cancel_url: \`\${origin}/billing?checkout=cancelled\`,
+      success_url: `${origin}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/billing?checkout=cancelled`,
       allow_promotion_codes: true,
       billing_address_collection: "required",
       tax_id_collection: { enabled: true },
