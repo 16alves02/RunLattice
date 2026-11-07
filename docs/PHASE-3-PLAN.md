@@ -1,6 +1,6 @@
 # Phase 3 — AI Builder and AI Architect
 
-Status: planning branch created from `feature/phase-2-execution-engine`. Implementation depends on Phase 2 CI and migration checks passing. This is a stacked branch; it does not merge Phase 2 or Phase 1.
+Status: implementation and initial automated validation are in progress on `feature/phase-3-ai-architect`. The Phase 3 CI quality job and PostgreSQL migration job passed for commit `83f0698`; subsequent evaluation and readiness changes require a fresh CI run. This is a stacked branch; it does not merge Phase 2 or Phase 1.
 
 ## Product outcome
 
@@ -71,9 +71,9 @@ Exact new filenames and model names are implementation decisions to be confirmed
 - Dry-run tests cannot execute external side effects.
 - AI usage and budgets are enforced per workspace, including concurrent requests.
 - Human approval is required before saving; activation and external execution require their existing separate permissions/actions.
-- CI, migration tests, adversarial tests and evaluation suite pass.
+- CI, migration tests, adversarial tests and evaluation suite pass on the final head SHA.
 
-## Dependencies and explicit exclusions
+## Current implementation notes\n\nThe evaluation module is a deterministic regression harness used by automated tests. It does not call a model and is not a runtime security filter or a guarantee that a model will resist prompt injection. The planning endpoint continues to validate every generated plan against the authoritative workflow schema and the integration catalog. Provider selection remains explicitly configured; cost/latency/privacy routing is intentionally deferred until measurable provider metadata and policy requirements are available.\n\n## Dependencies and explicit exclusions
 
 - Phase 2 execution contracts and migrations must pass CI before implementation is considered ready.
 - Phase 1 workspace membership and authorization remain prerequisites.
