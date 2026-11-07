@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
 import { ensureActiveWorkspace } from "@/lib/auth-workspace-client";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function SignInPage() {
   const [email, setEmail] = useState("");
@@ -27,7 +28,7 @@ export default function SignInPage() {
   }
 
   return <main className="auth-page"><section className="panel auth-card">
-    <Link className="brand" href="/"><span className="brand-mark">RL</span><span>runlattice<span style={{ color: "var(--accent)" }}>.</span></span></Link>
+    <BrandLogo variant="auth" />
     <h1>Welcome back</h1><p className="subtitle">Sign in to access your workflows.</p>
     <form onSubmit={submit} className="auth-form">
       <label>Email address<input className="field-input" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
