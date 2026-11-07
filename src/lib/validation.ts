@@ -28,14 +28,33 @@ const conditionConfigSchema = z.object({
   }
 });
 
+const cronFieldRanges: Array<[number, number]> = [[0, 59], [0, 23], [1, 31], [1, 12], [0, 7]];
+
+function isValidCronField(field: string, minimum: number, maximum: number) {
+  if (!field || !/^[0-9*/,-]+$/.test(field)) return false;
+  return field.split(",").every((part) => {
+    if (!part) return false;
+    const pieces = part.split("/");
+    if (pieces.length > 2 || (pieces.length === 2 && (!/^\d+$/.test(pieces[1]) || Number(pieces[1]) < 1))) return false;
+    const base = pieces[0];
+    if (base === "*") return true;
+    const range = base.split("-");
+    if (range.length > 2 || range.some((value) => !/^\d+$/.test(value))) return false;
+    const start = Number(range[0]);
+    const end = range.length === 2 ? Number(range[1]) : start;
+    return start >= minimum && start <= maximum && end >= minimum && end <= maximum && end >= start;
+  });
+}
+
 const triggerConfigSchema = z.object({
   triggerType: z.enum(["MANUAL", "WEBHOOK", "SCHEDULE"]),
   cronExpression: z.string().trim().min(1).max(100).optional(),
   timezone: z.string().trim().min(1).max(100).optional(),
 }).superRefine((config, context) => {
   if (config.triggerType === "SCHEDULE") {
-    if (!config.cronExpression || config.cronExpression.trim().split(/\s+/).length !== 5 || !/^[0-9*/?,-]+(?:\s+[0-9*/?,-]+){4}$/.test(config.cronExpression.trim())) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["cronExpression"], message: "Use a valid five-field cron expression." });
+    const fields = config.cronExpression?.trim().split(/\s+/) ?? [];
+    if (fields.length !== 5 || !fields.every((field, index) => isValidCronField(field, ...cronFieldRanges[index]))) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["cronExpression"], message: "Use a valid five-field cron expression with values inside each field's range." });
     }
     if (config.timezone) {
       try { new Intl.DateTimeFormat("en-US", { timeZone: config.timezone }); }
