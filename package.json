@@ -15,7 +15,9 @@
     "worker:watch": "tsx watch worker/index.ts",
     "db:generate": "prisma generate",
     "db:deploy": "prisma migrate deploy",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "db:baseline": "node scripts/baseline-existing-prisma-migrations.mjs",
+    "worker:start": "npm run db:baseline && npm run db:deploy && npm run worker"
   },
   "dependencies": {
     "@prisma/client": "^6.7.0",
