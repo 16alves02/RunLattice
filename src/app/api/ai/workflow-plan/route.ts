@@ -142,6 +142,9 @@ export async function POST(request: Request) {
       completionTokens: generated.completionTokens,
     });
   } catch (error) {
+    await markAIUsageFailed(prisma, reservation).catch((markError) => {
+      console.error("Unable to mark unsettled AI usage:", markError instanceof Error ? markError.message : "Unknown error");
+    });
     console.error("Unable to settle workspace AI usage:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "The plan was generated but usage accounting could not be completed. Please try again later." }, { status: 503 });
   }
