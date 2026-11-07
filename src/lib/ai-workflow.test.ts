@@ -54,7 +54,6 @@ describe("AI workflow planning validation", () => {
     expect(prompt).toContain("Do not invent a working adapter");
   });
 
-
   it("flags catalog-only, disconnected and unknown integrations", () => {
     const missing = findMissingIntegrations(["Discord", "Gmail", "Acme CRM"], [
       { id: "discord", name: "Discord", status: "available", connected: true, actions: ["Send message"] },
@@ -70,13 +69,12 @@ describe("AI workflow planning validation", () => {
     expect(systemPrompt).toContain("Never reveal or request passwords");
   });
 
-
-  it("requires action connections to belong to the current workspace and provider", async () => {
+  it("requires action connections to belong to the current workspace and provider", () => {
     const definition = workflowDefinitionSchema.parse({
       nodes: [
         { id: "trigger", kind: "trigger", title: "Manual", detail: "", x: 0, y: 0 },
         { id: "action", kind: "action", title: "Send message", detail: "", config: {
-          integrationId: "discord", connectionId: "foreign-connection", message: "Hello",
+          integrationId: "discord", actionId: "send_message", connectionId: "foreign-connection", message: "Hello",
         }, x: 250, y: 0 },
       ],
       edges: [{ id: "edge-1", from: "trigger", to: "action" }],
