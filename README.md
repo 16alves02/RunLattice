@@ -34,7 +34,7 @@ AI-generated workflows are drafts. They must be reviewed and saved by the user; 
 
 ## Current execution limits
 
-The worker currently supports manual runs with exactly one trigger and one linear path. The only live action is sending a static message to a connected Discord webhook. Conditions, branching, arbitrary code, inbound webhooks, scheduled triggers and other provider actions are not implemented.
+The worker currently supports manual runs with exactly one trigger and at most one condition node. Condition nodes evaluate input data and route execution through an explicit true or false branch; only the selected path runs. The only live external action is sending a message to a connected Discord webhook. Arbitrary code, inbound webhooks, scheduled triggers and other provider actions are not implemented.
 
 Automatic BullMQ retries are disabled for the Discord action because it is non-idempotent. The worker refreshes a database heartbeat while a run is active; a separate recovery sweep marks runs with an expired five-minute heartbeat as FAILED. It does not replay the run because an external action may already have happened. Step checkpoints are persisted, but resuming from a checkpoint and exactly-once delivery are not supported.
 
