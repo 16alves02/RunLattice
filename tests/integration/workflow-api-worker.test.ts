@@ -13,7 +13,7 @@ const webhookWorkflowId = `integration-webhook-${randomBytes(8).toString("hex")}
 const workerWorkflowId = `integration-worker-${randomBytes(8).toString("hex")}`;
 let workerProcess: ChildProcess | undefined;
 
-describe.sequential("RunLattice PostgreSQL, API and worker integration", () => {
+describe("RunLattice PostgreSQL, API and worker integration", () => {
   beforeAll(async () => {
     if (!process.env.DATABASE_URL || !process.env.REDIS_URL) {
       throw new Error("DATABASE_URL and REDIS_URL are required for integration tests.");
