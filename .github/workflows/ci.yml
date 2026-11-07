@@ -32,11 +32,13 @@ jobs:
         run: npx prisma validate
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
 
       - name: Generate Prisma Client
         run: npx prisma generate
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
 
       - name: Type check
         run: npm run typecheck
@@ -51,6 +53,7 @@ jobs:
         run: npm run build
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
           REDIS_URL: redis://localhost:6379
           BETTER_AUTH_SECRET: ci-only-secret-that-is-long-enough-for-tests
           BETTER_AUTH_URL: http://localhost:3000
@@ -95,14 +98,17 @@ jobs:
         run: npx prisma generate
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
       - name: Apply migrations
         run: npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
       - name: Run API and worker integration tests
         run: npm run test:integration
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
           REDIS_URL: redis://localhost:6379
           BETTER_AUTH_SECRET: integration-only-secret-that-is-long-enough
           BETTER_AUTH_URL: http://localhost:3000
