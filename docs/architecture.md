@@ -4,9 +4,9 @@
 
 RunLattice is split into three responsibilities:
 
-1. **Web application** — Next.js App Router serves the workspace interface and route handlers.
-2. **Persistence** — PostgreSQL stores workflow definitions and run records through Prisma.
-3. **Background worker** — BullMQ consumes queued runs from Redis, so the request handler does not perform a workflow inline.
+1. **Web application** - Next.js App Router serves the workspace interface and route handlers.
+2. **Persistence** - PostgreSQL stores workflow definitions and run records through Prisma.
+3. **Background worker** - BullMQ consumes queued runs from Redis, so the request handler does not perform a workflow inline.
 
 ```text
 Browser
