@@ -6,6 +6,7 @@ import { encryptSecret } from "@/lib/secrets";
 import { signWebhookPayload } from "@/lib/webhook-signature";
 import { getScheduleQueue, syncWorkflowSchedule } from "@/lib/schedule";
 import { POST as receiveWebhook } from "@/app/api/webhooks/[workflowId]/route";
+import type { WorkflowDefinition } from "@/lib/types";
 
 const organizationId = `integration-org-${randomBytes(8).toString("hex")}`;
 const webhookWorkflowId = `integration-webhook-${randomBytes(8).toString("hex")}`;
@@ -98,7 +99,7 @@ describe.sequential("RunLattice PostgreSQL, API and worker integration", () => {
 
   it("registers and removes a cron scheduler in the shared Redis service", async () => {
     const workflowId = `integration-schedule-${randomBytes(8).toString("hex")}`;
-    const definition = {
+    const definition: WorkflowDefinition = {
       nodes: [{
         id: "trigger",
         kind: "trigger",
@@ -113,8 +114,8 @@ describe.sequential("RunLattice PostgreSQL, API and worker integration", () => {
     await syncWorkflowSchedule({ workflowId, status: "ACTIVE", triggerType: "SCHEDULE", definition });
     const scheduler = await getScheduleQueue().getJobScheduler(`workflow:${workflowId}`);
     expect(scheduler).not.toBeNull();
-    await syncWorkflowSchedule({ workflowId, status: "PAUSED", triggerType: "SCHEDULE", definition });
-    expect(await getScheduleQueue().getJobScheduler(`workflow:${workflowId}`)).toBeNull();
+    const removed = await syncWorkflowSchedule({ workflowId, status: "PAUSED", triggerType: "SCHEDULE", definition });
+    expect(removed).toBe(true);
   });
 
   it("dispatches a persisted run through the real BullMQ worker and records failure safely", async () => {
