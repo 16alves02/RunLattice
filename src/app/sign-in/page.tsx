@@ -36,6 +36,6 @@ export default function SignInPage() {
       {error && <p className="auth-error" role="alert">{error}</p>}
       <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? "Signing in…" : "Sign in"}</button>
     </form>
-    <p className="auth-footer">New to RunLattice? <Link href="/sign-up">Create an account</Link></p>
+    <p className="auth-footer"><Link href="/forgot-password">Forgot password?</Link></p><p className="auth-footer">New to RunLattice? <Link href="/sign-up">Create an account</Link></p>
   </section></main>;
 }
