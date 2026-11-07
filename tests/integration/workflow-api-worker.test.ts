@@ -57,10 +57,10 @@ describe.sequential("RunLattice PostgreSQL, API and worker integration", () => {
 
     const body = JSON.stringify({ event: "order.created", orderId: "ord_test_123" });
     const timestamp = Math.floor(Date.now() / 1000).toString();
-    const signature = `v1=${signWebhookPayload(secret, timestamp, body)}`;
+    const deliveryId = `delivery_${randomBytes(8).toString("hex")}`;\n    const signature = `v1=${signWebhookPayload(secret, timestamp, deliveryId, body)}`;
     const request = new Request(`https://runlattice.test/api/webhooks/${webhookWorkflowId}`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-runlattice-timestamp": timestamp, "x-runlattice-signature": signature },
+      headers: { "content-type": "application/json", "x-runlattice-timestamp": timestamp, "x-runlattice-delivery-id": deliveryId, "x-runlattice-signature": signature },
       body,
     });
     const accepted = await receiveWebhook(request, { params: Promise.resolve({ workflowId: webhookWorkflowId }) });
@@ -76,10 +76,21 @@ describe.sequential("RunLattice PostgreSQL, API and worker integration", () => {
 
     const rejected = await receiveWebhook(new Request(request.url, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-runlattice-timestamp": timestamp, "x-runlattice-signature": "v1=" + "0".repeat(64) },
+      headers: { "content-type": "application/json", "x-runlattice-timestamp": timestamp, "x-runlattice-delivery-id": deliveryId, "x-runlattice-signature": "v1=" + "0".repeat(64) },
       body,
     }), { params: Promise.resolve({ workflowId: webhookWorkflowId }) });
     expect(rejected.status).toBe(401);
+    const replay = await receiveWebhook(new Request(request.url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-runlattice-timestamp": timestamp,
+        "x-runlattice-delivery-id": deliveryId,
+        "x-runlattice-signature": signature,
+      },
+      body,
+    }), { params: Promise.resolve({ workflowId: webhookWorkflowId }) });
+    expect(replay.status).toBe(409);
     expect(await prisma.workflowRun.count({ where: { workflowId: webhookWorkflowId } })).toBe(1);
   });
 
