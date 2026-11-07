@@ -50,16 +50,17 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Webhook endpoint is not configured." }, { status: 503 });
     }
 
+    const deliveryId = request.headers.get("x-runlattice-delivery-id");
+    if (!deliveryId) return NextResponse.json({ error: "A unique x-runlattice-delivery-id header is required." }, { status: 400 });
+
     const valid = verifyWebhookSignature({
       secret,
       timestamp: request.headers.get("x-runlattice-timestamp"),
+      deliveryId,
       signature: request.headers.get("x-runlattice-signature"),
       rawBody,
     });
     if (!valid) return NextResponse.json({ error: "Invalid or expired webhook signature." }, { status: 401 });
-
-    const deliveryId = request.headers.get("x-runlattice-delivery-id");
-    if (!deliveryId) return NextResponse.json({ error: "A unique x-runlattice-delivery-id header is required." }, { status: 400 });
 
     const run = await prisma.$transaction(async (transaction) => {
       await transaction.webhookDelivery.create({ data: { workflowId: workflow.id, deliveryId } });
