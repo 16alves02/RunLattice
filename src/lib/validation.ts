@@ -28,12 +28,12 @@ const conditionConfigSchema = z.object({
   }
 });
 
-const nodeSchema = z.object({
+const triggerConfigSchema = z.object({\n  triggerType: z.enum(["MANUAL", "WEBHOOK", "SCHEDULE"]),\n  cronExpression: z.string().trim().min(1).max(100).optional(),\n  timezone: z.string().trim().min(1).max(100).optional(),\n}).superRefine((config, context) => {\n  if (config.triggerType === "SCHEDULE") {\n    if (!config.cronExpression || config.cronExpression.trim().split(/\\s+/).length !== 5 || !/^[0-9*/?,\\-]+(?:\\s+[0-9*/?,\\-]+){4}$/.test(config.cronExpression.trim())) {\n      context.addIssue({ code: z.ZodIssueCode.custom, path: ["cronExpression"], message: "Use a valid five-field cron expression." });\n    }\n    if (config.timezone) {\n      try { new Intl.DateTimeFormat("en-US", { timeZone: config.timezone }); }\n      catch { context.addIssue({ code: z.ZodIssueCode.custom, path: ["timezone"], message: "Use a valid IANA timezone." }); }\n    }\n  }\n});\n\nconst nodeSchema = z.object({
   id: z.string().min(1).max(80),
   kind: z.enum(["trigger", "condition", "action"]),
   title: z.string().trim().min(1).max(100),
   detail: z.string().max(500).default(""),
-  config: z.union([discordActionConfigSchema, conditionConfigSchema]).optional(),
+  config: z.union([discordActionConfigSchema, conditionConfigSchema, triggerConfigSchema]).optional(),
   x: z.number().finite().min(0).max(5000),
   y: z.number().finite().min(0).max(5000),
 }).superRefine((node, context) => {
