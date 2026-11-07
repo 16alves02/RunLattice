@@ -30,10 +30,10 @@ The controller must document the applicable GDPR Article 6 basis for each purpos
 - Optional AI: enable only after deciding and documenting the legal basis, provider terms, data-processing terms, transfer safeguards and retention.
 
 ## 5. Processors and recipients
-Intended providers include Supabase (PostgreSQL; project region EU West/Ireland), Railway (application/worker hosting; current Redis service in a US region), Stripe (payments once implemented) and an AI provider only if selected and enabled. Verify provider legal entities, sub-processors, processing regions and DPAs before publication. Do not claim all processing remains in the EEA.
+Intended providers include Supabase (PostgreSQL; project region EU West/Ireland), Railway (application/worker hosting; current Redis service in a US region), Resend (transactional verification and password-reset email when configured), Stripe (subscription billing when configured) and an AI provider only if selected and enabled. Verify provider legal entities, sub-processors, processing regions and DPAs before publication. Do not claim all processing remains in the EEA.
 
 ## 6. International transfers
-Some providers or infrastructure regions may process data outside the EEA. Identify each transfer and confirm a GDPR Chapter V mechanism (adequacy decision or Standard Contractual Clauses), transfer impact assessment where required and supplementary measures. The current Railway Redis region requires specific review.
+Some providers or infrastructure regions may process data outside the EEA. Identify each transfer and confirm a GDPR Chapter V mechanism (adequacy decision or Standard Contractual Clauses), transfer impact assessment where required and supplementary measures. The current Railway Redis region requires specific review. Verify Resend and Stripe processing locations and contractual transfer safeguards before enabling their production integrations.
 
 ## 7. Retention
 Retention periods are **not yet finalized**. Define and implement periods for inactive accounts and sessions, workflows and run history, integration credentials, security/diagnostic logs, billing records, and backups. Delete or anonymize data when no longer necessary, subject to legal duties and backup rotation. Publish concrete periods or criteria only after implementation.
