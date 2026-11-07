@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { WorkflowStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { workflowDefinitionSchema } from "@/lib/validation";
-import { validateExecutableWorkflow } from "@/lib/execution";
+import { validateExecutableWorkflow } from "@/lib/execution";\nimport { inferTriggerType, getTriggerConfig } from "@/lib/trigger-type";\nimport { syncWorkflowSchedule } from "@/lib/schedule";
 import type { WorkflowDefinition } from "@/lib/types";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 
@@ -19,7 +19,7 @@ export async function GET(request: Request, context: RouteContext) {
       include: { runs: { orderBy: { createdAt: "desc" }, take: 20 } },
     });
     if (!workflow) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
-    return NextResponse.json({ data: workflow });
+    const { webhookSecretCiphertext: _secret, ...safeWorkflow } = workflow;\n    return NextResponse.json({ data: safeWorkflow });
   } catch (error) {
     console.error("Unable to retrieve workflow:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "The workflow service is unavailable." }, { status: 503 });
@@ -65,7 +65,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (!definition.success) {
       return NextResponse.json({ error: "Invalid workflow definition.", issues: definition.error.issues }, { status: 400 });
     }
-    data.definition = definition.data as Prisma.InputJsonValue;
+    data.definition = definition.data as Prisma.InputJsonValue;\n    data.triggerType = inferTriggerType(definition.data as WorkflowDefinition);
   }
   if (!Object.keys(data).length) {
     return NextResponse.json({ error: "No supported fields were provided." }, { status: 400 });
@@ -74,18 +74,18 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const existing = await prisma.workflow.findFirst({
       where: { id, organizationId: access.context.organizationId },
-      select: { status: true, definition: true },
+      select: { status: true, definition: true, triggerType: true, webhookSecretCiphertext: true },
     });
     if (!existing) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
 
-    const nextStatus = typeof input.status === "string" ? input.status : existing.status;
+    const nextStatus = typeof input.status === "string" ? input.status : existing.status;\n    const candidateDefinition = "definition" in input ? input.definition : existing.definition;\n    const parsedForTrigger = workflowDefinitionSchema.safeParse(candidateDefinition);\n    const nextTriggerType = "definition" in input && parsedForTrigger.success\n      ? inferTriggerType(parsedForTrigger.data as WorkflowDefinition)\n      : existing.triggerType;\n    if (nextTriggerType !== "WEBHOOK" && existing.triggerType === "WEBHOOK") data.webhookSecretCiphertext = null;
     if (nextStatus === "ACTIVE") {
       const candidateDefinition = "definition" in input ? input.definition : existing.definition;
       const parsedDefinition = workflowDefinitionSchema.safeParse(candidateDefinition);
       if (!parsedDefinition.success) {
         return NextResponse.json({ error: "The workflow definition is invalid.", issues: parsedDefinition.error.issues }, { status: 400 });
       }
-      let executablePath: WorkflowDefinition["nodes"];
+      const triggerConfig = getTriggerConfig(parsedDefinition.data as WorkflowDefinition);\n      if (triggerConfig.triggerType === "WEBHOOK" && !existing.webhookSecretCiphertext) {\n        return NextResponse.json({ error: "Generate a webhook signing secret before activating this workflow." }, { status: 409 });\n      }\n      if (triggerConfig.triggerType === "SCHEDULE" && !triggerConfig.cronExpression) {\n        return NextResponse.json({ error: "A valid cron expression is required before activating this schedule." }, { status: 400 });\n      }\n      let executablePath: WorkflowDefinition["nodes"];
       try {
         executablePath = validateExecutableWorkflow(parsedDefinition.data as WorkflowDefinition);
       } catch (error) {
@@ -140,7 +140,7 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   try {
-    const result = await prisma.workflow.deleteMany({
+    await syncWorkflowSchedule({ workflowId: id, status: "DRAFT", triggerType: "MANUAL", definition: { nodes: [], edges: [] } });\n    const result = await prisma.workflow.deleteMany({
       where: { id, organizationId: access.context.organizationId },
     });
     if (result.count === 0) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
