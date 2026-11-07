@@ -41,7 +41,8 @@ export async function syncStripeSubscription(subscription: Stripe.Subscription, 
     });
   }
 
-  const priceId = subscription.items.data[0]?.price.id;
+  const billingItem = subscription.items.data[0];
+  const priceId = billingItem?.price.id;
   if (!priceId) throw new Error("Stripe subscription has no recurring price.");
   const metadataPlan = subscription.metadata.plan;
   const plan: BillingPlan | null = metadataPlan === "pro" || metadataPlan === "team"
@@ -62,8 +63,8 @@ export async function syncStripeSubscription(subscription: Stripe.Subscription, 
       stripePriceId: priceId,
       plan,
       status: subscription.status,
-      currentPeriodStart: fromUnixTimestamp(subscription.current_period_start),
-      currentPeriodEnd: fromUnixTimestamp(subscription.current_period_end),
+      currentPeriodStart: fromUnixTimestamp(billingItem?.current_period_start),
+      currentPeriodEnd: fromUnixTimestamp(billingItem?.current_period_end),
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
       trialEndsAt: fromUnixTimestamp(subscription.trial_end),
     },
