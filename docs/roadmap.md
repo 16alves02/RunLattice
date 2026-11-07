@@ -34,7 +34,8 @@ RunLattice is evolving into an approachable automation platform for non-technica
 - [ ] General integration adapter interface and additional providers
 - [x] Restricted graph execution with declarative true/false branches, atomic run claiming, timeouts and step-level results
 - [x] Bounded manual trigger input and safe scalar templates for Discord messages
-- [x] Stale-run detection with heartbeat monitoring (does not resume or replay interrupted runs)\n- [x] Durable step ledger, lease fencing and stale-run outcome classification (no automatic replay or exactly-once guarantee)
+- [x] Stale-run detection with heartbeat monitoring (does not resume or replay interrupted runs)
+- [x] Durable step ledger, lease fencing and stale-run outcome classification (no automatic replay or exactly-once guarantee)
 - [ ] Signed webhook triggers, schedules and replay protection
 
 ## AI-assisted workflow creation
@@ -43,9 +44,19 @@ RunLattice is evolving into an approachable automation platform for non-technica
 - [x] Structured workflow validation
 - [x] Review and save generated workflow as draft
 - [x] Require authenticated access for AI planning
-- [ ] Add per-account AI quotas and spend controls before enabling publicly
-- [ ] Explain required permissions and missing integrations
-- [ ] Test generated workflows safely before activation
+- [x] Workspace-level monthly request and token budgets with atomic reservations
+- [x] Explain required integrations and identify missing/unconnected providers
+- [x] Side-effect-free graph simulation endpoint
+
+### Phase 3 implementation in progress
+
+- [x] Server-side provider abstraction for OpenAI and Anthropic
+- [x] Workspace-scoped AI usage ledger and monthly quotas
+- [x] Structured, explainable plans with assumptions and side-effect declarations
+- [x] Review and edit proposal details before saving
+- [x] Side-effect-free simulation that never invokes integrations
+- [ ] Provider routing by cost, latency and privacy preferences
+- [ ] Adversarial prompt-injection evaluation suite and automated regression scoring
 
 ## Integration library
 
