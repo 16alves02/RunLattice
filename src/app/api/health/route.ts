@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    await prisma.$queryRaw\`SELECT 1\`;
+    await prisma.$queryRaw`SELECT 1`;
     return NextResponse.json({
       status: "ok",
       service: "runlattice-web",
