@@ -71,3 +71,12 @@ Before public launch:
 9. Add provider-specific rate limits and integration end-to-end tests.
 
 This document describes the implemented foundation and remaining work. It is not a certification or a claim of completed compliance.
+
+
+## Signed webhook triggers
+
+Inbound webhook triggers use HMAC-SHA256 over the exact request timestamp and raw body. The timestamp must be within five minutes of server time to reduce replay risk. The endpoint rejects malformed JSON, oversized payloads, inactive workflows, missing secrets and invalid signatures. The secret is generated only by workspace owners/admins, encrypted at rest with the integration encryption key and returned only at generation time. Rotate it if the sending system is compromised.
+
+## Scheduled triggers
+
+Scheduled workflows use BullMQ job schedulers in a separate Redis queue. The worker checks that the workflow is still active and configured as a schedule before inserting a run and transactional outbox event. Schedules are reconciled periodically from PostgreSQL; pausing or deleting a workflow removes its scheduler through the API. Scheduled triggers require a continuously running worker and Redis service.
