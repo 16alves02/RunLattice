@@ -7,8 +7,8 @@ const prisma = new PrismaClient();
 const pendingMigration = "20261107235000_add_workspace_billing";
 
 try {
-  const [migrationState] = await prisma.$queryRaw\`SELECT to_regclass('public."_prisma_migrations"') IS NOT NULL AS exists\`;
-  if (migrationState.exists) {
+  const [migrationState] = await prisma.$queryRaw\`SELECT to_regclass('public."_prisma_migrations"') IS NOT NULL AS migration_table_exists\`;
+  if (migrationState.migration_table_exists) {
     console.info("[db:baseline] Prisma migration history already exists; skipping baseline.");
   } else {
     const [tableState] = await prisma.$queryRaw\`
