@@ -58,17 +58,23 @@ export async function POST(request: Request, context: RouteContext) {
     });
     if (!valid) return NextResponse.json({ error: "Invalid or expired webhook signature." }, { status: 401 });
 
-    const run = await prisma.workflowRun.create({
-      data: {
-        workflowId: workflow.id,
-        input: parsed.data as Prisma.InputJsonValue,
-        outboxEvent: { create: {} },
-      },
-      select: { id: true, status: true, createdAt: true },
+    const deliveryId = request.headers.get("x-runlattice-delivery-id");
+    if (!deliveryId) return NextResponse.json({ error: "A unique x-runlattice-delivery-id header is required." }, { status: 400 });
+
+    const run = await prisma.$transaction(async (transaction) => {
+      await transaction.webhookDelivery.create({ data: { workflowId: workflow.id, deliveryId } });
+      return transaction.workflowRun.create({
+        data: {
+          workflowId: workflow.id,
+          input: parsed.data as Prisma.InputJsonValue,
+          outboxEvent: { create: {} },
+        },
+        select: { id: true, status: true, createdAt: true },
+      });
     });
     return NextResponse.json({ data: run }, { status: 202 });
   } catch (error) {
-    console.error("Unable to accept signed workflow webhook:", error instanceof Error ? error.message : "Unknown error");
+    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {\n      return NextResponse.json({ error: "This webhook delivery has already been processed." }, { status: 409 });\n    }\n    console.error("Unable to accept signed workflow webhook:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "The webhook could not be queued." }, { status: 503 });
   }
 }
