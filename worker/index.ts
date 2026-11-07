@@ -162,7 +162,7 @@ async function syncActiveSchedules() {
         workflowId: workflow.id,
         status: workflow.status,
         triggerType: workflow.triggerType,
-        definition: workflow.definition as WorkflowDefinition,
+        definition: workflow.definition as unknown as WorkflowDefinition,
       });
     } catch (error) {
       console.error("[scheduler] Unable to synchronize a scheduled workflow:", error instanceof Error ? error.message : "Unknown error");
