@@ -15,12 +15,12 @@ export interface ConditionConfig {
   value?: string | number | boolean | null;
 }
 
-export interface WorkflowNode {
+export interface TriggerConfig {\n  triggerType: "MANUAL" | "WEBHOOK" | "SCHEDULE";\n  cronExpression?: string;\n  timezone?: string;\n}\n\nexport interface WorkflowNode {
   id: string;
   kind: NodeKind;
   title: string;
   detail: string;
-  config?: DiscordActionConfig | ConditionConfig;
+  config?: DiscordActionConfig | ConditionConfig | TriggerConfig;
   x: number;
   y: number;
 }
