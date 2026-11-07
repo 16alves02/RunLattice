@@ -1,6 +1,6 @@
 # Roadmap
 
-## Milestone 1 — Foundation
+## Milestone 1 - Foundation
 
 - [x] Workspace dashboard and responsive layout
 - [x] Interactive draft editor
@@ -9,7 +9,7 @@
 - [x] Redis/BullMQ queue and worker process
 - [x] Validation tests and CI workflow
 
-## Milestone 2 — Persistence and execution
+## Milestone 2 - Persistence and execution
 
 - [ ] Save and reload complete graph edits, including edges and node configuration
 - [ ] Load real workflow and run records in the workspace views
@@ -17,7 +17,7 @@
 - [ ] Add per-step input/output logs, timeouts and failure states
 - [ ] Add integration tests against PostgreSQL and Redis
 
-## Milestone 3 — Security and collaboration
+## Milestone 3 - Security and collaboration
 
 - [ ] Add authentication and workspace ownership
 - [ ] Add role-based permissions
@@ -25,7 +25,7 @@
 - [ ] Add scheduling and safe secret storage
 - [ ] Add rate limiting, audit logs and retention rules
 
-## Milestone 4 — Public demo
+## Milestone 4 - Public demo
 
 - [ ] Seed a dedicated demo workspace
 - [ ] Add deployment health checks and observability
