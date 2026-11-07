@@ -47,3 +47,20 @@ ALTER TABLE "BillingCustomer"
 ALTER TABLE "BillingSubscription"
   ADD CONSTRAINT "BillingSubscription_organizationId_fkey"
   FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Keep new billing tables private from the Supabase Data API.
+ALTER TABLE "BillingCustomer" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "BillingSubscription" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "StripeEvent" ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL PRIVILEGES ON TABLE "BillingCustomer", "BillingSubscription", "StripeEvent" FROM anon, authenticated;
+    CREATE POLICY deny_supabase_data_api_roles ON "BillingCustomer" FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+    CREATE POLICY deny_supabase_data_api_roles ON "BillingSubscription" FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+    CREATE POLICY deny_supabase_data_api_roles ON "StripeEvent" FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+  END IF;
+END
+$$;
