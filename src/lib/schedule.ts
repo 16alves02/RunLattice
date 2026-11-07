@@ -34,8 +34,7 @@ export async function syncWorkflowSchedule(input: {
   const config = getTriggerConfig(input.definition);
 
   if (input.status !== "ACTIVE" || input.triggerType !== "SCHEDULE" || config.triggerType !== "SCHEDULE" || !config.cronExpression) {
-    await queue.removeJobScheduler(schedulerId);
-    return;
+    return await queue.removeJobScheduler(schedulerId);
   }
 
   await queue.upsertJobScheduler(
