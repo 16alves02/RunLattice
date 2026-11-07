@@ -27,7 +27,9 @@ AI-generated workflows are drafts. They must be reviewed and saved by the user; 
 - Integration catalog, with Discord webhook as the first live provider.
 - AES-256-GCM encryption for Discord webhook credentials.
 - Redis/BullMQ background execution with atomic run claiming.
-- Real Discord message delivery from a supported workflow, including safe `{{input.path}}` message templates.\n- Signed inbound webhook triggers using timestamped HMAC-SHA256 signatures and replay-window validation.\n- Cron-based scheduled triggers managed by BullMQ with IANA timezone support and worker-side reconciliation.
+- Real Discord message delivery from a supported workflow, including safe `{{input.path}}` message templates.
+- Signed inbound webhook triggers using timestamped HMAC-SHA256 signatures and replay-window validation.
+- Cron-based scheduled triggers managed by BullMQ with IANA timezone support and worker-side reconciliation.
 - AI workflow planning with OpenAI and Anthropic adapters, disabled by default and returning reviewable drafts.
 - Workspace monthly AI request/token budgets and atomic per-user/per-workspace request throttling.
 - Vitest tests for workflow validation, execution-path validation and credential encryption.
@@ -137,7 +139,9 @@ docker compose down
 | GET | `/api/workflows/:id` | Retrieve a workflow and recent runs |
 | PATCH | `/api/workflows/:id` | Update workflow fields |
 | DELETE | `/api/workflows/:id` | Delete a workflow |
-| POST | `/api/workflows/:id/runs` | Queue an active workflow manually |\n| POST | `/api/workflows/:id/webhook-secret` | Generate or rotate a signed webhook secret (owner/admin) |\n| POST | `/api/webhooks/:workflowId` | Accept a signed inbound webhook and queue a run |
+| POST | `/api/workflows/:id/runs` | Queue an active workflow manually |
+| POST | `/api/workflows/:id/webhook-secret` | Generate or rotate a signed webhook secret (owner/admin) |
+| POST | `/api/webhooks/:workflowId` | Accept a signed inbound webhook and queue a run |
 | POST | `/api/ai/workflow-plan` | Generate a reviewable workflow proposal (feature-flagged) |
 | POST | `/api/ai/workflow-plan/test` | Simulate a workflow graph without external side effects |
 
@@ -165,7 +169,8 @@ RunLattice is an active portfolio project, not a production-ready automation ser
 - [ ] Member administration and transactional email
 - [x] AI workflow planning foundation, workspace usage budgets and application request throttling
 - [ ] Deployment-edge abuse protection, observability and billing
-- [ ] API/worker integration test coverage and managed public demo\n- [ ] Security review and public launch readiness
+- [ ] API/worker integration test coverage and managed public demo
+- [ ] Security review and public launch readiness
 
 ## Author
 
