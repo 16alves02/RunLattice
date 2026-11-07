@@ -30,7 +30,7 @@ The Processor will:
 ## 5. Subprocessors
 The Controller gives **[GENERAL / SPECIFIC]** authorization for subprocessors listed in Annex B. The Processor will provide advance notice of intended changes and a reasonable opportunity to object on data-protection grounds. The Processor remains responsible for subprocessors' performance of data-protection obligations.
 
-The current intended provider categories include database hosting (Supabase), application/worker hosting and Redis (Railway), payment processing (Stripe, where applicable) and AI providers only where the Controller has explicitly enabled the feature. Confirm exact legal entities, locations, services, subprocessor lists and contract terms before execution.
+The current intended provider categories include database hosting (Supabase), application/worker hosting and Redis (Railway), transactional email delivery (Resend), payment processing (Stripe, where applicable) and AI providers only where the Controller has explicitly enabled the feature. Confirm exact legal entities, locations, services, subprocessor lists and contract terms before execution.
 
 ## 6. International transfers
 No transfer outside the EEA may occur without a valid GDPR Chapter V mechanism and required supplementary safeguards. The parties must document transfer locations, adequacy decisions or Standard Contractual Clauses, transfer impact assessments and supplementary measures in Annex B. Current infrastructure includes a Railway Redis service configured in a US region; this must be assessed and reflected in the final annex.
@@ -72,6 +72,7 @@ The Processor will provide reasonable information to demonstrate compliance and 
 | Supabase | PostgreSQL hosting | EU West (Ireland) project region | **[VERIFY LEGAL ENTITY, DPA AND SUBPROCESSORS]** |
 | Railway | Web and worker hosting | **[VERIFY DEPLOYMENT REGION]** | **[VERIFY DPA AND TRANSFER MECHANISM]** |
 | Railway | Redis | US region currently configured | **[TRANSFER ASSESSMENT REQUIRED]** |
+| Resend | Verification and password-reset email | **[VERIFY]** | **[VERIFY DPA AND TRANSFER MECHANISM]** |
 | Stripe | Subscription billing, when enabled | **[VERIFY]** | **[VERIFY DPA AND TRANSFER MECHANISM]** |
 | AI provider | AI workflow planning, only if enabled | **[PROVIDER-DEPENDENT]** | **[VERIFY DPA, DATA USE AND TRANSFER TERMS]** |
 
