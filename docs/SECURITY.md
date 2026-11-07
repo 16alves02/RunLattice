@@ -80,3 +80,17 @@ Inbound webhook triggers use HMAC-SHA256 over the exact request timestamp and ra
 ## Scheduled triggers
 
 Scheduled workflows use BullMQ job schedulers in a separate Redis queue. The worker checks that the workflow is still active and configured as a schedule before inserting a run and transactional outbox event. Schedules are reconciled periodically from PostgreSQL; pausing or deleting a workflow removes its scheduler through the API. Scheduled triggers require a continuously running worker and Redis service.
+
+## PostgreSQL and Supabase Data API boundary
+
+The production application uses Better Auth for identity and Prisma for trusted server-side database access; it does not use Supabase Auth or direct browser access to application tables.
+
+All 16 public application tables have Row Level Security enabled. The `anon` and `authenticated` roles have no table privileges in the public schema. No permissive user-facing RLS policies are defined: the intended Data API posture is deny-by-default, while the trusted Prisma connection uses the server-side PostgreSQL role. Do not add `auth.uid()` policies; Better Auth sessions are not Supabase Auth JWT identities.
+
+The Supabase advisor may report `rls_enabled_no_policy` as an informational lint for these tables. This is expected for this architecture and is safer than inventing policies tied to a different identity system. Validate that:
+- the Data API roles cannot read or mutate any application table;
+- the Railway Web and Worker services connect only with server-side database credentials;
+- no database URL or privileged credential reaches browser code or public logs;
+- workspace authorization remains enforced by the API for every request.
+
+The migration `20261107224500_lock_down_public_table_access` keeps this boundary reproducible for future database deployments.
