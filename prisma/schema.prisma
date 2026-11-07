@@ -145,6 +145,9 @@ model Workflow {
   status         WorkflowStatus @default(DRAFT)
   triggerType    TriggerType    @default(MANUAL)
   definition     Json
+  webhookSecretCiphertext String?
+  webhookEnabled Boolean @default(false)
+  webhookDeliveries WebhookDelivery[]
   userId         String?
   user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   organizationId String?
@@ -250,4 +253,16 @@ model AiUsageEvent {
 
   @@index([organizationId, createdAt])
   @@index([status, createdAt])
+}
+
+
+model WebhookDelivery {
+  id         String   @id @default(cuid())
+  workflowId String
+  eventId    String
+  createdAt  DateTime @default(now())
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, eventId])
+  @@index([createdAt])
 }
