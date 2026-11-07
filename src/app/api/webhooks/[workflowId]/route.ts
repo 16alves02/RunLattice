@@ -74,7 +74,10 @@ export async function POST(request: Request, context: RouteContext) {
     });
     return NextResponse.json({ data: run }, { status: 202 });
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {\n      return NextResponse.json({ error: "This webhook delivery has already been processed." }, { status: 409 });\n    }\n    console.error("Unable to accept signed workflow webhook:", error instanceof Error ? error.message : "Unknown error");
+    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+      return NextResponse.json({ error: "This webhook delivery has already been processed." }, { status: 409 });
+    }
+    console.error("Unable to accept signed workflow webhook:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "The webhook could not be queued." }, { status: 503 });
   }
 }
