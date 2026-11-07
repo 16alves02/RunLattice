@@ -145,6 +145,7 @@ model Workflow {
   status         WorkflowStatus @default(DRAFT)
   triggerType    TriggerType    @default(MANUAL)
   webhookSecretCiphertext String?
+  webhookDeliveries WebhookDelivery[]
   definition     Json
   userId         String?
   user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
