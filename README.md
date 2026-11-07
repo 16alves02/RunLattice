@@ -28,12 +28,13 @@ AI-generated workflows are drafts. They must be reviewed and saved by the user; 
 - AES-256-GCM encryption for Discord webhook credentials.
 - Redis/BullMQ background execution with atomic run claiming.
 - Real Discord message delivery from a supported linear workflow, including safe `{{input.path}}` message templates.
-- AI workflow planning foundation, disabled by default and returning reviewable drafts.
+- AI workflow planning with OpenAI and Anthropic adapters, disabled by default and returning reviewable drafts.
+- Workspace monthly AI request/token budgets and atomic per-user/per-workspace request throttling.
 - Vitest tests for workflow validation, execution-path validation and credential encryption.
 
 ## Current execution limits
 
-The worker currently supports manual runs with exactly one trigger and one linear path. The only live action is sending a static message to a connected Discord webhook. Conditions, branching, arbitrary code, inbound webhooks, scheduled triggers and other provider actions are not implemented.
+The worker currently supports manual runs with exactly one trigger and at most one condition node. Condition nodes evaluate input data and route execution through an explicit true or false branch; only the selected path runs. The only live external action is sending a message to a connected Discord webhook. Arbitrary code, inbound webhooks, scheduled triggers and other provider actions are not implemented.
 
 Automatic BullMQ retries are disabled for the Discord action because it is non-idempotent. The worker refreshes a database heartbeat while a run is active; a separate recovery sweep marks runs with an expired five-minute heartbeat as FAILED. It does not replay the run because an external action may already have happened. Step checkpoints are persisted, but resuming from a checkpoint and exactly-once delivery are not supported.
 
@@ -56,7 +57,7 @@ Back up the key securely. Losing it makes existing integration credentials undec
 | Data | PostgreSQL, Prisma ORM |
 | Background jobs | Redis, BullMQ |
 | Authentication | Better Auth |
-| AI planning | Server-side OpenAI API integration |
+| AI planning | Server-side OpenAI and Anthropic adapters |
 | Tests | Vitest |
 | Local services | Docker Compose |
 
@@ -137,12 +138,18 @@ docker compose down
 | PATCH | `/api/workflows/:id` | Update workflow fields |
 | DELETE | `/api/workflows/:id` | Delete a workflow |
 | POST | `/api/workflows/:id/runs` | Queue an active workflow |
+| POST | `/api/ai/workflow-plan` | Generate a reviewable workflow proposal (feature-flagged) |
+| POST | `/api/ai/workflow-plan/test` | Simulate a workflow graph without external side effects |
 
-All workflow and integration endpoints require an authenticated session and verified membership in the active organization. Members can read; owners and admins can make changes and queue runs. The health endpoint is public and does not currently test PostgreSQL or Redis connectivity.
+All workflow and integration endpoints require an authenticated session and verified membership in the active organization. Members can read; owners and admins can make changes and queue runs. The AI planning endpoint requires an owner/admin role and remains disabled unless `AI_ASSISTANT_ENABLED=true`. It applies request-size limits, per-user/per-workspace throttling and monthly workspace usage budgets. The dry-run endpoint simulates graph traversal only and never invokes integration adapters. The health endpoint is public and does not currently test PostgreSQL or Redis connectivity.
+
+## Deployment
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the required web/worker topology, environment variables and production release checklist. The guide does not indicate that a production deployment has been completed.
 
 ## Project status
 
-RunLattice is an active portfolio project, not a production-ready automation service. The authentication and workspace foundation is implemented, and the first real external action is available through Discord webhooks. Additional provider integrations, general-purpose action adapters, condition evaluation, branching, durable recovery, email delivery, invitation management, AI quotas, observability, billing and a full security review remain outstanding.
+RunLattice is an active portfolio project, not a production-ready automation service. The authentication and workspace foundation is implemented, and the first real external action is available through Discord webhooks. AI planning now has provider adapters, workspace budgets, request throttling and review-only proposals, but remains disabled by default. Additional provider integrations, general-purpose action adapters, durable recovery, email delivery, invitation management, deployment-edge abuse protection, observability, billing and a full security review remain outstanding.
 
 ## Roadmap
 
@@ -156,7 +163,8 @@ RunLattice is an active portfolio project, not a production-ready automation ser
 - [ ] Additional integrations and OAuth connections
 - [ ] Signed inbound webhooks and scheduled triggers
 - [ ] Member administration and transactional email
-- [ ] AI usage budgets, observability and billing
+- [x] AI workflow planning foundation, workspace usage budgets and application request throttling
+- [ ] Deployment-edge abuse protection, observability and billing
 - [ ] Security review and public launch readiness
 
 ## Author
