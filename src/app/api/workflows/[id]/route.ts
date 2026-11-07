@@ -141,7 +141,26 @@ export async function PATCH(request: Request, context: RouteContext) {
     const workflow = await prisma.workflow.findFirst({
       where: { id, organizationId: access.context.organizationId },
     });
-    return NextResponse.json({ data: workflow });
+    if (!workflow) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
+    try {
+      await syncWorkflowSchedule({
+        workflowId: workflow.id,
+        status: workflow.status,
+        triggerType: workflow.triggerType,
+        definition: workflow.definition as WorkflowDefinition,
+      });
+    } catch (scheduleError) {
+      if (workflow.status === "ACTIVE" && workflow.triggerType === "SCHEDULE") {
+        await prisma.workflow.updateMany({
+          where: { id, organizationId: access.context.organizationId },
+          data: { status: "PAUSED" },
+        });
+        return NextResponse.json({ error: "The schedule service is unavailable. The workflow was paused to prevent an unscheduled activation." }, { status: 503 });
+      }
+      console.error("Unable to synchronize workflow schedule:", scheduleError instanceof Error ? scheduleError.message : "Unknown error");
+    }
+    const { webhookSecretCiphertext: _secret, ...safeWorkflow } = workflow;
+    return NextResponse.json({ data: safeWorkflow });
   } catch (error) {
     console.error("Unable to update workflow:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "The workflow could not be updated." }, { status: 503 });
