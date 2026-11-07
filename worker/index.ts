@@ -13,7 +13,7 @@ import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 
 const prisma = new PrismaClient();
 const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl || !/^postgres(?:ql)?:\\/\\//i.test(databaseUrl)) {
+if (!databaseUrl || !/^postgres(?:ql)?:\/\//i.test(databaseUrl)) {
   throw new Error("DATABASE_URL must be a valid PostgreSQL connection URI.");
 }
 void prisma.$connect().then(() => {
