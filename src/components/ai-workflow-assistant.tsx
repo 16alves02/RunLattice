@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, FlaskConical, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import type { WorkflowDefinition } from "@/lib/types";
+import type { ConditionConfig, WorkflowDefinition } from "@/lib/types";
 
 type Plan = {
   name: string;
@@ -74,6 +74,54 @@ export function AIWorkflowAssistant() {
     setDryRun(null);
   }
 
+  function updateActionMessage(nodeId: string, message: string) {
+    setPlan((current) => current ? {
+      ...current,
+      definition: {
+        ...current.definition,
+        nodes: current.definition.nodes.map((node) => node.id === nodeId && node.kind === "action"
+          && node.config && "integrationId" in node.config
+          ? { ...node, config: { ...node.config, message } }
+          : node),
+      },
+    } : current);
+    setDryRun(null);
+  }
+
+  function updateCondition(nodeId: string, field: "path" | "operator" | "value", value: string) {
+    setPlan((current) => current ? {
+      ...current,
+      definition: {
+        ...current.definition,
+        nodes: current.definition.nodes.map((node) => {
+          if (node.id !== nodeId || node.kind !== "condition" || !node.config || !("operator" in node.config)) return node;
+          const config = node.config;
+          if (field === "path") return { ...node, config: { ...config, path: value } };
+          if (field === "operator") {
+            const operator = value as ConditionConfig["operator"];
+            const nextConfig: ConditionConfig = operator === "exists"
+              ? { path: config.path, operator }
+              : {
+                  path: config.path,
+                  operator,
+                  value: config.value ?? (operator === "greater_than" || operator === "less_than" ? 0 : ""),
+                };
+            return { ...node, config: nextConfig };
+          }
+          const nextValue = config.operator === "greater_than" || config.operator === "less_than"
+            ? Number(value)
+            : typeof config.value === "number"
+              ? Number(value)
+              : typeof config.value === "boolean"
+                ? value === "true"
+                : value;
+          return { ...node, config: { ...config, value: nextValue } };
+        }),
+      },
+    } : current);
+    setDryRun(null);
+  }
+
   async function simulatePlan() {
     if (!plan) return;
     setTesting(true);
@@ -123,7 +171,7 @@ export function AIWorkflowAssistant() {
       <label className="field-label" htmlFor="ai-plan-name">Workflow name</label><input id="ai-plan-name" className="field-input" value={plan.name} maxLength={80} onChange={(event) => setPlan({ ...plan, name: event.target.value })}/>
       <label className="field-label" htmlFor="ai-plan-description" style={{ display: "block", marginTop: 12 }}>Description</label><textarea id="ai-plan-description" className="field-input" rows={2} value={plan.description} maxLength={300} onChange={(event) => setPlan({ ...plan, description: event.target.value })}/>
       <div className="panel-subtitle" style={{ marginTop: 18 }}>Why this design</div><p className="subtitle">{plan.rationale}</p>
-      <div className="ai-plan-steps">{plan.definition.nodes.map((node, index) => <div className="ai-plan-step" key={node.id}><span className="ai-plan-number">{index + 1}</span><div style={{ flex: 1, minWidth: 0 }}><input aria-label={`Step ${index + 1} title`} className="field-input" value={node.title} maxLength={100} onChange={(event) => updateNode(node.id, "title", event.target.value)}/><input aria-label={`Step ${index + 1} details`} className="field-input" style={{ marginTop: 6 }} value={node.detail} maxLength={500} onChange={(event) => updateNode(node.id, "detail", event.target.value)}/><div className="activity-meta" style={{ marginTop: 4 }}>{node.kind}</div></div></div>)}</div>
+      <div className="ai-plan-steps">{plan.definition.nodes.map((node, index) => <div className="ai-plan-step" key={node.id}><span className="ai-plan-number">{index + 1}</span><div style={{ flex: 1, minWidth: 0 }}><input aria-label={`Step ${index + 1} title`} className="field-input" value={node.title} maxLength={100} onChange={(event) => updateNode(node.id, "title", event.target.value)}/><input aria-label={`Step ${index + 1} details`} className="field-input" style={{ marginTop: 6 }} value={node.detail} maxLength={500} onChange={(event) => updateNode(node.id, "detail", event.target.value)}/>{node.kind === "action" && node.config && "integrationId" in node.config && <><label className="field-label" style={{ display: "block", marginTop: 8 }}>Action message</label><textarea aria-label={`Step ${index + 1} action message`} className="field-input" rows={2} maxLength={2000} value={node.config.message ?? ""} onChange={(event) => updateActionMessage(node.id, event.target.value)} /></>}{node.kind === "condition" && node.config && "operator" in node.config && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, marginTop: 8 }}><div><label className="field-label" style={{ display: "block" }}>Input path</label><input aria-label={`Step ${index + 1} condition path`} className="field-input" value={node.config.path} maxLength={200} onChange={(event) => updateCondition(node.id, "path", event.target.value)} /></div><div><label className="field-label" style={{ display: "block" }}>Operator</label><select aria-label={`Step ${index + 1} condition operator`} className="field-input" value={node.config.operator} onChange={(event) => updateCondition(node.id, "operator", event.target.value)}><option value="exists">Exists</option><option value="equals">Equals</option><option value="not_equals">Does not equal</option><option value="contains">Contains</option><option value="greater_than">Greater than</option><option value="less_than">Less than</option></select></div>{node.config.operator !== "exists" && <div><label className="field-label" style={{ display: "block" }}>Comparison value</label>{typeof node.config.value === "boolean" ? <select aria-label={`Step ${index + 1} condition value`} className="field-input" value={String(node.config.value)} onChange={(event) => updateCondition(node.id, "value", event.target.value)}><option value="true">True</option><option value="false">False</option></select> : <input aria-label={`Step ${index + 1} condition value`} className="field-input" type={node.config.operator === "greater_than" || node.config.operator === "less_than" || typeof node.config.value === "number" ? "number" : "text"} value={node.config.value == null ? "" : String(node.config.value)} onChange={(event) => updateCondition(node.id, "value", event.target.value)} />}</div>}</div>}{node.kind === "action" && !node.config && <div className="activity-meta" style={{ marginTop: 8 }}>This action has no live configuration yet. Connect a supported integration before activation.</div>}<div className="activity-meta" style={{ marginTop: 4 }}>{node.kind}</div></div></div>)}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 18 }}>
         <div><div className="panel-subtitle">Assumptions</div>{plan.assumptions.length ? <ul>{plan.assumptions.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="activity-meta">No assumptions supplied.</p>}</div>
         <div><div className="panel-subtitle">Required integrations</div>{plan.requiredIntegrations.length ? <ul>{plan.requiredIntegrations.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="activity-meta">No external integrations declared.</p>}</div>
