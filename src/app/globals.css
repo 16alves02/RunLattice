@@ -172,3 +172,18 @@ h1 { font-size:27px; line-height:1.2; letter-spacing:-1px; margin:0 0 8px; }
 .brand-logo-sidebar { max-width: 158px; margin-bottom: 2px; }
 .brand-logo-auth { max-width: 205px; padding: 0; }
 @media(max-width:720px) { .brand-logo-sidebar { max-width: 142px; } }
+
+/* Workspace billing */
+.billing-usage { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:18px 21px; }
+.billing-usage > div { display:grid;gap:7px;padding:12px;border:1px solid var(--border);border-radius:9px;background:#17191d; }
+.billing-usage span { color:var(--muted);font-size:10px; }
+.billing-usage strong { font-size:14px; }
+.billing-plan-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:16px 0; }
+.billing-plan-grid .panel { padding:19px; }
+.billing-plan-grid ul { display:grid;gap:9px;padding-left:17px;color:#c4c8ce;font-size:11px;line-height:1.5;min-height:112px; }
+.billing-price { margin:13px 0 5px;font-size:27px;font-weight:800;letter-spacing:-1px; }
+.billing-price span { color:var(--muted);font-size:11px;font-weight:500;letter-spacing:0; }
+.billing-actions { display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:14px; }
+.billing-error { color:#ef9999;font-size:11px; }
+@media(max-width:900px) { .billing-plan-grid { grid-template-columns:1fr; } .billing-usage { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:520px) { .billing-usage { grid-template-columns:1fr 1fr;gap:8px;padding:14px; } .billing-usage > div { padding:10px; } .billing-usage strong { font-size:12px; } }
