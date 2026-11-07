@@ -20,8 +20,8 @@ describe("AI request rate limiting", () => {
 
     expect(result).toEqual({ allowed: true });
     expect(query).toHaveBeenCalledTimes(2);
-    const firstKey = query.mock.calls[0][1] as string;
-    const secondKey = query.mock.calls[1][1] as string;
+    const firstKey = query.mock.calls[0][2] as string;
+    const secondKey = query.mock.calls[1][2] as string;
     expect(firstKey).toMatch(/^runlattice:ai:user:/);
     expect(secondKey).toMatch(/^runlattice:ai:workspace:/);
     expect(firstKey).not.toContain("workspace-secret");
