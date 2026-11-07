@@ -7,6 +7,7 @@ import {
   buildWorkflowPrompt,
   buildWorkflowSystemPrompt,
   findMissingIntegrations,
+  findUnconfiguredActionTitles,
   type AIIntegrationContext,
 } from "@/lib/ai-workflow";
 import { generateAICompletion, getAIProviderSelection, type AIProviderResult } from "@/lib/ai-provider";
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
   try {
     const connections = await prisma.integrationConnection.findMany({
       where: { organizationId: access.context.organizationId },
-      select: { provider: true },
+      select: { id: true, provider: true },
     });
     const connectedProviders = new Set(connections.map((connection) => connection.provider));
     integrationContext = integrationCatalog.map((integration) => ({
@@ -147,13 +148,12 @@ export async function POST(request: Request) {
     if (node.config && "integrationId" in node.config) required.add(node.config.integrationId);
   }
   const missingIntegrations = findMissingIntegrations([...required], integrationContext);
-  const actionNodes = plan.data.definition.nodes.filter((node) => node.kind === "action");
-  const setupRequiredActions = actionNodes.length === 0
-    ? ["Add at least one action"]
-    : actionNodes
-      .filter((node) => !node.config || !("integrationId" in node.config)
-        || !node.config.connectionId || !node.config.message?.trim())
-      .map((node) => node.title);
+  // A model-generated connectionId is untrusted. It must match a real
+  // connection belonging to this workspace and the declared provider.
+  const setupRequiredActions = findUnconfiguredActionTitles(
+    plan.data.definition,
+    connections,
+  );
   const executionReadiness = missingIntegrations.length > 0 || setupRequiredActions.length > 0
     ? "setup_required"
     : "review_required";
