@@ -20,7 +20,7 @@ export default function ForgotPasswordPage() {
     try {
       const result = await authClient.requestPasswordReset({
         email,
-        redirectTo: \`\${window.location.origin}/reset-password\`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
       if (result.error) throw new Error(result.error.message || "Unable to request a password reset.");
       setMessage("If this address belongs to an account, a password reset link will be sent.");
