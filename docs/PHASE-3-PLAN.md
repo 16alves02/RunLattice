@@ -1,6 +1,6 @@
 # Phase 3 — AI Builder and AI Architect
 
-Status: implementation and initial automated validation are in progress on `feature/phase-3-ai-architect`. The Phase 3 CI quality job and PostgreSQL migration job passed for commit `83f0698`; subsequent evaluation and readiness changes require a fresh CI run. This is a stacked branch; it does not merge Phase 2 or Phase 1.
+Status: implementation is in place on `feature/phase-3-ai-architect`. CI quality checks and PostgreSQL migration tests passed for commit `c9f0494`. Documentation and production-readiness review remain in progress. This is a stacked branch; it does not merge Phase 2 or Phase 1.
 
 ## Product outcome
 
@@ -73,7 +73,15 @@ Exact new filenames and model names are implementation decisions to be confirmed
 - Human approval is required before saving; activation and external execution require their existing separate permissions/actions.
 - CI, migration tests, adversarial tests and evaluation suite pass on the final head SHA.
 
-## Current implementation notes\n\nThe evaluation module is a deterministic regression harness used by automated tests. It does not call a model and is not a runtime security filter or a guarantee that a model will resist prompt injection. The planning endpoint continues to validate every generated plan against the authoritative workflow schema and the integration catalog. Provider selection remains explicitly configured; cost/latency/privacy routing is intentionally deferred until measurable provider metadata and policy requirements are available.\n\n## Dependencies and explicit exclusions
+## Current implementation notes
+
+The evaluation module is a deterministic regression harness used by automated tests. It does not call a model and is not a runtime security filter or a guarantee that a model will resist prompt injection. The planning endpoint continues to validate every generated plan against the authoritative workflow schema and the integration catalog.
+
+Provider selection remains explicitly configured; cost/latency/privacy routing is intentionally deferred until measurable provider metadata and policy requirements are available. Workspace monthly request/token budgets are enforced, but deployment-edge rate limiting and abuse monitoring are still required before public AI enablement.
+
+Action readiness does not trust a model-generated connection ID. It checks that the referenced connection exists in the active workspace and matches the declared provider. The evaluator and readiness checks are defense-in-depth validation, not a substitute for runtime authorization.
+
+## Dependencies and explicit exclusions
 
 - Phase 2 execution contracts and migrations must pass CI before implementation is considered ready.
 - Phase 1 workspace membership and authorization remain prerequisites.
