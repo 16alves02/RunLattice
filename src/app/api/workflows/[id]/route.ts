@@ -147,7 +147,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         workflowId: workflow.id,
         status: workflow.status,
         triggerType: workflow.triggerType,
-        definition: workflow.definition as WorkflowDefinition,
+        definition: workflow.definition as unknown as WorkflowDefinition,
       });
     } catch (scheduleError) {
       if (workflow.status === "ACTIVE" && workflow.triggerType === "SCHEDULE") {
