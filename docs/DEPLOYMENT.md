@@ -9,7 +9,7 @@ RunLattice has two independently running application processes and two shared da
 1. **Web application** — Next.js application and Route Handlers.
 2. **Execution worker** — long-running Node.js process started with `npm run worker`.
 3. **PostgreSQL** — persistent application database managed by Prisma migrations.
-4. **Redis** — BullMQ queue and worker coordination.
+4. **Redis** — BullMQ queue, worker coordination and cron-based scheduled triggers.
 
 The web application and worker must use the same PostgreSQL database, Redis instance and `INTEGRATION_ENCRYPTION_KEY`. The worker must run as a persistent process/container; do not start it from a serverless request handler or rely on a serverless function staying alive.
 
@@ -47,7 +47,7 @@ AI planning is disabled unless `AI_ASSISTANT_ENABLED=true`. Keep it disabled unt
 3. Build and test the exact commit intended for release.
 4. Run `npx prisma migrate deploy` once as a release step against the target database; do not run migrations independently from every web or worker instance.
 5. Start the web application with `npm run start`.
-6. Start the worker as a persistent service with `npm run worker`.
+6. Start the worker as a persistent service with `npm run worker`. The worker consumes run jobs, reconciles active cron schedules and queues scheduled runs through the same transactional outbox. Keep at least one worker process running for scheduled triggers to fire.
 7. Verify authentication, workspace isolation, integration credential encryption, queue dispatch, worker execution and failure recovery.
 8. Confirm database backups and test a restore before accepting real customer data.
 
@@ -70,3 +70,24 @@ AI planning is disabled unless `AI_ASSISTANT_ENABLED=true`. Keep it disabled unt
 ## Current status
 
 This guide records the required deployment architecture and checklist only. RunLattice has not been deployed to production by this change, and no production credentials, domains, databases, Redis services, backups or monitoring have been provisioned here.
+
+
+## Signed inbound webhooks
+
+- Configure the workflow trigger as **Signed webhook**, save the workflow, then generate a signing secret from the builder.
+- The secret is shown only once. Store it in the sending system's secret manager; rotating it immediately invalidates the previous secret.
+- Send a JSON object (maximum 32 KB) to `POST /api/webhooks/:workflowId`.
+- Include `x-runlattice-timestamp` as Unix seconds and `x-runlattice-signature` as `v1=<hex>`.
+- The signature is HMAC-SHA256 over `timestamp + "." + exact raw request body`; timestamps outside the five-minute replay window are rejected.
+- Webhook secrets are encrypted at rest using the same `INTEGRATION_ENCRYPTION_KEY` used by the worker. Back up and rotate this key carefully.
+
+## Scheduled workflows
+
+- Configure the trigger with a five-field cron expression and an IANA timezone such as `Europe/Lisbon`.
+- The worker registers schedules in the dedicated BullMQ `workflow-schedules` queue and periodically reconciles active schedules from PostgreSQL.
+- Keep the worker online and Redis reachable. If the schedule service cannot be registered while activating a workflow, the API pauses that workflow rather than reporting a false successful activation.
+- Scheduled runs are inserted through the same PostgreSQL outbox as manual and webhook runs.
+
+## Integration tests
+
+Run `npm run test:integration` with a disposable PostgreSQL database and Redis instance available. The suite applies real API webhook requests, verifies persisted run/outbox records, checks the BullMQ scheduler lifecycle, and starts the real worker against an intentionally invalid workflow to verify safe failure recording. Do not point this test suite at production data.
