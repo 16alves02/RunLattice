@@ -23,10 +23,12 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(Boolean(workflowId));
   const [saving, setSaving] = useState(false);
-  const [connections, setConnections] = useState<IntegrationConnection[]>([]);\n  const [webhookSecret, setWebhookSecret] = useState("");
+  const [connections, setConnections] = useState<IntegrationConnection[]>([]);
+  const [webhookSecret, setWebhookSecret] = useState("");
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selected), [nodes, selected]);
   const selectedActionConfig = selectedNode?.config && "integrationId" in selectedNode.config ? selectedNode.config : undefined;
-  const selectedConditionConfig = selectedNode?.config && "operator" in selectedNode.config ? selectedNode.config : undefined;\n  const selectedTriggerConfig = selectedNode?.config && "triggerType" in selectedNode.config ? selectedNode.config : undefined;
+  const selectedConditionConfig = selectedNode?.config && "operator" in selectedNode.config ? selectedNode.config : undefined;
+  const selectedTriggerConfig = selectedNode?.config && "triggerType" in selectedNode.config ? selectedNode.config : undefined;
   const hasCondition = nodes.some((node) => node.kind === "condition");
 
   useEffect(() => {
