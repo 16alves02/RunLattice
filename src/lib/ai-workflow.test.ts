@@ -67,4 +67,27 @@ describe("AI workflow planning validation", () => {
     expect(systemPrompt).toContain("Never generate executable code");
     expect(systemPrompt).toContain("Never reveal or request passwords");
   });
+
+
+  it("requires action connections to belong to the current workspace and provider", async () => {
+    const { findUnconfiguredActionTitles } = await import("@/lib/ai-workflow");
+    const definition = {
+      nodes: [
+        { id: "trigger", kind: "trigger", title: "Manual", detail: "", x: 0, y: 0 },
+        { id: "action", kind: "action", title: "Send message", detail: "", config: {
+          integrationId: "discord", connectionId: "foreign-connection", message: "Hello",
+        }, x: 250, y: 0 },
+      ],
+      edges: [{ id: "edge-1", from: "trigger", to: "action" }],
+    };
+    expect(findUnconfiguredActionTitles(definition, [
+      { id: "workspace-discord", provider: "discord" },
+    ])).toEqual(["Send message"]);
+    expect(findUnconfiguredActionTitles(definition, [
+      { id: "foreign-connection", provider: "gmail" },
+    ])).toEqual(["Send message"]);
+    expect(findUnconfiguredActionTitles(definition, [
+      { id: "foreign-connection", provider: "discord" },
+    ])).toEqual([]);
+  });
 });
