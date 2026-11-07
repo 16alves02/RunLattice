@@ -42,6 +42,9 @@
   },
   "overrides": {
     "deepmerge-ts": "^8.0.0",
-    "minimatch": "^11.0.1"
+    "minimatch": "^11.0.1",
+    "@eslint/eslintrc": {
+      "minimatch": "^3.1.4"
+    }
   }
 }
