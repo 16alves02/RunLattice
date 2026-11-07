@@ -1,4 +1,4 @@
-# RunLattice — Roadmap de desenvolvimento
+# RunLattice - Roadmap de desenvolvimento
 
 **Data:** 5 de novembro de 2026  
 **Estratégia:** desenvolvimento paralelo de Web, Desktop e Mobile, com núcleo partilhado.  
@@ -15,7 +15,7 @@
 - Fazer deploys Preview por pull request e produção apenas após validação.
 - Cada fase começa com um plano curto, ficheiros envolvidos, riscos e testes; a execução dessa fase aguarda aprovação explícita do utilizador.
 
-## Fase 0 — Auditoria e estabilização da base
+## Fase 0 - Auditoria e estabilização da base
 
 **Objetivo:** perceber exatamente o que existe e tornar a base reproduzível.
 
@@ -35,7 +35,7 @@
 - Nenhuma funcionalidade simulada é apresentada como execução real.
 - Existe mapa de arquitetura e inventário de riscos.
 
-## Fase 1 — Fundamentos de plataforma e segurança
+## Fase 1 - Fundamentos de plataforma e segurança
 
 **Objetivo:** preparar o produto para utilizadores reais e múltiplos clientes.
 
@@ -56,7 +56,7 @@
 - Testes automatizados cobrem permissões e isolamento.
 - Migrações e rollback estão documentados.
 
-## Fase 2 — Motor de execução real e integrações
+## Fase 2 - Motor de execução real e integrações
 
 **Objetivo:** deixar de simular workflows e executar ações reais com segurança.
 
@@ -79,7 +79,7 @@
 - Cada conector publicado tem testes e documentação.
 - Custos, rate limits e falhas dos fornecedores são observáveis.
 
-## Fase 3 — AI Builder e AI Architect
+## Fase 3 - AI Builder e AI Architect
 
 **Objetivo:** permitir que uma pessoa descreva o que quer e obtenha um workflow funcional, explicável e testável.
 
@@ -100,7 +100,7 @@
 - Utilização e custos são medidos por workspace.
 - Existem testes de avaliação para qualidade, segurança e regressões.
 
-## Fase 4 — Experiência multiplataforma em paralelo
+## Fase 4 - Experiência multiplataforma em paralelo
 
 **Objetivo:** disponibilizar uma experiência coerente em Web, Desktop e Mobile.
 
@@ -109,7 +109,7 @@
 - Implementar estados de execução em tempo real, inspeção por nó, logs e histórico.
 - Adicionar acessibilidade por teclado e leitores de ecrã.
 
-### Mobile — iOS e Android
+### Mobile - iOS e Android
 - Criar app Expo/React Native.
 - Implementar editor touch-first completo para os mesmos modelos de workflow suportados.
 - Suportar pan, zoom, seleção, ligação de nós, painel de configuração, pesquisa, undo/redo, AI Builder, testes e inspeção.
@@ -117,7 +117,7 @@
 - Implementar notificações push, autenticação biométrica e cache/offline seguro de drafts.
 - Não armazenar credenciais ou outputs sensíveis em cache local sem proteção.
 
-### Desktop — Windows, macOS e Linux
+### Desktop - Windows, macOS e Linux
 - Criar app Tauri 2, inicialmente com a experiência web.
 - Adicionar atalhos, notificações, janelas/workspaces e atualizações.
 - Desenvolver Local Agent separado, com permissões explícitas por pasta, comando e integração.
@@ -129,7 +129,7 @@
 - Desktop funciona sem Node.js instalado pelo utilizador.
 - Testes de interface cobrem os fluxos críticos em cada plataforma.
 
-## Fase 5 — Monetização, lançamento e operação
+## Fase 5 - Monetização, lançamento e operação
 
 **Objetivo:** lançar um produto com billing transparente e capacidade de operar com clientes.
 
@@ -150,7 +150,7 @@
 - Suporte, incidentes e comunicação de falhas têm processo documentado.
 - O lançamento tem métricas e critérios de rollback.
 
-## Fase 6 — Expansão do ecossistema
+## Fase 6 - Expansão do ecossistema
 
 **Objetivo:** aumentar retenção, distribuição e receitas sem comprometer a fiabilidade do core.
 
