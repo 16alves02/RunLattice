@@ -15,7 +15,13 @@ export interface ConditionConfig {
   value?: string | number | boolean | null;
 }
 
-export interface TriggerConfig {\n  triggerType: "MANUAL" | "WEBHOOK" | "SCHEDULE";\n  cronExpression?: string;\n  timezone?: string;\n}\n\nexport interface WorkflowNode {
+export interface TriggerConfig {
+  triggerType: "MANUAL" | "WEBHOOK" | "SCHEDULE";
+  cronExpression?: string;
+  timezone?: string;
+}
+
+export interface WorkflowNode {
   id: string;
   kind: NodeKind;
   title: string;
