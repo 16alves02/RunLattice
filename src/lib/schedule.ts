@@ -1,6 +1,6 @@
 import { Queue } from "bullmq";
-import type { WorkflowDefinition } from "@/lib/types";
-import { getTriggerConfig } from "@/lib/trigger-type";
+import type { WorkflowDefinition } from "./types";
+import { getTriggerConfig } from "./trigger-type";
 
 function redisConnection() {
   const redisUrl = process.env.REDIS_URL;
