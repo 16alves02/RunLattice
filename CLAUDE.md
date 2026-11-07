@@ -1,4 +1,4 @@
-# CLAUDE.md — RunLattice
+# CLAUDE.md - RunLattice
 
 ## Project objective
 
