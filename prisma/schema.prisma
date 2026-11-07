@@ -252,3 +252,14 @@ model AiUsageEvent {
   @@index([organizationId, createdAt])
   @@index([status, createdAt])
 }
+
+model WebhookDelivery {
+  id         String   @id @default(cuid())
+  workflowId String
+  deliveryId String
+  createdAt  DateTime @default(now())
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, deliveryId])
+  @@index([createdAt])
+}
