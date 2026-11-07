@@ -40,7 +40,8 @@ describe("workflow definition validation", () => {
     expect(workflowDefinitionSchema.safeParse(invalidCron).success).toBe(false);
     expect(workflowDefinitionSchema.safeParse(invalidTimezone).success).toBe(false);
   });
-\n  it("rejects connections to missing nodes", () => {
+
+  it("rejects connections to missing nodes", () => {
     const invalid = { ...validDefinition, edges: [{ id: "edge-1", from: "trigger", to: "missing" }] };
     expect(workflowDefinitionSchema.safeParse(invalid).success).toBe(false);
   });
