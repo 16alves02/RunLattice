@@ -30,7 +30,8 @@ describe("inferTriggerType", () => {
     };
     expect(inferTriggerType(typed)).toBe("SCHEDULE");
   });
-\n  it("defaults to manual when no trigger is configured", () => {
+
+  it("defaults to manual when no trigger is configured", () => {
     expect(inferTriggerType({ nodes: [], edges: [] })).toBe("MANUAL");
   });
 });
