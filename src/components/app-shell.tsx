@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Activity, Blocks, BookOpen, Bot, CircleHelp, GitBranch, LayoutDashboard, LayoutTemplate, Plug, Workflow } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
+import { BrandLogo } from "@/components/brand-logo";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 
 const navItems = [
@@ -15,7 +16,7 @@ const navItems = [
 export function AppShell({ children, active = "Overview" }: { children: React.ReactNode; active?: string }) {
   return <div className="app-shell">
     <aside className="sidebar">
-      <Link className="brand" href="/"><span className="brand-mark">RL</span><span>runlattice<span style={{ color: "var(--accent)" }}>.</span></span></Link>
+      <BrandLogo variant="sidebar" />
       <div><div className="eyebrow">Workspace</div><nav className="nav-list" aria-label="Main navigation">{navItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`nav-item ${active === label ? "active" : ""}`}><Icon size={16}/>{label}</Link>)}</nav></div>
       <div><div className="eyebrow">Manage</div><nav className="nav-list"><Link href="/workflows/new" className={`nav-item ${active === "Builder" ? "active" : ""}`}><GitBranch size={16}/>Workflow builder</Link><a className="nav-item" href="https://docs.bullmq.io/" target="_blank" rel="noreferrer"><BookOpen size={16}/>Documentation</a><a className="nav-item" href="https://github.com/16alves02" target="_blank" rel="noreferrer"><Blocks size={16}/>Developer profile</a></nav></div>
       <div className="sidebar-bottom"><WorkspaceSwitcher /><SignOutButton/><div style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--muted)", fontSize: 10, padding: "18px 10px 0" }}><CircleHelp size={13}/> Built for learning and shipping</div></div>
