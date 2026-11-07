@@ -1,4 +1,4 @@
-# RunLattice — Product Requirements Document
+# RunLattice - Product Requirements Document
 
 **Estado:** visão de produto e requisitos de referência  
 **Versão:** 1.0  
