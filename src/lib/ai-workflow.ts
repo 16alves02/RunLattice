@@ -79,3 +79,23 @@ export function findMissingIntegrations(
   ));
   return [...missing, ...unknown];
 }
+
+
+export function findUnconfiguredActionTitles(
+  definition: z.infer<typeof workflowDefinitionSchema>,
+  connections: Array<{ id: string; provider: string }>,
+) {
+  const actions = definition.nodes.filter((node) => node.kind === "action");
+  if (actions.length === 0) return ["Add at least one action"];
+
+  return actions
+    .filter((node) => {
+      const config = node.config;
+      if (!config || !("integrationId" in config)
+        || !config.connectionId || !config.message?.trim()) return true;
+      return !connections.some((connection) =>
+        connection.id === config.connectionId && connection.provider === config.integrationId,
+      );
+    })
+    .map((node) => node.title);
+}
