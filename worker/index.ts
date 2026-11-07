@@ -365,6 +365,9 @@ async function shutdown(signal: string) {
   console.info(`[worker] ${signal} received; closing gracefully`);
   clearInterval(recoveryTimer);
   clearInterval(outboxTimer);
+  clearInterval(scheduleSyncTimer);
+  await scheduleWorker.close();
+  await getScheduleQueue().close();
   await worker.close();
   await dispatchQueue.close();
   await prisma.$disconnect();
