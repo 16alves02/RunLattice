@@ -12,6 +12,16 @@ import type { DiscordActionConfig, WorkflowDefinition } from "../src/lib/types";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 
 const prisma = new PrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl || !/^postgres(?:ql)?:\\/\\//i.test(databaseUrl)) {
+  throw new Error("DATABASE_URL must be a valid PostgreSQL connection URI.");
+}
+void prisma.$connect().then(() => {
+  console.info("[worker] PostgreSQL connection established.");
+}).catch((error: unknown) => {
+  console.error("[worker] PostgreSQL connection failed:", error instanceof Error ? error.message : "Unknown error");
+  process.exit(1);
+});
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl) throw new Error("REDIS_URL is required to start the worker.");
 
@@ -24,7 +34,6 @@ const connection = {
   maxRetriesPerRequest: null,
   ...(parsedUrl.protocol === "rediss:" ? { tls: {} } : {}),
 };
-
 interface WorkflowJob {
   runId: string;
   workflowId: string;

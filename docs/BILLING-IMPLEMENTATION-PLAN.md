@@ -1,59 +1,38 @@
-# RunLattice — Stripe Billing implementation plan
+# RunLattice — Stripe Billing
 
-**Status:** Architecture selected. Application billing code and Stripe account configuration are not complete.
+**Status:** Billing application code and test-mode safeguards are implemented on the development branch. End-to-end sandbox verification still requires a Stripe sandbox, Price IDs and webhook signing secret.
 
-## Product model
-- B2B SaaS subscription billed per workspace initially (not per seat).
-- Free tier without payment details.
-- Paid plans: Pro and Team, monthly and annual, in EUR.
-- Each selectable tier is a separate Stripe Product; monthly/annual variants are Prices on that product.
-- Backend enforces entitlements and quotas; never trust client-side plan labels.
+## Proposed subscription model
+- Free: €0/month, 3 workflows, 100 runs/month, 1 member.
+- Pro: €19/month, 25 workflows, 5,000 runs/month, 3 members, 100 AI requests/month.
+- Team: €49/month, 100 workflows, 25,000 runs/month, 10 members, 500 AI requests/month.
+- Flat-rate monthly subscription per workspace. These are launch proposals, not yet live Stripe prices.
 
-## Checkout and lifecycle
-1. Authenticate with Better Auth.
-2. Resolve active workspace from server session and verify owner/admin membership.
-3. Create/retrieve Stripe Customer associated with that workspace.
-4. Create hosted Checkout Session in subscription mode using a server-side allowlist of configured Price IDs.
-5. Store Stripe identifiers and subscription state in PostgreSQL.
-6. Provide Stripe Customer Portal for upgrades, downgrades, cancellations and payment-method updates.
-7. Grant paid entitlements only after verified webhooks and a valid subscription state. Never grant access from a browser success redirect alone.
+## Implemented in the application
+- Authenticated owner/admin-only Checkout and Customer Portal API.
+- Stripe Customer mapped to each workspace.
+- Hosted subscription Checkout with required billing address and VAT ID collection.
+- Optional Stripe Tax flag, disabled by default.
+- Signed webhook verification using the raw request body.
+- Event ID persistence for webhook deduplication.
+- Subscription state synchronization.
+- Server-side workspace entitlements and workflow/run quota enforcement.
+- Stripe live keys rejected unless STRIPE_LIVE_MODE_ENABLED=true is explicitly enabled.
 
-## Required webhook events
-Handle only events the application acts on:
-- `checkout.session.completed`
-- `checkout.session.async_payment_succeeded`
-- `customer.subscription.created`
-- `customer.subscription.updated`
-- `customer.subscription.deleted`
-- `invoice.paid`
-- `invoice.payment_failed`
-- `charge.dispute.created`
-- `charge.refunded`
-- `radar.early_fraud_warning.created`
+## Required Railway Web variables
+- STRIPE_SECRET_KEY: sandbox/test secret key (sk_test_... or restricted test key).
+- STRIPE_WEBHOOK_SECRET: sandbox webhook signing secret.
+- STRIPE_PRICE_PRO_MONTHLY: Pro monthly test Price ID.
+- STRIPE_PRICE_TEAM_MONTHLY: Team monthly test Price ID.
+- STRIPE_AUTOMATIC_TAX_ENABLED: keep false until tax registrations are configured.
+- RESEND_API_KEY and EMAIL_FROM: transactional email verification and password recovery.
 
-Verify signatures against the raw request body. Persist event IDs for idempotency and make handlers retry-safe. Resolve Stripe Customer/Subscription resources to the owning workspace; do not rely on untrusted metadata alone. Never log keys, webhook secrets or payment data.
+## Remaining Stripe Dashboard work
+1. Create Pro (€19/month) and Team (€49/month) Products/Prices in a Stripe sandbox.
+2. Configure the Customer Portal for cancellation, payment method updates and plan changes.
+3. Register /api/billing/webhook for Checkout completion, subscription create/update/delete and invoice payment failure.
+4. Add test-mode Price IDs and webhook secret to Railway.
+5. Test successful checkout, failed payment, renewal, cancellation, plan changes, replayed events and workspace isolation.
 
-## Required Railway Web configuration
-- `STRIPE_SECRET_KEY`: test-mode restricted key during development; separate least-privilege live restricted key only after launch approval.
-- `STRIPE_WEBHOOK_SECRET`: test endpoint signing secret.
-- `STRIPE_PRICE_PRO_MONTHLY`
-- `STRIPE_PRICE_PRO_ANNUAL`
-- `STRIPE_PRICE_TEAM_MONTHLY`
-- `STRIPE_PRICE_TEAM_ANNUAL`
-- `APP_BASE_URL`: canonical HTTPS origin.
-
-Use separate test/live keys and secrets. Prefer restricted API keys with only required Customer, Checkout Session, Billing Portal, Subscription and Product/Price permissions.
-
-## Tax
-Do not enable automatic tax until the merchant's VAT/tax obligations and active Stripe Tax registrations are confirmed. Enabling an automatic-tax flag without a valid registration does not ensure tax is collected.
-
-## Launch gates
-- [ ] Create Products and Prices in a Stripe sandbox/test environment.
-- [ ] Configure Customer Portal features and branding.
-- [ ] Implement checkout, portal and webhook API routes.
-- [ ] Add database migration and idempotent event storage.
-- [ ] Test successful/async payment, renewal, failed invoice, cancellation, plan change, refund, dispute and replayed webhook.
-- [ ] Verify workspace isolation and entitlement enforcement.
-- [ ] Add billing emails and support/refund processes.
-- [ ] Complete VAT/tax and legal review.
-- [ ] Only then configure live-mode products, restricted key and webhook endpoint.
+## Tax and legal
+Automatic tax remains disabled until the company has configured applicable VAT registrations and tax settings in Stripe. Tax treatment, refund policy, terms and pricing need review before live billing.

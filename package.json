@@ -2,7 +2,7 @@
   "name": "runlattice",
   "version": "0.1.0",
   "private": true,
-  "description": "A workflow automation platform built as a full-stack portfolio project.",
+  "description": "A workspace-based workflow automation platform with visual editing, durable execution and extensible integrations.",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -26,6 +26,7 @@
     "next": "^16.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "stripe": "^23.1.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

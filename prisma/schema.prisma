@@ -96,18 +96,20 @@ model RateLimit {
 }
 
 model Organization {
-  id          String       @id
-  name        String
-  slug        String       @unique
-  logo        String?
-  metadata    String?
-  createdAt   DateTime     @default(now())
-  members     Member[]
-  invitations Invitation[]
-  workflows   Workflow[]
-  integrations IntegrationConnection[]
-  aiUsage      AiWorkspaceUsage[]
-  aiUsageEvents AiUsageEvent[]
+  id                 String       @id
+  name               String
+  slug               String       @unique
+  logo               String?
+  metadata           String?
+  createdAt          DateTime     @default(now())
+  members            Member[]
+  invitations        Invitation[]
+  workflows          Workflow[]
+  integrations       IntegrationConnection[]
+  aiUsage            AiWorkspaceUsage[]
+  aiUsageEvents      AiUsageEvent[]
+  billingCustomer    BillingCustomer?
+  billingSubscription BillingSubscription?
 }
 
 model Member {
@@ -140,21 +142,21 @@ model Invitation {
 }
 
 model Workflow {
-  id             String         @id @default(cuid())
-  name           String
-  description    String         @default("")
-  status         WorkflowStatus @default(DRAFT)
-  triggerType    TriggerType    @default(MANUAL)
+  id                      String         @id @default(cuid())
+  name                    String
+  description             String         @default("")
+  status                  WorkflowStatus @default(DRAFT)
+  triggerType             TriggerType    @default(MANUAL)
   webhookSecretCiphertext String?
-  webhookDeliveries WebhookDelivery[]
-  definition     Json
-  userId         String?
-  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  organizationId String?
-  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  runs           WorkflowRun[]
+  webhookDeliveries       WebhookDelivery[]
+  definition              Json
+  userId                  String?
+  user                    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organizationId          String?
+  organization            Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  runs                    WorkflowRun[]
 
   @@index([userId, status, updatedAt])
   @@index([organizationId, updatedAt])
@@ -180,7 +182,6 @@ model WorkflowRun {
   @@index([status, createdAt])
 }
 
- 
 model WorkflowRunOutbox {
   id           String      @id @default(cuid())
   runId        String      @unique
@@ -239,17 +240,17 @@ model AiWorkspaceUsage {
 }
 
 model AiUsageEvent {
-  id             String       @id @default(cuid())
-  organizationId String
-  userId         String
-  provider       String
-  model          String
-  status         String       @default("RESERVED")
-  reservedTokens Int
-  promptTokens   Int          @default(0)
-  completionTokens Int        @default(0)
-  createdAt      DateTime     @default(now())
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id               String       @id @default(cuid())
+  organizationId   String
+  userId           String
+  provider         String
+  model            String
+  status           String       @default("RESERVED")
+  reservedTokens   Int
+  promptTokens     Int          @default(0)
+  completionTokens Int          @default(0)
+  createdAt        DateTime     @default(now())
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, createdAt])
   @@index([status, createdAt])
@@ -264,4 +265,42 @@ model WebhookDelivery {
 
   @@unique([workflowId, deliveryId])
   @@index([createdAt])
+}
+
+model BillingCustomer {
+  id               String       @id @default(cuid())
+  organizationId   String       @unique
+  stripeCustomerId String       @unique
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model BillingSubscription {
+  id                   String       @id @default(cuid())
+  organizationId       String       @unique
+  stripeSubscriptionId String       @unique
+  stripeCustomerId     String
+  stripePriceId        String
+  plan                 String
+  status               String
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean      @default(false)
+  trialEndsAt          DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([status, currentPeriodEnd])
+  @@index([stripeCustomerId])
+}
+
+model StripeEvent {
+  id          String    @id
+  type        String
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([type, createdAt])
 }
