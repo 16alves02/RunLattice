@@ -154,7 +154,7 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the required web/worker topolog
 
 ## Project status
 
-RunLattice is an active portfolio project, not a production-ready automation service. The authentication and workspace foundation is implemented, and the first real external action is available through Discord webhooks. AI planning now has provider adapters, workspace budgets, request throttling and review-only proposals, but remains disabled by default. Additional provider integrations, general-purpose action adapters, durable step resumption, email delivery, invitation management, deployment-edge abuse protection, production observability, billing, managed public-demo infrastructure and a full security review remain outstanding. Signed inbound webhooks, cron scheduling and the PostgreSQL/Redis API-worker integration suite are implemented and pass CI.
+RunLattice is an early-stage automation product prototype, not yet a production-ready service. The authentication and workspace foundation is implemented, and the first real external action is available through Discord webhooks. AI planning now has provider adapters, workspace budgets, request throttling and review-only proposals, but remains disabled by default. Additional provider integrations, general-purpose action adapters, durable step resumption, email delivery, invitation management, deployment-edge abuse protection, production observability, billing, managed public-demo infrastructure and a full security review remain outstanding. Signed inbound webhooks, cron scheduling and the PostgreSQL/Redis API-worker integration suite are implemented and pass CI.
 
 ## Roadmap
 
