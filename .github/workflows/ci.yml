@@ -56,3 +56,54 @@ jobs:
           BETTER_AUTH_URL: http://localhost:3000
           BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000
           NEXT_TELEMETRY_DISABLED: "1"
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: runlattice
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d runlattice"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+      - name: Run API and worker integration tests
+        run: npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: integration-only-secret-that-is-long-enough
+          BETTER_AUTH_URL: http://localhost:3000
+          BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000
