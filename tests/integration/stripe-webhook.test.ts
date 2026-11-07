@@ -36,7 +36,7 @@ describe("Stripe webhook verification and idempotency", () => {
   });
 
   it("accepts a valid signature once and acknowledges duplicate delivery", async () => {
-    const eventId = \`evt_runlattice_\${randomUUID()}\`;
+    const eventId = `evt_runlattice_${randomUUID()}`;
     eventIds.push(eventId);
     const payload = makePayload(eventId);
     const signature = stripe.webhooks.generateTestHeaderString({
@@ -65,7 +65,7 @@ describe("Stripe webhook verification and idempotency", () => {
   });
 
   it("rejects a request with an invalid signature", async () => {
-    const payload = makePayload(\`evt_invalid_\${randomUUID()}\`);
+    const payload = makePayload(`evt_invalid_${randomUUID()}`);
     const response = await POST(new Request("http://localhost/api/billing/webhook", {
       method: "POST",
       headers: { "stripe-signature": "t=1,v1=invalid" },
