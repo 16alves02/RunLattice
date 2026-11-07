@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret } from "@/lib/secrets";
-import { signWebhookPayload } from "@/lib/webhook-signature";
+import { signWebhookPayload } from "@/lib/webhook-signature";\nimport { getScheduleQueue, syncWorkflowSchedule } from "@/lib/schedule";
 import { POST as receiveWebhook } from "@/app/api/webhooks/[workflowId]/route";
 
 const organizationId = `integration-org-${randomBytes(8).toString("hex")}`;
@@ -79,6 +79,28 @@ describe.sequential("RunLattice PostgreSQL, API and worker integration", () => {
     }), { params: Promise.resolve({ workflowId: webhookWorkflowId }) });
     expect(rejected.status).toBe(401);
     expect(await prisma.workflowRun.count({ where: { workflowId: webhookWorkflowId } })).toBe(1);
+  });
+
+
+  it("registers and removes a cron scheduler in the shared Redis service", async () => {
+    const workflowId = `integration-schedule-${randomBytes(8).toString("hex")}`;
+    const definition = {
+      nodes: [{
+        id: "trigger",
+        kind: "trigger",
+        title: "Daily schedule",
+        detail: "Trigger · SCHEDULE",
+        config: { triggerType: "SCHEDULE", cronExpression: "*/10 * * * *", timezone: "Europe/Lisbon" },
+        x: 0,
+        y: 0,
+      }],
+      edges: [],
+    };
+    await syncWorkflowSchedule({ workflowId, status: "ACTIVE", triggerType: "SCHEDULE", definition });
+    const scheduler = await getScheduleQueue().getJobScheduler(`workflow:${workflowId}`);
+    expect(scheduler).not.toBeNull();
+    await syncWorkflowSchedule({ workflowId, status: "PAUSED", triggerType: "SCHEDULE", definition });
+    expect(await getScheduleQueue().getJobScheduler(`workflow:${workflowId}`)).toBeNull();
   });
 
   it("dispatches a persisted run through the real BullMQ worker and records failure safely", async () => {
