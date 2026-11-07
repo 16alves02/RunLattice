@@ -57,7 +57,8 @@ describe.sequential("RunLattice PostgreSQL, API and worker integration", () => {
 
     const body = JSON.stringify({ event: "order.created", orderId: "ord_test_123" });
     const timestamp = Math.floor(Date.now() / 1000).toString();
-    const deliveryId = `delivery_${randomBytes(8).toString("hex")}`;\n    const signature = `v1=${signWebhookPayload(secret, timestamp, deliveryId, body)}`;
+    const deliveryId = `delivery_${randomBytes(8).toString("hex")}`;
+    const signature = `v1=${signWebhookPayload(secret, timestamp, deliveryId, body)}`;
     const request = new Request(`https://runlattice.test/api/webhooks/${webhookWorkflowId}`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-runlattice-timestamp": timestamp, "x-runlattice-delivery-id": deliveryId, "x-runlattice-signature": signature },
