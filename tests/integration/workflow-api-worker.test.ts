@@ -31,7 +31,7 @@ describe.sequential("RunLattice PostgreSQL, API and worker integration", () => {
         new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
       ]);
     }
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
+    await getScheduleQueue().close();\n    await prisma.organization.deleteMany({ where: { id: organizationId } });
     await prisma.$disconnect();
   });
 
