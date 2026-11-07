@@ -47,7 +47,8 @@ Do not replace the existing planner wholesale. Evolve it behind stable contracts
 - Keep limits configurable by plan for the later billing phase.
 
 ### 3.5 Security and evaluations
-- Add rate limiting and request size limits.
+- Enforce atomic per-user and per-workspace request rate limits in PostgreSQL, in addition to monthly workspace budgets and request size limits.
+- Add deployment-edge rate limiting and abuse monitoring before public enablement.
 - Prevent prompt injection from overriding system policy or invoking tools.
 - Do not pass secrets, raw credentials or unrelated workspace data into model prompts.
 - Redact provider errors and avoid logging prompts or sensitive outputs by default.
@@ -77,7 +78,7 @@ Exact new filenames and model names are implementation decisions to be confirmed
 
 The evaluation module is a deterministic regression harness used by automated tests. It does not call a model and is not a runtime security filter or a guarantee that a model will resist prompt injection. The planning endpoint continues to validate every generated plan against the authoritative workflow schema and the integration catalog.
 
-Provider selection remains explicitly configured; cost/latency/privacy routing is intentionally deferred until measurable provider metadata and policy requirements are available. Workspace monthly request/token budgets are enforced, but deployment-edge rate limiting and abuse monitoring are still required before public AI enablement.
+Provider selection remains explicitly configured; cost/latency/privacy routing is intentionally deferred until measurable provider metadata and policy requirements are available. Workspace monthly request/token budgets and atomic per-user/per-workspace fixed-window limits are enforced in the application. Deployment-edge rate limiting and abuse monitoring are still required before public AI enablement.
 
 Action readiness does not trust a model-generated connection ID. It checks that the referenced connection exists in the active workspace and matches the declared provider. The evaluator and readiness checks are defense-in-depth validation, not a substitute for runtime authorization.
 
