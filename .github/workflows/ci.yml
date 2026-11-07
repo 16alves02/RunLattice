@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**", "fix/**", "release/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: ci-only-secret-that-is-long-enough-for-tests
+          BETTER_AUTH_URL: http://localhost:3000
+          BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000
+          NEXT_TELEMETRY_DISABLED: "1"

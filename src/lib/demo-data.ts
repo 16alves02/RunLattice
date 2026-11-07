@@ -2,13 +2,11 @@ import type { WorkflowDefinition, WorkflowSummary } from "@/lib/types";
 
 export const demoDefinition: WorkflowDefinition = {
   nodes: [
-    { id: "trigger-1", kind: "trigger", title: "New form submission", detail: "Trigger · Webhook", x: 70, y: 90 },
-    { id: "condition-1", kind: "condition", title: "Check email address", detail: "Condition · contains @", x: 350, y: 90 },
-    { id: "action-1", kind: "action", title: "Create contact", detail: "Action · Save to workspace", x: 630, y: 90 },
+    { id: "trigger-1", kind: "trigger", title: "Manual start", detail: "Trigger · Manual", x: 70, y: 90 },
+    { id: "action-1", kind: "action", title: "Send Discord message", detail: "Action · Discord · Send message", x: 350, y: 90 },
   ],
   edges: [
-    { id: "edge-1", from: "trigger-1", to: "condition-1" },
-    { id: "edge-2", from: "condition-1", to: "action-1" },
+    { id: "edge-1", from: "trigger-1", to: "action-1" },
   ],
 };
 
