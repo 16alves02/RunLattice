@@ -5,7 +5,9 @@ import {
   buildWorkflowPrompt,
   buildWorkflowSystemPrompt,
   findMissingIntegrations,
+  findUnconfiguredActionTitles,
 } from "@/lib/ai-workflow";
+import { workflowDefinitionSchema } from "@/lib/validation";
 
 const validPlan = {
   name: "Order notification",
@@ -70,8 +72,7 @@ describe("AI workflow planning validation", () => {
 
 
   it("requires action connections to belong to the current workspace and provider", async () => {
-    const { findUnconfiguredActionTitles } = await import("@/lib/ai-workflow");
-    const definition = {
+    const definition = workflowDefinitionSchema.parse({
       nodes: [
         { id: "trigger", kind: "trigger", title: "Manual", detail: "", x: 0, y: 0 },
         { id: "action", kind: "action", title: "Send message", detail: "", config: {
@@ -79,7 +80,7 @@ describe("AI workflow planning validation", () => {
         }, x: 250, y: 0 },
       ],
       edges: [{ id: "edge-1", from: "trigger", to: "action" }],
-    };
+    });
     expect(findUnconfiguredActionTitles(definition, [
       { id: "workspace-discord", provider: "discord" },
     ])).toEqual(["Send message"]);
