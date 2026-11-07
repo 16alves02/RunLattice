@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
 import { ensureActiveWorkspace } from "@/lib/auth-workspace-client";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function SignUpPage() {
   const [name, setName] = useState("");
@@ -28,7 +29,7 @@ export default function SignUpPage() {
   }
 
   return <main className="auth-page"><section className="panel auth-card">
-    <Link className="brand" href="/"><span className="brand-mark">RL</span><span>runlattice<span style={{ color: "var(--accent)" }}>.</span></span></Link>
+    <BrandLogo variant="auth" />
     <h1>Create your account</h1><p className="subtitle">Start building automations in your workspace.</p>
     <form onSubmit={submit} className="auth-form">
       <label>Name<input className="field-input" autoComplete="name" required minLength={2} maxLength={80} value={name} onChange={(event) => setName(event.target.value)} /></label>
