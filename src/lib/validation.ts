@@ -53,7 +53,7 @@ const triggerConfigSchema = z.object({
 }).superRefine((config, context) => {
   if (config.triggerType === "SCHEDULE") {
     const fields = config.cronExpression?.trim().split(/\s+/) ?? [];
-    if (fields.length !== 5 || !fields.every((field, index) => isValidCronField(field, ...cronFieldRanges[index]))) {
+    if (fields.length !== 5 || !fields.every((field, index) => { const range = cronFieldRanges[index]; return Boolean(range && isValidCronField(field, range[0], range[1])); })) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["cronExpression"], message: "Use a valid five-field cron expression with values inside each field's range." });
     }
     if (config.timezone) {
