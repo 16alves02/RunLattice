@@ -155,6 +155,10 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
       ...(selectedNode.config && "triggerType" in selectedNode.config ? selectedNode.config : {}),
       ...patch,
     };
+    if (config.triggerType !== "SCHEDULE") {
+      delete config.cronExpression;
+      delete config.timezone;
+    }
     updateSelected({ config, detail: `Trigger · ${config.triggerType}` });
     setWebhookSecret("");
   }
