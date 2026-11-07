@@ -77,8 +77,8 @@ This guide records the required deployment architecture and checklist only. RunL
 - Configure the workflow trigger as **Signed webhook**, save the workflow, then generate a signing secret from the builder.
 - The secret is shown only once. Store it in the sending system's secret manager; rotating it immediately invalidates the previous secret.
 - Send a JSON object (maximum 32 KB) to `POST /api/webhooks/:workflowId`.
-- Include `x-runlattice-timestamp` as Unix seconds and `x-runlattice-signature` as `v1=<hex>`.
-- The signature is HMAC-SHA256 over `timestamp + "." + exact raw request body`; timestamps outside the five-minute replay window are rejected.
+- Include a unique `x-runlattice-delivery-id`, `x-runlattice-timestamp` as Unix seconds and `x-runlattice-signature` as `v1=<hex>`. Reusing a delivery ID for the same workflow is rejected.
+- The signature is HMAC-SHA256 over `timestamp + "." + deliveryId + "." + exact raw request body`; timestamps outside the five-minute replay window are rejected.
 - Webhook secrets are encrypted at rest using the same `INTEGRATION_ENCRYPTION_KEY` used by the worker. Back up and rotate this key carefully.
 
 ## Scheduled workflows
