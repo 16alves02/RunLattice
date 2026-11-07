@@ -22,7 +22,15 @@ describe("inferTriggerType", () => {
     expect(inferTriggerType(definition("Trigger · Weekly schedule"))).toBe("SCHEDULE");
   });
 
-  it("defaults to manual when no trigger is configured", () => {
+
+  it("prefers explicit typed trigger configuration over legacy labels", () => {
+    const typed: WorkflowDefinition = {
+      nodes: [{ id: "trigger", kind: "trigger", title: "Start", detail: "Manual", config: { triggerType: "SCHEDULE", cronExpression: "0 9 * * *", timezone: "UTC" }, x: 0, y: 0 }],
+      edges: [],
+    };
+    expect(inferTriggerType(typed)).toBe("SCHEDULE");
+  });
+\n  it("defaults to manual when no trigger is configured", () => {
     expect(inferTriggerType({ nodes: [], edges: [] })).toBe("MANUAL");
   });
 });
