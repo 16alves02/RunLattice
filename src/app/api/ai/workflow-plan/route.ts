@@ -61,8 +61,9 @@ export async function POST(request: Request) {
   }
 
   let integrationContext: AIIntegrationContext[];
+  let connections: Array<{ id: string; provider: string }>;
   try {
-    const connections = await prisma.integrationConnection.findMany({
+    connections = await prisma.integrationConnection.findMany({
       where: { organizationId: access.context.organizationId },
       select: { id: true, provider: true },
     });
