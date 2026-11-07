@@ -22,6 +22,7 @@ import {
 } from "@/lib/ai-usage";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { consumeAIRequestRateLimit } from "@/lib/ai-rate-limit";
+import { getWorkspaceEntitlements } from "@/lib/billing";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -97,7 +98,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Workspace integration metadata is temporarily unavailable." }, { status: 503 });
   }
 
-  const limits = getAIUsageLimits();
+  const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
+  if (entitlements.limits.aiRequests === 0) {
+    return NextResponse.json({ error: "AI workflow planning is not included in the Free plan. Upgrade to Pro or Team to use it." }, { status: 402 });
+  }
+  const configuredLimits = getAIUsageLimits();
+  const limits = { ...configuredLimits, monthlyRequests: Math.min(configuredLimits.monthlyRequests, entitlements.limits.aiRequests) };
   const reservedTokens = estimateReservedTokens(parsed.data.prompt);
   let reservation: AIUsageReservation | null;
   try {

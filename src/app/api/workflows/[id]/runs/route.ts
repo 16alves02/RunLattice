@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { workflowRunInputSchema } from "@/lib/validation";
+import { getWorkspaceEntitlements } from "@/lib/billing";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -47,6 +48,11 @@ export async function POST(request: Request, context: RouteContext) {
     if (!workflow) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
     if (workflow.status !== "ACTIVE") {
       return NextResponse.json({ error: "Only active workflows can be run." }, { status: 409 });
+    }
+
+    const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
+    if (!entitlements.canRunWorkflow) {
+      return NextResponse.json({ error: "Your workspace has reached its monthly run limit. Upgrade your plan to continue." }, { status: 402 });
     }
 
     const run = await prisma.workflowRun.create({

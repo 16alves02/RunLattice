@@ -28,12 +28,47 @@ const conditionConfigSchema = z.object({
   }
 });
 
+const cronFieldRanges: Array<[number, number]> = [[0, 59], [0, 23], [1, 31], [1, 12], [0, 7]];
+
+function isValidCronField(field: string, minimum: number, maximum: number) {
+  if (!field || !/^[0-9*/,-]+$/.test(field)) return false;
+  return field.split(",").every((part) => {
+    if (!part) return false;
+    const pieces = part.split("/");
+    if (pieces.length > 2 || (pieces.length === 2 && (!/^\d+$/.test(pieces[1]) || Number(pieces[1]) < 1))) return false;
+    const base = pieces[0];
+    if (base === "*") return true;
+    const range = base.split("-");
+    if (range.length > 2 || range.some((value) => !/^\d+$/.test(value))) return false;
+    const start = Number(range[0]);
+    const end = range.length === 2 ? Number(range[1]) : start;
+    return start >= minimum && start <= maximum && end >= minimum && end <= maximum && end >= start;
+  });
+}
+
+const triggerConfigSchema = z.object({
+  triggerType: z.enum(["MANUAL", "WEBHOOK", "SCHEDULE"]),
+  cronExpression: z.string().trim().min(1).max(100).optional(),
+  timezone: z.string().trim().min(1).max(100).optional(),
+}).superRefine((config, context) => {
+  if (config.triggerType === "SCHEDULE") {
+    const fields = config.cronExpression?.trim().split(/\s+/) ?? [];
+    if (fields.length !== 5 || !fields.every((field, index) => { const range = cronFieldRanges[index]; return Boolean(range && isValidCronField(field, range[0], range[1])); })) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["cronExpression"], message: "Use a valid five-field cron expression with values inside each field's range." });
+    }
+    if (config.timezone) {
+      try { new Intl.DateTimeFormat("en-US", { timeZone: config.timezone }); }
+      catch { context.addIssue({ code: z.ZodIssueCode.custom, path: ["timezone"], message: "Use a valid IANA timezone." }); }
+    }
+  }
+});
+
 const nodeSchema = z.object({
   id: z.string().min(1).max(80),
   kind: z.enum(["trigger", "condition", "action"]),
   title: z.string().trim().min(1).max(100),
   detail: z.string().max(500).default(""),
-  config: z.union([discordActionConfigSchema, conditionConfigSchema]).optional(),
+  config: z.union([discordActionConfigSchema, conditionConfigSchema, triggerConfigSchema]).optional(),
   x: z.number().finite().min(0).max(5000),
   y: z.number().finite().min(0).max(5000),
 }).superRefine((node, context) => {
@@ -43,8 +78,11 @@ const nodeSchema = z.object({
   if (node.kind === "action" && node.config && !("integrationId" in node.config)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Action nodes require an action configuration." });
   }
-  if (node.kind === "trigger" && node.config) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Trigger nodes cannot contain a configuration." });
+  if (node.kind === "trigger" && node.config && !("triggerType" in node.config)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Trigger nodes require valid trigger settings." });
+  }
+  if (node.kind !== "trigger" && node.config && "triggerType" in node.config) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Only trigger nodes can contain trigger settings." });
   }
 });
 
