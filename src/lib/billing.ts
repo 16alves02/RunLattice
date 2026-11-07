@@ -1,4 +1,3 @@
-import "server-only";
 import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { PLAN_LIMITS, resolveEntitledPlan, type BillingPlan } from "@/lib/billing-core";
