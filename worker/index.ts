@@ -8,7 +8,8 @@ import { renderInputTemplate } from "../src/lib/template";
 import { resolveExecutionPath, validateExecutableWorkflow } from "../src/lib/execution";
 import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
-import type { DiscordActionConfig, WorkflowDefinition } from "../src/lib/types";\nimport { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
+import type { DiscordActionConfig, WorkflowDefinition } from "../src/lib/types";
+import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 
 const prisma = new PrismaClient();
 const redisUrl = process.env.REDIS_URL;
