@@ -62,7 +62,7 @@ describe("AI request rate limiting", () => {
     );
 
     expect(query.mock.calls[0][0]).toContain('WHEN "RateLimit"."lastRequest" <= $4 THEN 1');
-    expect(query.mock.calls[0][3]).toBe(1_800_000_000_000n);
-    expect(query.mock.calls[0][4]).toBe(1_799_999_940_000n);
+    expect(query.mock.calls[0][3]).toBe(BigInt(1_800_000_000_000));
+    expect(query.mock.calls[0][4]).toBe(BigInt(1_799_999_940_000));
   });
 });
