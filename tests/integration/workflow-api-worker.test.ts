@@ -3,7 +3,8 @@ import { randomBytes } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret } from "@/lib/secrets";
-import { signWebhookPayload } from "@/lib/webhook-signature";\nimport { getScheduleQueue, syncWorkflowSchedule } from "@/lib/schedule";
+import { signWebhookPayload } from "@/lib/webhook-signature";
+import { getScheduleQueue, syncWorkflowSchedule } from "@/lib/schedule";
 import { POST as receiveWebhook } from "@/app/api/webhooks/[workflowId]/route";
 
 const organizationId = `integration-org-${randomBytes(8).toString("hex")}`;
