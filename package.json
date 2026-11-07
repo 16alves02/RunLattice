@@ -14,7 +14,8 @@
     "worker": "tsx worker/index.ts",
     "worker:watch": "tsx watch worker/index.ts",
     "db:generate": "prisma generate",
-    "db:deploy": "prisma migrate deploy"
+    "db:deploy": "prisma migrate deploy",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.7.0",
