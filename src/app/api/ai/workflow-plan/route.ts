@@ -21,6 +21,7 @@ import {
   type AIUsageReservation,
 } from "@/lib/ai-usage";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
+import { consumeAIRequestRateLimit } from "@/lib/ai-rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -58,6 +59,22 @@ export async function POST(request: Request) {
   const selection = getAIProviderSelection();
   if (!selection.configured) {
     return NextResponse.json({ error: "Configure a server-side AI provider key and model before enabling planning." }, { status: 503 });
+  }
+
+  try {
+    const rateLimit = await consumeAIRequestRateLimit(prisma, {
+      organizationId: access.context.organizationId,
+      userId: access.context.userId,
+    });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "AI planning is temporarily rate limited. Please wait before trying again." },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
+  } catch (error) {
+    console.error("Unable to enforce AI request rate limit:", error instanceof Error ? error.message : "Unknown error");
+    return NextResponse.json({ error: "AI planning protection is temporarily unavailable." }, { status: 503 });
   }
 
   let integrationContext: AIIntegrationContext[];
