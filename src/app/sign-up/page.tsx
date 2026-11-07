@@ -22,7 +22,7 @@ export default function SignUpPage() {
     try {
       const result = await authClient.signUp.email({ name, email, password, callbackURL: "/onboarding" });
       if (result.error) throw new Error(result.error.message || "Unable to create your account.");
-      if (!result.data?.session) {
+      if (!result.data?.token) {
         setNotice("Check your inbox to verify your email address before signing in.");
         setLoading(false);
         return;
