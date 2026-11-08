@@ -51,7 +51,7 @@ One workflow run consumes one execution, including failed runs. A duplicate deli
 ## Not yet implemented or verified
 
 - Physical deletion/archival of run history after the visible-history window.
-- Additional prepaid AI credit packs, with Stripe one-time checkout and usage reconciliation still pending.
+- Additional prepaid AI credit packs, with Stripe one-time checkout and usage reconciliation still pending. Pack sizes and prices have not been approved and are deliberately not exposed in checkout.
 - Annual Stripe sandbox Price objects and end-to-end checkout verification.
 - Stripe sandbox Products/Prices, webhook signing secret and end-to-end checkout tests.
 - Automatic usage notifications by email or push at 50%, 75% and 90%.
@@ -69,6 +69,7 @@ One workflow run consumes one execution, including failed runs. A duplicate deli
 - `STRIPE_PRICE_PRO_ANNUAL`: Pro annual sandbox Price ID.
 - `STRIPE_PRICE_TEAM_ANNUAL`: Teams annual sandbox Price ID.
 - `STRIPE_PRICE_BUSINESS_ANNUAL`: Business annual sandbox Price ID.
+- `AI_MODEL_CREDIT_COSTS`: optional JSON map overriding default model-to-credit weights.
 - `STRIPE_AUTOMATIC_TAX_ENABLED`: keep `false` until applicable tax registrations and settings are confirmed.
 - `RESEND_API_KEY` and `EMAIL_FROM`: transactional email verification and password recovery.
 
