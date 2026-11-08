@@ -5,6 +5,7 @@ import { decryptSecret } from "../src/lib/secrets";
 import { recoverStaleWorkflowRuns } from "../src/lib/run-recovery";
 import { dispatchPendingWorkflowRuns } from "../src/lib/outbox";
 import { createQuotaBoundWorkflowRun } from "../src/lib/run-quota";
+import { PLAN_LIMITS, resolveEntitledPlan } from "../src/lib/billing-core";
 import { renderInputTemplate } from "../src/lib/template";
 import { resolveExecutionPath, validateExecutableWorkflow } from "../src/lib/execution";
 import { evaluateCondition } from "../src/lib/condition";
@@ -207,13 +208,64 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
     return { skipped: true };
   }
 
-  // A fresh lease token fences every later write from this worker attempt.
-  const leaseToken = randomUUID();
-  const claimed = await prisma.workflowRun.updateMany({
-    where: { id: runId, workflowId, status: "QUEUED" },
-    data: { status: "RUNNING", startedAt: new Date(), heartbeatAt: new Date(), leaseToken, error: null },
+  const admissionWorkflow = await prisma.workflow.findUnique({
+    where: { id: workflowId },
+    select: { status: true, organizationId: true },
   });
-  if (claimed.count === 0) return { skipped: true, reason: "Run was already claimed or completed." };
+  if (!admissionWorkflow || admissionWorkflow.status !== "ACTIVE" || !admissionWorkflow.organizationId) {
+    await prisma.workflowRun.updateMany({
+      where: { id: runId, workflowId, status: "QUEUED" },
+      data: { status: "CANCELLED", finishedAt: new Date(), error: "Workflow is unavailable, inactive or not assigned to a workspace." },
+    });
+    return { skipped: true, reason: "Workflow is unavailable, inactive or not assigned to a workspace." };
+  }
+
+  // Admission and the RUNNING transition share a workspace lock, so workers
+  // cannot race past the plan's concurrency ceiling.
+  const leaseToken = randomUUID();
+  const admission = await prisma.$transaction(async (transaction) => {
+    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${admissionWorkflow.organizationId!}, 0))`;
+    const subscription = await transaction.billingSubscription.findUnique({
+      where: { organizationId: admissionWorkflow.organizationId! },
+      select: { plan: true, status: true, currentPeriodEnd: true },
+    });
+    const plan = resolveEntitledPlan(subscription);
+    const limit = PLAN_LIMITS[plan].concurrentRuns;
+    const running = await transaction.workflowRun.count({
+      where: { status: "RUNNING", workflow: { organizationId: admissionWorkflow.organizationId! } },
+    });
+    if (running >= limit) return { claimed: false, capacityReached: true as const };
+
+    const result = await transaction.workflowRun.updateMany({
+      where: { id: runId, workflowId, status: "QUEUED" },
+      data: { status: "RUNNING", startedAt: new Date(), heartbeatAt: new Date(), leaseToken, error: null },
+    });
+    return { claimed: result.count === 1, capacityReached: false as const };
+  });
+
+  if (!admission.claimed && admission.capacityReached) {
+    try {
+      await dispatchQueue.add(
+        "execute-workflow",
+        { runId, workflowId },
+        {
+          jobId: `${runId}-capacity-${Math.floor(Date.now() / 5_000)}`,
+          delay: 5_000,
+          attempts: 1,
+          removeOnComplete: 500,
+          removeOnFail: 1_000,
+        },
+      );
+      return { deferred: true, reason: "Workspace concurrency limit reached; run deferred." };
+    } catch (error) {
+      await prisma.workflowRun.updateMany({
+        where: { id: runId, workflowId, status: "QUEUED" },
+        data: { status: "FAILED", finishedAt: new Date(), error: "The run could not be deferred while the workspace concurrency limit was reached." },
+      });
+      throw error;
+    }
+  }
+  if (!admission.claimed) return { skipped: true, reason: "Run was already claimed or completed." };
 
   const heartbeatTimer = setInterval(() => {
     void prisma.workflowRun.updateMany({
@@ -343,7 +395,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
   } finally {
     clearInterval(heartbeatTimer);
   }
-}, { connection, concurrency: 5 });
+}, { connection, concurrency: 10 });
 
 worker.on("completed", (job) => console.info(`[worker] run ${job.id} processed`));
 worker.on("failed", (job, error) => console.error(`[worker] queue job ${job?.id ?? "unknown"} failed: ${error.message}`));
