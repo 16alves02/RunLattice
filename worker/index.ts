@@ -4,6 +4,7 @@ import { PrismaClient, type Prisma } from "@prisma/client";
 import { decryptSecret } from "../src/lib/secrets";
 import { recoverStaleWorkflowRuns } from "../src/lib/run-recovery";
 import { dispatchPendingWorkflowRuns } from "../src/lib/outbox";
+import { createQuotaBoundWorkflowRun } from "../src/lib/run-quota";
 import { renderInputTemplate } from "../src/lib/template";
 import { resolveExecutionPath, validateExecutableWorkflow } from "../src/lib/execution";
 import { evaluateCondition } from "../src/lib/condition";
@@ -134,7 +135,7 @@ const scheduleWorker = new Worker<{ workflowId: string }>("workflow-schedules", 
   if (job.name !== "scheduled-trigger" || !job.data.workflowId) return { skipped: true };
   const workflow = await prisma.workflow.findFirst({
     where: { id: job.data.workflowId, status: "ACTIVE", triggerType: "SCHEDULE" },
-    select: { id: true, definition: true },
+    select: { id: true, organizationId: true, definition: true },
   });
   if (!workflow) return { skipped: true, reason: "Scheduled workflow is no longer active." };
 
@@ -148,16 +149,24 @@ const scheduleWorker = new Worker<{ workflowId: string }>("workflow-schedules", 
     return { skipped: true, reason: "Workflow no longer has a schedule trigger." };
   }
 
-  const run = await prisma.workflowRun.create({
-    data: {
-      workflowId: workflow.id,
-      input: { triggerType: "SCHEDULE", scheduledAt: new Date().toISOString() },
-      outboxEvent: { create: {} },
-    },
-    select: { id: true },
+  if (!workflow.organizationId) return { skipped: true, reason: "Scheduled workflow has no workspace." };
+  const quota = await createQuotaBoundWorkflowRun({
+    organizationId: workflow.organizationId,
+    create: (transaction) => transaction.workflowRun.create({
+      data: {
+        workflowId: workflow.id,
+        input: { triggerType: "SCHEDULE", scheduledAt: new Date().toISOString() },
+        outboxEvent: { create: {} },
+      },
+      select: { id: true },
+    }),
   });
-  console.info(`[scheduler] queued scheduled run ${run.id}`);
-  return { runId: run.id };
+  if (!quota.allowed) {
+    console.warn(`[scheduler] skipped scheduled run for workspace at monthly quota (${quota.used}/${quota.limit})`);
+    return { skipped: true, reason: "Workspace monthly run quota reached." };
+  }
+  console.info(`[scheduler] queued scheduled run ${quota.data.id}`);
+  return { runId: quota.data.id };
 }, { connection, concurrency: 5 });
 
 async function syncActiveSchedules() {
