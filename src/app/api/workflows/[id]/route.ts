@@ -191,7 +191,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
       console.error("Unable to synchronize workflow schedule:", scheduleError instanceof Error ? scheduleError.message : "Unknown error");
     }
-    const { webhookSecretCiphertext: _secret, ...safeWorkflow } = workflow;
+    const safeWorkflow = { ...workflow, webhookSecretCiphertext: undefined };
     return NextResponse.json({ data: safeWorkflow });
   } catch (error) {
     console.error("Unable to update workflow:", error instanceof Error ? error.message : "Unknown error");
