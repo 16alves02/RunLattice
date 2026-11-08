@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: { default: "RunLattice | Workflow automation", template: "%s | RunLattice" },
   description: "Design workflow definitions, validate automation logic and monitor background execution from one workspace.",
   applicationName: "RunLattice",
