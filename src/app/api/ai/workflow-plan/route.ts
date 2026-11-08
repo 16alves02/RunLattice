@@ -13,6 +13,7 @@ import {
 import { generateAICompletion, getAIProviderSelection, type AIProviderResult } from "@/lib/ai-provider";
 import {
   estimateReservedTokens,
+  getAIModelCreditCost,
   getAIUsageLimits,
   getUsagePeriodStart,
   markAIUsageFailed,
@@ -135,10 +136,12 @@ export async function POST(request: Request) {
   }
   const configuredLimits = getAIUsageLimits();
   const limits = {
-    monthlyRequests: Math.min(configuredLimits.monthlyRequests, entitlements.limits.aiRequests),
+    monthlyRequests: configuredLimits.monthlyRequests,
+    monthlyCredits: Math.min(configuredLimits.monthlyCredits, entitlements.limits.aiRequests),
     monthlyTokens: Math.min(configuredLimits.monthlyTokens, entitlements.limits.aiTokens),
   };
   const reservedTokens = estimateReservedTokens(parsed.data.prompt);
+  const creditCost = usesBYOK ? 0 : getAIModelCreditCost(selection.model);
   let reservation: AIUsageReservation | null;
   try {
     reservation = usesBYOK
@@ -154,6 +157,7 @@ export async function POST(request: Request) {
           provider: selection.provider,
           model: selection.model,
           reservedTokens,
+          creditCost,
           limits,
         });
   } catch (error) {
@@ -248,9 +252,12 @@ export async function POST(request: Request) {
     saved: false,
     usage: {
       requestsUsed: usage?.requestsUsed ?? 0,
+      creditsUsed: usage?.creditsUsed ?? 0,
       tokensUsed: usage?.tokensUsed ?? 0,
       monthlyRequestLimit: limits.monthlyRequests,
+      monthlyCreditLimit: limits.monthlyCredits,
       monthlyTokenLimit: limits.monthlyTokens,
+      creditCostThisRequest: creditCost,
       provider: generated.provider,
       model: generated.model,
       billingSource: usesBYOK ? "byok" : "platform",
