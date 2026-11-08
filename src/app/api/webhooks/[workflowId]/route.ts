@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/secrets";
 import { verifyWebhookSignature } from "@/lib/webhook-signature";
 import { workflowRunInputSchema } from "@/lib/validation";
+import { createQuotaBoundWorkflowRun } from "@/lib/run-quota";
 
 export const runtime = "nodejs";
 type RouteContext = { params: Promise<{ workflowId: string }> };
@@ -62,18 +63,27 @@ export async function POST(request: Request, context: RouteContext) {
     });
     if (!valid) return NextResponse.json({ error: "Invalid or expired webhook signature." }, { status: 401 });
 
-    const run = await prisma.$transaction(async (transaction) => {
-      await transaction.webhookDelivery.create({ data: { workflowId: workflow.id, deliveryId } });
-      return transaction.workflowRun.create({
-        data: {
-          workflowId: workflow.id,
-          input: parsed.data as Prisma.InputJsonValue,
-          outboxEvent: { create: {} },
-        },
-        select: { id: true, status: true, createdAt: true },
-      });
+    const quota = await createQuotaBoundWorkflowRun({
+      organizationId: workflow.organizationId,
+      create: async (transaction) => {
+        await transaction.webhookDelivery.create({ data: { workflowId: workflow.id, deliveryId } });
+        return transaction.workflowRun.create({
+          data: {
+            workflowId: workflow.id,
+            input: parsed.data as Prisma.InputJsonValue,
+            outboxEvent: { create: {} },
+          },
+          select: { id: true, status: true, createdAt: true },
+        });
+      },
     });
-    return NextResponse.json({ data: run }, { status: 202 });
+    if (!quota.allowed) {
+      return NextResponse.json({
+        error: "This workspace has reached its monthly run limit.",
+        usage: { used: quota.used, limit: quota.limit },
+      }, { status: 402 });
+    }
+    return NextResponse.json({ data: quota.data }, { status: 202 });
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
       return NextResponse.json({ error: "This webhook delivery has already been processed." }, { status: 409 });
