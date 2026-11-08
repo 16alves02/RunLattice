@@ -6,7 +6,7 @@ import { getAppOrigin, getStripe } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 const requestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("checkout"), plan: z.enum(["pro", "team", "business"]) }),
+  z.object({ action: z.literal("checkout"), plan: z.enum(["pro", "team", "business"]), interval: z.enum(["month", "year"]).default("month") }),
   z.object({ action: z.literal("portal") }),
 ]);
 
@@ -37,11 +37,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ url: session.url });
     }
 
-    const priceId = parsed.data.plan === "pro"
-      ? process.env.STRIPE_PRICE_PRO_MONTHLY
-      : parsed.data.plan === "team"
-        ? process.env.STRIPE_PRICE_TEAM_MONTHLY
-        : process.env.STRIPE_PRICE_BUSINESS_MONTHLY;
+    const prices = {
+      pro: { month: process.env.STRIPE_PRICE_PRO_MONTHLY, year: process.env.STRIPE_PRICE_PRO_ANNUAL },
+      team: { month: process.env.STRIPE_PRICE_TEAM_MONTHLY, year: process.env.STRIPE_PRICE_TEAM_ANNUAL },
+      business: { month: process.env.STRIPE_PRICE_BUSINESS_MONTHLY, year: process.env.STRIPE_PRICE_BUSINESS_ANNUAL },
+    } as const;
+    const priceId = prices[parsed.data.plan][parsed.data.interval];
     if (!priceId?.startsWith("price_")) {
       return NextResponse.json({ error: "The selected plan is not configured in Stripe yet." }, { status: 503 });
     }
@@ -82,8 +83,11 @@ export async function POST(request: Request) {
       tax_id_collection: { enabled: true },
       ...(process.env.STRIPE_AUTOMATIC_TAX_ENABLED === "true" ? { automatic_tax: { enabled: true } } : {}),
       customer_update: { address: "auto", name: "auto" },
-      metadata: { organizationId: access.context.organizationId, plan: parsed.data.plan },
-      subscription_data: { metadata: { organizationId: access.context.organizationId, plan: parsed.data.plan } },
+      metadata: { organizationId: access.context.organizationId, plan: parsed.data.plan, billingInterval: parsed.data.interval },
+      subscription_data: {
+        trial_period_days: 14,
+        metadata: { organizationId: access.context.organizationId, plan: parsed.data.plan, billingInterval: parsed.data.interval },
+      },
     });
     if (!session.url) return NextResponse.json({ error: "Stripe did not return a checkout URL." }, { status: 502 });
     return NextResponse.json({ url: session.url });
