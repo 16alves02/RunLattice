@@ -1,24 +1,54 @@
+import { Queue } from "bullmq";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function redisConnection() {
+  const value = process.env.REDIS_URL;
+  if (!value) throw new Error("REDIS_URL is not configured.");
+  const url = new URL(value);
+  if (url.protocol !== "redis:" && url.protocol !== "rediss:") {
+    throw new Error("REDIS_URL must use redis:// or rediss://.");
+  }
+  return {
+    host: url.hostname,
+    port: Number(url.port || 6379),
+    username: url.username || undefined,
+    password: url.password || undefined,
+    maxRetriesPerRequest: null,
+    ...(url.protocol === "rediss:" ? { tls: {} } : {}),
+  };
+}
+
 export async function GET() {
+  const checks = { database: "error", redis: "error" };
+  let queue: Queue | undefined;
+
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return NextResponse.json({
-      status: "ok",
-      service: "runlattice-web",
-      checks: { database: "ok" },
-      timestamp: new Date().toISOString(),
-    });
+    checks.database = "ok";
   } catch {
-    return NextResponse.json({
-      status: "degraded",
-      service: "runlattice-web",
-      checks: { database: "error" },
-      timestamp: new Date().toISOString(),
-    }, { status: 503 });
+    // Keep the public health response free of connection details.
   }
+
+  try {
+    queue = new Queue("runlattice-health-check", { connection: redisConnection() });
+    const client = await queue.client;
+    await client.ping();
+    checks.redis = "ok";
+  } catch {
+    // Keep the public health response free of connection details.
+  } finally {
+    await queue?.close().catch(() => undefined);
+  }
+
+  const healthy = checks.database === "ok" && checks.redis === "ok";
+  return NextResponse.json({
+    status: healthy ? "ok" : "degraded",
+    service: "runlattice-web",
+    checks,
+    timestamp: new Date().toISOString(),
+  }, { status: healthy ? 200 : 503 });
 }
