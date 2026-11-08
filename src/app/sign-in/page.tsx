@@ -1,12 +1,14 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
 import { ensureActiveWorkspace } from "@/lib/auth-workspace-client";
 import { BrandLogo } from "@/components/brand-logo";
 
 export default function SignInPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -20,7 +22,7 @@ export default function SignInPage() {
       const result = await authClient.signIn.email({ email, password, callbackURL: "/" });
       if (result.error) throw new Error(result.error.message || "Unable to sign in. Check your details.");
       await ensureActiveWorkspace("Personal workspace");
-      window.location.assign("/");
+      router.push("/");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to sign in. Check your details.");
       setLoading(false);
