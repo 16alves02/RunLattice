@@ -11,6 +11,7 @@ import type { WorkflowDefinition } from "@/lib/types";
 const organizationId = `integration-org-${randomBytes(8).toString("hex")}`;
 const webhookWorkflowId = `integration-webhook-${randomBytes(8).toString("hex")}`;
 const workerWorkflowId = `integration-worker-${randomBytes(8).toString("hex")}`;
+const successfulWorkflowId = `integration-success-${randomBytes(8).toString("hex")}`;
 let workerProcess: ChildProcess | undefined;
 
 describe("RunLattice PostgreSQL, API and worker integration", () => {
@@ -118,7 +119,64 @@ describe("RunLattice PostgreSQL, API and worker integration", () => {
     expect(removed).toBe(true);
   });
 
-  it("dispatches a persisted run through the real BullMQ worker and records failure safely", async () => {
+  function startWorkerProcess() {
+    if (workerProcess && workerProcess.exitCode === null) return;
+    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+    workerProcess = spawn(npm, ["run", "worker"], {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: "ignore",
+      shell: process.platform === "win32",
+    });
+  }
+
+  async function waitForRunStatus(runId: string, expected: "SUCCEEDED" | "FAILED") {
+    const deadline = Date.now() + 25_000;
+    let status = "QUEUED";
+    while (Date.now() < deadline && status !== expected) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const current = await prisma.workflowRun.findUnique({ where: { id: runId }, select: { status: true } });
+      status = current?.status ?? "MISSING";
+      if (status === "FAILED" && expected === "SUCCEEDED") break;
+    }
+    return status;
+  }
+
+  it("executes a valid persisted workflow through the real BullMQ worker", async () => {
+    await prisma.workflow.create({
+      data: {
+        id: successfulWorkflowId,
+        name: "Worker integration success path",
+        description: "",
+        status: "ACTIVE",
+        triggerType: "MANUAL",
+        definition: {
+          nodes: [{
+            id: "trigger",
+            kind: "trigger",
+            title: "Manual trigger",
+            detail: "Trigger · MANUAL",
+            config: { triggerType: "MANUAL" },
+            x: 0,
+            y: 0,
+          }],
+          edges: [],
+        },
+        organizationId,
+      },
+    });
+    const run = await prisma.workflowRun.create({
+      data: { workflowId: successfulWorkflowId, outboxEvent: { create: {} } },
+    });
+
+    startWorkerProcess();
+    expect(await waitForRunStatus(run.id, "SUCCEEDED")).toBe("SUCCEEDED");
+    const completed = await prisma.workflowRun.findUnique({ where: { id: run.id } });
+    expect(completed?.finishedAt).toBeInstanceOf(Date);
+    expect(completed?.output).toMatchObject({ executionMode: "LIVE", message: "Workflow actions completed successfully." });
+  });
+
+  it("records an invalid workflow failure safely in the real BullMQ worker", async () => {
     await prisma.workflow.create({
       data: {
         id: workerWorkflowId,
@@ -134,21 +192,7 @@ describe("RunLattice PostgreSQL, API and worker integration", () => {
       data: { workflowId: workerWorkflowId, outboxEvent: { create: {} } },
     });
 
-    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-    workerProcess = spawn(npm, ["run", "worker"], {
-      cwd: process.cwd(),
-      env: process.env,
-      stdio: "ignore",
-      shell: process.platform === "win32",
-    });
-
-    const deadline = Date.now() + 20_000;
-    let status = "QUEUED";
-    while (Date.now() < deadline && status !== "FAILED") {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const current = await prisma.workflowRun.findUnique({ where: { id: run.id }, select: { status: true } });
-      status = current?.status ?? "MISSING";
-    }
-    expect(status).toBe("FAILED");
+    startWorkerProcess();
+    expect(await waitForRunStatus(run.id, "FAILED")).toBe("FAILED");
   });
 });
