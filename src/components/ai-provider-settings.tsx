@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 type Provider = "openai" | "anthropic" | "google";
 type Credential = { provider: Provider; model: string; updatedAt: string };
@@ -21,7 +21,7 @@ export function AIProviderSettings() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function loadCredentials() {
+  const loadCredentials = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch("/api/ai/providers");
@@ -33,9 +33,9 @@ export function AIProviderSettings() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { void loadCredentials(); }, []);
+  useEffect(() => { void loadCredentials(); }, [loadCredentials]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
