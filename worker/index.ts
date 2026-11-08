@@ -132,6 +132,21 @@ async function executeAction(node: WorkflowDefinition["nodes"][number], organiza
 
 const dispatchQueue = new Queue<WorkflowJob>("workflow-runs", { connection });
 
+const workerHeartbeatKey = "runlattice:worker:heartbeat";
+async function refreshWorkerHeartbeat() {
+  try {
+    const client = await dispatchQueue.client as unknown as {
+      set: (key: string, value: string, expiryMode: "EX", ttl: number) => Promise<unknown>;
+    };
+    await client.set(workerHeartbeatKey, Date.now().toString(), "EX", 90);
+  } catch (error) {
+    console.error("[worker] Unable to refresh service heartbeat:", error instanceof Error ? error.message : "Unknown error");
+  }
+}
+const workerHeartbeatTimer = setInterval(() => void refreshWorkerHeartbeat(), 30_000);
+workerHeartbeatTimer.unref();
+void refreshWorkerHeartbeat();
+
 const scheduleWorker = new Worker<{ workflowId: string }>("workflow-schedules", async (job) => {
   if (job.name !== "scheduled-trigger" || !job.data.workflowId) return { skipped: true };
   const workflow = await prisma.workflow.findFirst({
@@ -434,6 +449,7 @@ void recoverStaleRuns().catch((error: unknown) => {
 async function shutdown(signal: string) {
   console.info(`[worker] ${signal} received; closing gracefully`);
   clearInterval(recoveryTimer);
+  clearInterval(workerHeartbeatTimer);
   clearInterval(outboxTimer);
   clearInterval(scheduleSyncTimer);
   await scheduleWorker.close();
