@@ -4,6 +4,7 @@ type UsageDatabase = Pick<PrismaClient, "aiWorkspaceUsage" | "aiUsageEvent" | "$
 
 export interface AIUsageLimits {
   monthlyRequests: number;
+  monthlyCredits: number;
   monthlyTokens: number;
 }
 
@@ -12,11 +13,13 @@ export interface AIUsageReservation {
   organizationId: string;
   periodStart: Date;
   reservedTokens: number;
+  creditCost: number;
   billingSource: "platform" | "byok";
 }
 
 const DEFAULT_LIMITS: AIUsageLimits = {
-  monthlyRequests: 100,
+  monthlyRequests: 1_000,
+  monthlyCredits: 1_200,
   monthlyTokens: 2_400_000,
 };
 
@@ -28,12 +31,31 @@ function positiveInteger(value: string | undefined, fallback: number) {
 export function getAIUsageLimits(): AIUsageLimits {
   return {
     monthlyRequests: positiveInteger(process.env.AI_MONTHLY_REQUEST_LIMIT, DEFAULT_LIMITS.monthlyRequests),
+    monthlyCredits: positiveInteger(process.env.AI_MONTHLY_CREDIT_LIMIT, DEFAULT_LIMITS.monthlyCredits),
     monthlyTokens: positiveInteger(process.env.AI_MONTHLY_TOKEN_LIMIT, DEFAULT_LIMITS.monthlyTokens),
   };
 }
 
 export function getUsagePeriodStart(now = new Date()) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+
+export function getAIModelCreditCost(model: string) {
+  const configured = process.env.AI_MODEL_CREDIT_COSTS;
+  if (configured) {
+    try {
+      const overrides = JSON.parse(configured) as Record<string, unknown>;
+      const value = overrides[model];
+      if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) return value;
+    } catch {
+      // Ignore invalid optional overrides and use the safe built-in tiers.
+    }
+  }
+  const normalized = model.toLowerCase();
+  if (/(mini|nano|haiku|flash)/.test(normalized)) return 1;
+  if (/(opus|\\bo[1-9]|reasoner|\\bpro\\b)/.test(normalized)) return 5;
+  return 3;
 }
 
 export function estimateReservedTokens(prompt: string, maxOutputTokens = 1_200) {
@@ -49,13 +71,15 @@ export async function reserveAIUsage(
     provider: string;
     model: string;
     reservedTokens: number;
+    creditCost?: number;
     limits?: AIUsageLimits;
     now?: Date;
   },
 ): Promise<AIUsageReservation | null> {
   const limits = input.limits ?? getAIUsageLimits();
   const periodStart = getUsagePeriodStart(input.now);
-  if (input.reservedTokens > limits.monthlyTokens) return null;
+  const creditCost = input.creditCost ?? 1;
+  if (input.reservedTokens > limits.monthlyTokens || creditCost < 1 || creditCost > limits.monthlyCredits) return null;
 
   return database.$transaction(async (transaction) => {
     await transaction.aiWorkspaceUsage.upsert({
@@ -69,10 +93,12 @@ export async function reserveAIUsage(
         organizationId: input.organizationId,
         periodStart,
         requestsUsed: { lt: limits.monthlyRequests },
+        creditsUsed: { lte: limits.monthlyCredits - creditCost },
         tokensUsed: { lte: limits.monthlyTokens - input.reservedTokens },
       },
       data: {
         requestsUsed: { increment: 1 },
+        creditsUsed: { increment: creditCost },
         tokensUsed: { increment: input.reservedTokens },
       },
     });
@@ -85,6 +111,7 @@ export async function reserveAIUsage(
         provider: input.provider,
         model: input.model,
         reservedTokens: input.reservedTokens,
+        creditCost,
       },
       select: { id: true },
     });
@@ -94,6 +121,7 @@ export async function reserveAIUsage(
       organizationId: input.organizationId,
       periodStart,
       reservedTokens: input.reservedTokens,
+      creditCost,
       billingSource: "platform",
     };
   });
@@ -116,6 +144,7 @@ export async function recordBYOKAIUsage(
       provider: input.provider,
       model: input.model,
       reservedTokens: 0,
+      creditCost: 0,
       billingSource: "byok",
     },
     select: { id: true },
@@ -125,6 +154,7 @@ export async function recordBYOKAIUsage(
     organizationId: input.organizationId,
     periodStart: getUsagePeriodStart(input.now),
     reservedTokens: 0,
+    creditCost: 0,
     billingSource: "byok",
   };
 }
