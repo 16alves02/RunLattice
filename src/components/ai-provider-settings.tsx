@@ -86,7 +86,7 @@ export function AIProviderSettings() {
     <p className="panel-subtitle">Connect an API key owned by your organisation. Requests made with this key are billed directly by the AI provider and do not consume RunLattice included AI credits. Keys are encrypted at rest and never displayed after saving.</p>
     <form onSubmit={save} className="ai-provider-form">
       <label className="field-label" htmlFor="ai-provider">Provider</label>
-      <select id="ai-provider" value={provider} onChange={(event) => {
+      <select className="field-input" id="ai-provider" value={provider} onChange={(event) => {
         const next = event.target.value as Provider;
         setProvider(next);
         setModel(next === "openai" ? "gpt-4.1-mini" : next === "anthropic" ? "claude-sonnet-4-5" : "gemini-2.5-flash");
@@ -96,9 +96,9 @@ export function AIProviderSettings() {
         <option value="google">Google Gemini</option>
       </select>
       <label className="field-label" htmlFor="ai-model">Model ID</label>
-      <input id="ai-model" value={model} onChange={(event) => setModel(event.target.value)} minLength={1} maxLength={120} required />
+      <input className="field-input" id="ai-model" value={model} onChange={(event) => setModel(event.target.value)} minLength={1} maxLength={120} required />
       <label className="field-label" htmlFor="ai-api-key">API key</label>
-      <input id="ai-api-key" type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} minLength={12} maxLength={500} placeholder="Paste the provider API key" required />
+      <input className="field-input" id="ai-api-key" type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} minLength={12} maxLength={500} placeholder="Paste the provider API key" required />
       <button className="btn btn-primary" type="submit" disabled={busy || loading || !apiKey || !model.trim()}>
         {busy ? "Saving…" : "Save encrypted API key"}
       </button>
