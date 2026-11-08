@@ -1,4 +1,4 @@
-export type AIProviderId = "openai" | "anthropic";
+export type AIProviderId = "openai" | "anthropic" | "google";
 
 export interface AIProviderResult {
   content: string;
@@ -13,26 +13,31 @@ export interface AIProviderOptions {
   model?: string;
   maxOutputTokens?: number;
   timeoutMs?: number;
+  apiKey?: string;
 }
 
 export function getAIProviderSelection(options: Pick<AIProviderOptions, "provider" | "model"> = {}) {
-  const provider = options.provider ?? (process.env.AI_PROVIDER === "anthropic" ? "anthropic" : "openai");
+  const provider = options.provider ?? (process.env.AI_PROVIDER === "anthropic" || process.env.AI_PROVIDER === "google" ? process.env.AI_PROVIDER : "openai");
   const model = options.model ?? process.env.AI_MODEL ?? (provider === "openai" ? "gpt-4.1-mini" : "");
   const apiKey = provider === "openai"
     ? process.env.OPENAI_API_KEY ?? process.env.AI_API_KEY
-    : process.env.ANTHROPIC_API_KEY;
+    : provider === "anthropic"
+      ? process.env.ANTHROPIC_API_KEY
+      : process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY;
   return { provider, model, configured: Boolean(apiKey && model) };
 }
 
-function resolveProviderConfig(provider?: AIProviderId, model?: string) {
-  const selectedProvider = provider ?? (process.env.AI_PROVIDER === "anthropic" ? "anthropic" : "openai");
+function resolveProviderConfig(provider?: AIProviderId, model?: string, suppliedApiKey?: string) {
+  const selectedProvider = provider ?? (process.env.AI_PROVIDER === "anthropic" || process.env.AI_PROVIDER === "google" ? process.env.AI_PROVIDER : "openai");
   const selectedModel = model ?? process.env.AI_MODEL ?? (selectedProvider === "openai" ? "gpt-4.1-mini" : "");
-  const apiKey = selectedProvider === "openai"
+  const apiKey = suppliedApiKey ?? (selectedProvider === "openai"
     ? process.env.OPENAI_API_KEY ?? process.env.AI_API_KEY
-    : process.env.ANTHROPIC_API_KEY;
+    : selectedProvider === "anthropic"
+      ? process.env.ANTHROPIC_API_KEY
+      : process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY);
 
   if (!selectedModel) throw new Error("AI_MODEL must be configured for the selected provider.");
-  if (!apiKey) throw new Error(selectedProvider === "openai" ? "OPENAI_API_KEY is not configured." : "ANTHROPIC_API_KEY is not configured.");
+  if (!apiKey) throw new Error(selectedProvider === "openai" ? "OPENAI_API_KEY is not configured." : selectedProvider === "anthropic" ? "ANTHROPIC_API_KEY is not configured." : "GOOGLE_API_KEY is not configured.");
 
   return { provider: selectedProvider, model: selectedModel, apiKey };
 }
@@ -46,12 +51,15 @@ export async function generateAICompletion(
   userPrompt: string,
   options: AIProviderOptions = {},
 ): Promise<AIProviderResult> {
-  const config = resolveProviderConfig(options.provider, options.model);
+  const config = resolveProviderConfig(options.provider, options.model, options.apiKey);
   const signal = AbortSignal.timeout(options.timeoutMs ?? 25_000);
   const maxOutputTokens = options.maxOutputTokens ?? 1_200;
 
-  if (config.provider === "openai") {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  if (config.provider !== "anthropic") {
+    const endpoint = config.provider === "google"
+      ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+      : "https://api.openai.com/v1/chat/completions";
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
