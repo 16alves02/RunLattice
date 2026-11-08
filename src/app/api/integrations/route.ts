@@ -4,6 +4,7 @@ import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { encryptSecret } from "@/lib/secrets";
 import { createIntegrationConnectionSchema } from "@/lib/validation";
 import { integrationCatalog } from "@/lib/integrations";
+import { getWorkspaceEntitlements } from "@/lib/billing";
 
 export async function GET(request: Request) {
   const access = await getRequestWorkspace(request);
@@ -45,6 +46,14 @@ export async function POST(request: Request) {
   }
 
   try {
+    const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
+    if (!entitlements.canConnectIntegration) {
+      return NextResponse.json({
+        error: "Your workspace has reached its integration connection limit. Upgrade your plan to connect more services.",
+        usage: { used: entitlements.usage.integrations, limit: entitlements.limits.integrations },
+      }, { status: 402 });
+    }
+
     const connection = await prisma.integrationConnection.create({
       data: {
         organizationId: access.context.organizationId,
