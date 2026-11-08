@@ -23,7 +23,7 @@ function redisConnection() {
 }
 
 export async function GET() {
-  const checks = { database: "error", redis: "error" };
+  const checks = { database: "error", redis: "error", worker: "error" };
   let queue: Queue | undefined;
 
   try {
@@ -35,16 +35,24 @@ export async function GET() {
 
   try {
     queue = new Queue("runlattice-health-check", { connection: redisConnection() });
-    const client = await queue.client as unknown as { ping: () => Promise<string> };
+    const client = await queue.client as unknown as {
+      ping: () => Promise<string>;
+      get: (key: string) => Promise<string | null>;
+    };
     await client.ping();
     checks.redis = "ok";
+    const heartbeat = await client.get("runlattice:worker:heartbeat");
+    const heartbeatAt = heartbeat ? Number(heartbeat) : 0;
+    if (Number.isFinite(heartbeatAt) && heartbeatAt > 0 && Date.now() - heartbeatAt < 90_000) {
+      checks.worker = "ok";
+    }
   } catch {
     // Keep the public health response free of connection details.
   } finally {
     await queue?.close().catch(() => undefined);
   }
 
-  const healthy = checks.database === "ok" && checks.redis === "ok";
+  const healthy = checks.database === "ok" && checks.redis === "ok" && checks.worker === "ok";
   return NextResponse.json({
     status: healthy ? "ok" : "degraded",
     service: "runlattice-web",
