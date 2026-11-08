@@ -56,7 +56,16 @@ describe("workspace monthly execution quota", () => {
 
   it("rejects an execution once the Free monthly limit is reached", async () => {
     const transaction = createTransaction(100);
-    transactionRunner.mockImplementation((callback: (tx: typeof transaction) => Promise<unknown>) => callback(transaction));
+    transactionRunner.mockImplementation(async (...args: unknown[]) => {
+      const callback = args.find(
+        (argument): argument is (tx: typeof transaction) => Promise<unknown> =>
+          typeof argument === "function",
+      );
+      if (!callback) {
+        throw new Error("Expected Prisma $transaction to receive a callback.");
+      }
+      return callback(transaction);
+    });
 
     const create = vi.fn().mockResolvedValue({ id: "must-not-be-created" });
     const result = await createQuotaBoundWorkflowRun({
