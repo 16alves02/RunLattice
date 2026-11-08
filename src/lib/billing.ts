@@ -20,7 +20,7 @@ export async function getWorkspaceEntitlements(organizationId: string, now = new
     prisma.integrationConnection.count({ where: { organizationId } }),
     prisma.aiWorkspaceUsage.findUnique({
       where: { organizationId_periodStart: { organizationId, periodStart } },
-      select: { requestsUsed: true, tokensUsed: true },
+      select: { requestsUsed: true, creditsUsed: true, tokensUsed: true },
     }),
   ]);
   const plan = resolveEntitledPlan(subscription, now);
@@ -31,6 +31,7 @@ export async function getWorkspaceEntitlements(organizationId: string, now = new
     members,
     integrations,
     aiRequests: aiUsage?.requestsUsed ?? 0,
+    aiCredits: aiUsage?.creditsUsed ?? 0,
     aiTokens: aiUsage?.tokensUsed ?? 0,
   };
   return {

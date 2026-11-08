@@ -13,16 +13,20 @@ import {
 import { generateAICompletion, getAIProviderSelection, type AIProviderResult } from "@/lib/ai-provider";
 import {
   estimateReservedTokens,
+  getAIModelCreditCost,
   getAIUsageLimits,
   getUsagePeriodStart,
   markAIUsageFailed,
   reserveAIUsage,
+  recordBYOKAIUsage,
   settleAIUsage,
   type AIUsageReservation,
 } from "@/lib/ai-usage";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { consumeAIRequestRateLimit } from "@/lib/ai-rate-limit";
 import { getWorkspaceEntitlements } from "@/lib/billing";
+import { decryptSecret } from "@/lib/secrets";
+import type { AIProviderId } from "@/lib/ai-provider";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -57,9 +61,37 @@ export async function POST(request: Request) {
     }, { status: 400 });
   }
 
-  const selection = getAIProviderSelection();
+  let selection = getAIProviderSelection();
+  let byokApiKey: string | undefined;
+  let usesBYOK = false;
+  try {
+    const credential = await prisma.aIProviderCredential.findFirst({
+      where: { organizationId: access.context.organizationId },
+      orderBy: { updatedAt: "desc" },
+      select: { provider: true, model: true, secretCiphertext: true },
+    });
+    if (credential) {
+      if (!["openai", "anthropic", "google"].includes(credential.provider)) {
+        return NextResponse.json({ error: "The saved AI provider is not supported by this deployment." }, { status: 503 });
+      }
+      byokApiKey = decryptSecret(
+        credential.secretCiphertext,
+        `${access.context.organizationId}:ai-provider:${credential.provider}`,
+      );
+      selection = {
+        provider: credential.provider as AIProviderId,
+        model: credential.model,
+        configured: true,
+      };
+      usesBYOK = true;
+    }
+  } catch (error) {
+    console.error("Unable to load workspace AI provider credentials:", error instanceof Error ? error.message : "Unknown error");
+    return NextResponse.json({ error: "The workspace AI provider configuration could not be loaded." }, { status: 503 });
+  }
+
   if (!selection.configured) {
-    return NextResponse.json({ error: "Configure a server-side AI provider key and model before enabling planning." }, { status: 503 });
+    return NextResponse.json({ error: "Configure an AI provider or add a workspace-owned API key before enabling planning." }, { status: 503 });
   }
 
   try {
@@ -99,25 +131,35 @@ export async function POST(request: Request) {
   }
 
   const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
-  if (entitlements.limits.aiRequests === 0) {
+  if (entitlements.limits.aiRequests === 0 && !usesBYOK) {
     return NextResponse.json({ error: "AI workflow planning is not included in the Free plan. Upgrade to Pro or Team to use it." }, { status: 402 });
   }
   const configuredLimits = getAIUsageLimits();
   const limits = {
-    monthlyRequests: Math.min(configuredLimits.monthlyRequests, entitlements.limits.aiRequests),
+    monthlyRequests: configuredLimits.monthlyRequests,
+    monthlyCredits: Math.min(configuredLimits.monthlyCredits, entitlements.limits.aiRequests),
     monthlyTokens: Math.min(configuredLimits.monthlyTokens, entitlements.limits.aiTokens),
   };
   const reservedTokens = estimateReservedTokens(parsed.data.prompt);
+  const creditCost = usesBYOK ? 0 : getAIModelCreditCost(selection.model);
   let reservation: AIUsageReservation | null;
   try {
-    reservation = await reserveAIUsage(prisma, {
-      organizationId: access.context.organizationId,
-      userId: access.context.userId,
-      provider: selection.provider,
-      model: selection.model,
-      reservedTokens,
-      limits,
-    });
+    reservation = usesBYOK
+      ? await recordBYOKAIUsage(prisma, {
+          organizationId: access.context.organizationId,
+          userId: access.context.userId,
+          provider: selection.provider,
+          model: selection.model,
+        })
+      : await reserveAIUsage(prisma, {
+          organizationId: access.context.organizationId,
+          userId: access.context.userId,
+          provider: selection.provider,
+          model: selection.model,
+          reservedTokens,
+          creditCost,
+          limits,
+        });
   } catch (error) {
     console.error("Unable to reserve workspace AI usage:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "AI usage accounting is temporarily unavailable." }, { status: 503 });
@@ -135,7 +177,7 @@ export async function POST(request: Request) {
     generated = await generateAICompletion(
       buildWorkflowSystemPrompt(),
       buildWorkflowPrompt(parsed.data.prompt, integrationContext),
-      { provider: selection.provider, model: selection.model, maxOutputTokens: 1_200 },
+      { provider: selection.provider, model: selection.model, maxOutputTokens: 1_200, ...(byokApiKey ? { apiKey: byokApiKey } : {}) },
     );
   } catch (error) {
     await markAIUsageFailed(prisma, reservation).catch((markError) => {
@@ -196,7 +238,7 @@ export async function POST(request: Request) {
         periodStart,
       },
     },
-    select: { requestsUsed: true, tokensUsed: true },
+    select: { requestsUsed: true, creditsUsed: true, tokensUsed: true },
   });
 
   return NextResponse.json({
@@ -210,11 +252,15 @@ export async function POST(request: Request) {
     saved: false,
     usage: {
       requestsUsed: usage?.requestsUsed ?? 0,
+      creditsUsed: usage?.creditsUsed ?? 0,
       tokensUsed: usage?.tokensUsed ?? 0,
       monthlyRequestLimit: limits.monthlyRequests,
+      monthlyCreditLimit: limits.monthlyCredits,
       monthlyTokenLimit: limits.monthlyTokens,
+      creditCostThisRequest: creditCost,
       provider: generated.provider,
       model: generated.model,
+      billingSource: usesBYOK ? "byok" : "platform",
       tokensThisRequest: generated.promptTokens + generated.completionTokens,
     },
   });

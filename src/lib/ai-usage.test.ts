@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   estimateReservedTokens,
   getUsagePeriodStart,
+  getAIModelCreditCost,
   markAIUsageFailed,
   reserveAIUsage,
+  recordBYOKAIUsage,
   settleAIUsage,
 } from "@/lib/ai-usage";
 
@@ -38,7 +40,7 @@ describe("workspace AI usage accounting", () => {
       provider: "openai",
       model: "test-model",
       reservedTokens: 2_000,
-      limits: { monthlyRequests: 10, monthlyTokens: 10_000 },
+      limits: { monthlyRequests: 10, monthlyCredits: 20, monthlyTokens: 10_000 },
       now: new Date("2026-11-05T00:00:00.000Z"),
     });
 
@@ -46,9 +48,10 @@ describe("workspace AI usage accounting", () => {
     expect(transaction.aiWorkspaceUsage.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         requestsUsed: { lt: 10 },
+        creditsUsed: { lte: 19 },
         tokensUsed: { lte: 8_000 },
       }),
-      data: { requestsUsed: { increment: 1 }, tokensUsed: { increment: 2_000 } },
+      data: { requestsUsed: { increment: 1 }, creditsUsed: { increment: 1 }, tokensUsed: { increment: 2_000 } },
     }));
   });
 
@@ -60,7 +63,7 @@ describe("workspace AI usage accounting", () => {
       provider: "openai",
       model: "test-model",
       reservedTokens: 2_000,
-      limits: { monthlyRequests: 10, monthlyTokens: 10_000 },
+      limits: { monthlyRequests: 10, monthlyCredits: 20, monthlyTokens: 10_000 },
     });
 
     expect(result).toBeNull();
@@ -74,6 +77,8 @@ describe("workspace AI usage accounting", () => {
       organizationId: "workspace-1",
       periodStart: new Date("2026-11-01T00:00:00.000Z"),
       reservedTokens: 2_000,
+      billingSource: "platform",
+      creditCost: 1,
     }, { promptTokens: 600, completionTokens: 400 });
 
     expect(transaction.aiWorkspaceUsage.updateMany).toHaveBeenCalledWith({
@@ -93,9 +98,69 @@ describe("workspace AI usage accounting", () => {
       organizationId: "workspace-1",
       periodStart: new Date("2026-11-01T00:00:00.000Z"),
       reservedTokens: 2_000,
+      billingSource: "platform",
+      creditCost: 1,
     });
     expect(transaction.aiWorkspaceUsage.updateMany).not.toHaveBeenCalled();
     expect(transaction.aiUsageEvent.update).toHaveBeenCalledWith({ where: { id: "event-1" }, data: { status: "FAILED" } });
+  });
+
+
+  it("records BYOK usage without consuming RunLattice AI credits", async () => {
+    const { database, transaction } = createDatabase();
+    const reservation = await recordBYOKAIUsage(database as never, {
+      organizationId: "workspace-1",
+      userId: "user-1",
+      provider: "openai",
+      model: "test-model",
+    });
+    expect(reservation.billingSource).toBe("byok");
+    expect(transaction.aiUsageEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ billingSource: "byok", reservedTokens: 0 }),
+    }));
+    expect(transaction.aiWorkspaceUsage.upsert).not.toHaveBeenCalled();
+    expect(transaction.aiWorkspaceUsage.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("settles BYOK token telemetry without changing included credit usage", async () => {
+    const { database, transaction } = createDatabase();
+    await settleAIUsage(database as never, {
+      eventId: "event-1",
+      organizationId: "workspace-1",
+      periodStart: new Date("2026-11-01T00:00:00.000Z"),
+      reservedTokens: 0,
+      billingSource: "byok",
+      creditCost: 0,
+    }, { promptTokens: 100, completionTokens: 50 });
+    expect(transaction.aiWorkspaceUsage.updateMany).not.toHaveBeenCalled();
+    expect(transaction.aiUsageEvent.update).toHaveBeenCalledWith({
+      where: { id: "event-1" },
+      data: { status: "SUCCEEDED", promptTokens: 100, completionTokens: 50 },
+    });
+  });
+
+
+  it("charges more credits for higher-cost model families", () => {
+    expect(getAIModelCreditCost("gpt-4.1-mini")).toBe(1);
+    expect(getAIModelCreditCost("claude-sonnet-4-5")).toBe(3);
+    expect(getAIModelCreditCost("claude-opus-4")).toBe(5);
+  });
+
+  it("reserves the model's full credit cost atomically", async () => {
+    const { database, transaction } = createDatabase();
+    await reserveAIUsage(database as never, {
+      organizationId: "workspace-1",
+      userId: "user-1",
+      provider: "anthropic",
+      model: "claude-opus-4",
+      reservedTokens: 2_000,
+      creditCost: 5,
+      limits: { monthlyRequests: 10, monthlyCredits: 20, monthlyTokens: 10_000 },
+    });
+    expect(transaction.aiWorkspaceUsage.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ creditsUsed: { lte: 15 } }),
+      data: expect.objectContaining({ creditsUsed: { increment: 5 } }),
+    }));
   });
 
   it("estimates a bounded reservation for prompts without provider tokenizers", () => {

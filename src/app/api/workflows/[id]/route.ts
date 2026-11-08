@@ -31,7 +31,7 @@ export async function GET(request: Request, context: RouteContext) {
       },
     });
     if (!workflow) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
-    const { webhookSecretCiphertext: _secret, ...safeWorkflow } = workflow;
+    const safeWorkflow = { ...workflow, webhookSecretCiphertext: undefined };
     return NextResponse.json({ data: safeWorkflow });
   } catch (error) {
     console.error("Unable to retrieve workflow:", error instanceof Error ? error.message : "Unknown error");
@@ -144,7 +144,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const updateResult = await prisma.$transaction(async (transaction) => {
       if (nextStatus === "ACTIVE" && existing.status !== "ACTIVE") {
-        await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${access.context.organizationId}, 0))`;
+        await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${access.context.organizationId}, 0))::text AS lock_value`;
         const subscription = await transaction.billingSubscription.findUnique({
           where: { organizationId: access.context.organizationId },
           select: { plan: true, status: true, currentPeriodEnd: true },
@@ -191,7 +191,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
       console.error("Unable to synchronize workflow schedule:", scheduleError instanceof Error ? scheduleError.message : "Unknown error");
     }
-    const { webhookSecretCiphertext: _secret, ...safeWorkflow } = workflow;
+    const safeWorkflow = { ...workflow, webhookSecretCiphertext: undefined };
     return NextResponse.json({ data: safeWorkflow });
   } catch (error) {
     console.error("Unable to update workflow:", error instanceof Error ? error.message : "Unknown error");

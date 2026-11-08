@@ -1,12 +1,14 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
 import { ensureActiveWorkspace } from "@/lib/auth-workspace-client";
 import { BrandLogo } from "@/components/brand-logo";
 
 export default function SignUpPage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +30,7 @@ export default function SignUpPage() {
         return;
       }
       await ensureActiveWorkspace(`${name.trim()}'s workspace`);
-      window.location.assign("/");
+      router.push("/");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to create your account.");
       setLoading(false);

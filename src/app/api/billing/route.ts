@@ -73,6 +73,7 @@ export async function POST(request: Request) {
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
+      payment_method_collection: "always",
       customer: customer.stripeCustomerId,
       client_reference_id: access.context.organizationId,
       line_items: [{ price: priceId, quantity: 1 }],
@@ -86,6 +87,7 @@ export async function POST(request: Request) {
       metadata: { organizationId: access.context.organizationId, plan: parsed.data.plan, billingInterval: parsed.data.interval },
       subscription_data: {
         trial_period_days: 14,
+        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
         metadata: { organizationId: access.context.organizationId, plan: parsed.data.plan, billingInterval: parsed.data.interval },
       },
     });

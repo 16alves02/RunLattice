@@ -52,6 +52,30 @@ describe("AI provider abstraction", () => {
     );
   });
 
+
+  it("supports Google Gemini through its OpenAI-compatible endpoint using a supplied workspace key", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: "{\"name\":\"Example\"}" } }],
+      usage: { prompt_tokens: 12, completion_tokens: 6 },
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateAICompletion("system", "user", {
+      provider: "google",
+      model: "gemini-test-model",
+      apiKey: "workspace-google-key",
+    });
+
+    expect(result.provider).toBe("google");
+    expect(result.model).toBe("gemini-test-model");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer workspace-google-key" }),
+      }),
+    );
+  });
+
   it("reports provider configuration without exposing its key", () => {
     vi.stubEnv("AI_PROVIDER", "openai");
     vi.stubEnv("OPENAI_API_KEY", "private-key");

@@ -14,10 +14,15 @@ export const metadata: Metadata = {
 export default async function BillingPage() {
   const workspace = await requireServerWorkspace();
   const entitlements = await getWorkspaceEntitlements(workspace.organizationId);
-  const customer = await prisma.billingCustomer.findUnique({
-    where: { organizationId: workspace.organizationId },
-    select: { id: true },
-  });
+  const [customer, openBillingAlerts] = await Promise.all([
+    prisma.billingCustomer.findUnique({
+      where: { organizationId: workspace.organizationId },
+      select: { id: true },
+    }),
+    prisma.stripeEvent.count({
+      where: { organizationId: workspace.organizationId, actionRequired: true },
+    }),
+  ]);
   const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
   const checkoutAvailability = {
     pro: { month: stripeConfigured && Boolean(process.env.STRIPE_PRICE_PRO_MONTHLY), year: stripeConfigured && Boolean(process.env.STRIPE_PRICE_PRO_ANNUAL) },
@@ -29,7 +34,7 @@ export default async function BillingPage() {
     { label: "Workflows ativos", used: entitlements.usage.activeWorkflows, limit: entitlements.limits.workflows },
     { label: "Execuções", used: entitlements.usage.monthlyRuns, limit: entitlements.limits.monthlyRuns },
     { label: "Integrações", used: entitlements.usage.integrations, limit: entitlements.limits.integrations },
-    { label: "Créditos de IA", used: entitlements.usage.aiRequests, limit: entitlements.limits.aiRequests },
+    { label: "Créditos de IA", used: entitlements.usage.aiCredits, limit: entitlements.limits.aiRequests },
   ];
   const usageAlerts = usageMeters.flatMap((meter) => {
     const percentage = meter.limit > 0 ? Math.floor((meter.used / meter.limit) * 100) : 0;
@@ -51,13 +56,14 @@ export default async function BillingPage() {
     </div>
 
     <section className="panel">
-      <div className="panel-heading"><div><div className="panel-title">Utilização atual</div><div className="panel-subtitle">As execuções e os créditos de IA renovam no primeiro dia de cada mês (UTC).</div></div></div>
+      <div className="panel-heading"><div><div className="panel-title">Utilização atual</div><div className="panel-subtitle">As execuções e os créditos incluídos renovam no primeiro dia de cada mês (UTC). Pesos predefinidos: modelos económicos 1 crédito, standard 3 e avançados 5; BYOK não consome créditos RunLattice.</div></div></div>
       <div className="billing-usage">
         <div><span>Workflows ativos</span><strong>{entitlements.usage.activeWorkflows} / {entitlements.limits.workflows}</strong></div>
         <div><span>Execuções este mês</span><strong>{entitlements.usage.monthlyRuns.toLocaleString("pt-PT")} / {entitlements.limits.monthlyRuns.toLocaleString("pt-PT")}</strong></div>
         <div><span>Utilizadores</span><strong>{entitlements.usage.members} / {entitlements.limits.members}</strong></div>
         <div><span>Integrações ligadas</span><strong>{entitlements.usage.integrations} / {entitlements.limits.integrations}</strong></div>
-        <div><span>Créditos IA utilizados</span><strong>{entitlements.usage.aiRequests.toLocaleString("pt-PT")} / {entitlements.limits.aiRequests.toLocaleString("pt-PT")}</strong></div>
+        <div><span>Créditos IA utilizados</span><strong>{entitlements.usage.aiCredits.toLocaleString("pt-PT")} / {entitlements.limits.aiRequests.toLocaleString("pt-PT")}</strong></div>
+        <div><span>Pedidos IA este mês</span><strong>{entitlements.usage.aiRequests.toLocaleString("pt-PT")}</strong></div>
         <div><span>Tokens IA utilizados</span><strong>{entitlements.usage.aiTokens.toLocaleString("pt-PT")} / {entitlements.limits.aiTokens.toLocaleString("pt-PT")}</strong></div>
       </div>
       <p className="panel-subtitle" style={{ marginTop: 16 }}>Concorrência máxima: {entitlements.limits.concurrentRuns} execução(ões). Histórico visível: últimos {entitlements.limits.historyDays} dias.</p>
@@ -65,6 +71,11 @@ export default async function BillingPage() {
         Subscription status: <strong>{entitlements.subscription.status}</strong>
         {entitlements.subscription.cancelAtPeriodEnd ? " · Cancels at the end of the current billing period" : ""}
       </p>}
+    </section>
+
+    <section className="panel">
+      <div className="panel-title">Limites iniciais dos planos</div>
+      <p className="panel-subtitle">Os limites de workflows, execuções, utilizadores e créditos apresentados são valores iniciais de configuração e ainda devem ser calibrados com custos reais, utilização e feedback dos primeiros clientes. Os preços mensais e anuais são a tabela comercial selecionada.</p>
     </section>
 
     <section className="panel">
@@ -91,6 +102,11 @@ export default async function BillingPage() {
         <p className="panel-subtitle">Limites, suporte e condições ajustados ao volume e às necessidades da organização.</p>
       </section>
     </div>
+
+    {openBillingAlerts > 0 && <section className="panel" role="status">
+      <div className="panel-title">Revisão de faturação necessária</div>
+      <p className="panel-subtitle">{openBillingAlerts} evento(s) de pagamento, reembolso ou risco requerem revisão. Consulte o Stripe Dashboard para investigar e resolver estes eventos.</p>
+    </section>}
 
     <section className="panel">
       <div className="panel-title">Gestão da subscrição</div>
