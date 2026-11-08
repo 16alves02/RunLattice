@@ -39,7 +39,8 @@ One workflow run consumes one execution, including failed runs. A duplicate deli
 - Active workflow quota, enforced atomically when a workflow is activated. Draft workflows do not consume an active-workflow slot.
 - Integration connection quota, enforced atomically when a connection is created.
 - Better Auth organization membership limit, resolved from the workspace's current subscription.
-- AI request and token reservations before provider calls, with plan-specific ceilings and provider-reported usage settlement.
+- AI request and token reservations before platform-funded provider calls, with plan-specific ceilings and provider-reported usage settlement.
+- Encrypted workspace BYOK credentials for OpenAI, Anthropic and Google Gemini; BYOK usage is recorded for telemetry but does not consume RunLattice-funded credits.
 - Run-history visibility windows in the API. This hides older history from the application; it does not physically delete old database records.
 - Dashboard usage warnings at 50%, 75% and 90% of the workflow, execution, integration and AI credit limits.
 - Billing page aligned with the proposed monthly prices and quota table.
@@ -50,7 +51,7 @@ One workflow run consumes one execution, including failed runs. A duplicate deli
 ## Not yet implemented or verified
 
 - Physical deletion/archival of run history after the visible-history window.
-- BYOK (customer-owned AI provider keys) and additional credit packs.
+- Additional prepaid AI credit packs, with Stripe one-time checkout and usage reconciliation still pending.
 - Annual Stripe sandbox Price objects and end-to-end checkout verification.
 - Stripe sandbox Products/Prices, webhook signing secret and end-to-end checkout tests.
 - Automatic usage notifications by email or push at 50%, 75% and 90%.
