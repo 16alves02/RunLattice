@@ -17,9 +17,17 @@ export async function GET(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   try {
+    const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
+    const historyStart = new Date(Date.now() - entitlements.limits.historyDays * 24 * 60 * 60 * 1000);
     const workflow = await prisma.workflow.findFirst({
       where: { id, organizationId: access.context.organizationId },
-      include: { runs: { orderBy: { createdAt: "desc" }, take: 20 } },
+      include: {
+        runs: {
+          where: { createdAt: { gte: historyStart } },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        },
+      },
     });
     if (!workflow) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
     const { webhookSecretCiphertext: _secret, ...safeWorkflow } = workflow;
