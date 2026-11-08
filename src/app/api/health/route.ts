@@ -35,7 +35,7 @@ export async function GET() {
 
   try {
     queue = new Queue("runlattice-health-check", { connection: redisConnection() });
-    const client = await queue.client;
+    const client = await queue.client as unknown as { ping: () => Promise<string> };
     await client.ping();
     checks.redis = "ok";
   } catch {
