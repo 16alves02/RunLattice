@@ -2,7 +2,7 @@ name: Dependency security
 
 on:
   push:
-    branches: ["feature/webhooks-scheduling-integration-tests"]
+    branches: [main, "feature/**", "fix/**", "release/**"]
   workflow_dispatch:
 
 permissions:

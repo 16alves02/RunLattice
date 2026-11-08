@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { workflowRunInputSchema } from "@/lib/validation";
-import { getWorkspaceEntitlements } from "@/lib/billing";
+import { createQuotaBoundWorkflowRun } from "@/lib/run-quota";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -50,19 +50,24 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Only active workflows can be run." }, { status: 409 });
     }
 
-    const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
-    if (!entitlements.canRunWorkflow) {
-      return NextResponse.json({ error: "Your workspace has reached its monthly run limit. Upgrade your plan to continue." }, { status: 402 });
+    const quota = await createQuotaBoundWorkflowRun({
+      organizationId: access.context.organizationId,
+      create: (transaction) => transaction.workflowRun.create({
+        data: {
+          workflowId: workflow.id,
+          input: input as Prisma.InputJsonValue,
+          outboxEvent: { create: {} },
+        },
+      }),
+    });
+    if (!quota.allowed) {
+      return NextResponse.json({
+        error: "Your workspace has reached its monthly run limit. Upgrade your plan to continue.",
+        usage: { used: quota.used, limit: quota.limit },
+      }, { status: 402 });
     }
 
-    const run = await prisma.workflowRun.create({
-      data: {
-        workflowId: workflow.id,
-        input: input as Prisma.InputJsonValue,
-        outboxEvent: { create: {} },
-      },
-    });
-    return NextResponse.json({ data: run }, { status: 202 });
+    return NextResponse.json({ data: quota.data }, { status: 202 });
   } catch (error) {
     console.error("Unable to create workflow run:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "The workflow run could not be created. Check database configuration." }, { status: 503 });

@@ -16,7 +16,7 @@ export interface AIUsageReservation {
 
 const DEFAULT_LIMITS: AIUsageLimits = {
   monthlyRequests: 100,
-  monthlyTokens: 100_000,
+  monthlyTokens: 2_400_000,
 };
 
 function positiveInteger(value: string | undefined, fallback: number) {

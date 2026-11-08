@@ -18,11 +18,31 @@ export default async function BillingPage() {
     where: { organizationId: workspace.organizationId },
     select: { id: true },
   });
-  const checkoutReady = Boolean(
-    process.env.STRIPE_SECRET_KEY
-    && process.env.STRIPE_PRICE_PRO_MONTHLY
-    && process.env.STRIPE_PRICE_TEAM_MONTHLY,
-  );
+  const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
+  const checkoutAvailability = {
+    pro: { month: stripeConfigured && Boolean(process.env.STRIPE_PRICE_PRO_MONTHLY), year: stripeConfigured && Boolean(process.env.STRIPE_PRICE_PRO_ANNUAL) },
+    team: { month: stripeConfigured && Boolean(process.env.STRIPE_PRICE_TEAM_MONTHLY), year: stripeConfigured && Boolean(process.env.STRIPE_PRICE_TEAM_ANNUAL) },
+    business: { month: stripeConfigured && Boolean(process.env.STRIPE_PRICE_BUSINESS_MONTHLY), year: stripeConfigured && Boolean(process.env.STRIPE_PRICE_BUSINESS_ANNUAL) },
+  };
+
+  const usageMeters = [
+    { label: "Workflows ativos", used: entitlements.usage.activeWorkflows, limit: entitlements.limits.workflows },
+    { label: "Execuções", used: entitlements.usage.monthlyRuns, limit: entitlements.limits.monthlyRuns },
+    { label: "Integrações", used: entitlements.usage.integrations, limit: entitlements.limits.integrations },
+    { label: "Créditos de IA", used: entitlements.usage.aiRequests, limit: entitlements.limits.aiRequests },
+  ];
+  const usageAlerts = usageMeters.flatMap((meter) => {
+    const percentage = meter.limit > 0 ? Math.floor((meter.used / meter.limit) * 100) : 0;
+    const threshold = percentage >= 90 ? 90 : percentage >= 75 ? 75 : percentage >= 50 ? 50 : null;
+    return threshold ? [{ ...meter, percentage, threshold }] : [];
+  });
+
+  const plans = [
+    { key: "free", name: "Free", price: "€0", description: "Para experimentar e automatizar tarefas simples.", limits: ["3 workflows ativos", "100 execuções/mês", "1 utilizador", "1 integração", "10 créditos de IA/mês", "Histórico visível: 7 dias"] },
+    { key: "pro", name: "Pro", price: "€11,99", annual: "€9,99/mês · €119,88/ano", description: "Para utilização individual regular.", limits: ["20 workflows ativos", "1.000 execuções/mês", "1 utilizador", "5 integrações", "100 créditos de IA/mês", "Histórico visível: 30 dias"] },
+    { key: "team", name: "Teams", price: "€34,99", annual: "€27,99/mês · €335,88/ano", description: "Para pequenas equipas que trabalham em conjunto.", limits: ["100 workflows ativos", "5.000 execuções/mês", "5 utilizadores", "15 integrações", "400 créditos de IA/mês", "Histórico visível: 90 dias"] },
+    { key: "business", name: "Business", price: "€99,99", annual: "€84,99/mês · €1.019,88/ano", description: "Para operações com maior volume.", limits: ["500 workflows ativos", "20.000 execuções/mês", "15 utilizadores", "50 integrações", "1.200 créditos de IA/mês", "Histórico visível: 180 dias"] },
+  ];
 
   return <AppShell active="Billing"><div className="page">
     <div className="page-heading">
@@ -31,44 +51,51 @@ export default async function BillingPage() {
     </div>
 
     <section className="panel">
-      <div className="panel-heading"><div><div className="panel-title">Current usage</div><div className="panel-subtitle">Workflow run limits reset monthly.</div></div></div>
+      <div className="panel-heading"><div><div className="panel-title">Utilização atual</div><div className="panel-subtitle">As execuções e os créditos de IA renovam no primeiro dia de cada mês (UTC).</div></div></div>
       <div className="billing-usage">
-        <div><span>Workflows</span><strong>{entitlements.usage.workflows} / {entitlements.limits.workflows}</strong></div>
-        <div><span>Monthly runs</span><strong>{entitlements.usage.monthlyRuns.toLocaleString("en-GB")} / {entitlements.limits.monthlyRuns.toLocaleString("en-GB")}</strong></div>
-        <div><span>Workspace members</span><strong>{entitlements.usage.members} / {entitlements.limits.members}</strong></div>
-        <div><span>AI requests</span><strong>{entitlements.limits.aiRequests.toLocaleString("en-GB")} / month</strong></div>
+        <div><span>Workflows ativos</span><strong>{entitlements.usage.activeWorkflows} / {entitlements.limits.workflows}</strong></div>
+        <div><span>Execuções este mês</span><strong>{entitlements.usage.monthlyRuns.toLocaleString("pt-PT")} / {entitlements.limits.monthlyRuns.toLocaleString("pt-PT")}</strong></div>
+        <div><span>Utilizadores</span><strong>{entitlements.usage.members} / {entitlements.limits.members}</strong></div>
+        <div><span>Integrações ligadas</span><strong>{entitlements.usage.integrations} / {entitlements.limits.integrations}</strong></div>
+        <div><span>Créditos IA utilizados</span><strong>{entitlements.usage.aiRequests.toLocaleString("pt-PT")} / {entitlements.limits.aiRequests.toLocaleString("pt-PT")}</strong></div>
+        <div><span>Tokens IA utilizados</span><strong>{entitlements.usage.aiTokens.toLocaleString("pt-PT")} / {entitlements.limits.aiTokens.toLocaleString("pt-PT")}</strong></div>
       </div>
-      {entitlements.subscription && <p className="panel-subtitle" style={{ marginTop: 16 }}>
+      <p className="panel-subtitle" style={{ marginTop: 16 }}>Concorrência máxima: {entitlements.limits.concurrentRuns} execução(ões). Histórico visível: últimos {entitlements.limits.historyDays} dias.</p>
+      {entitlements.subscription && <p className="panel-subtitle" style={{ marginTop: 8 }}>
         Subscription status: <strong>{entitlements.subscription.status}</strong>
         {entitlements.subscription.cancelAtPeriodEnd ? " · Cancels at the end of the current billing period" : ""}
       </p>}
     </section>
 
+    <section className="panel">
+      <div className="panel-title">Alertas de utilização</div>
+      {usageAlerts.length > 0
+        ? <ul>{usageAlerts.map((alert) => <li key={alert.label}>{alert.label}: {alert.percentage}% utilizado. Atingiu o patamar de alerta de {alert.threshold}% ({alert.used.toLocaleString("pt-PT")} / {alert.limit.toLocaleString("pt-PT")}).</li>)}</ul>
+        : <p className="panel-subtitle">Nenhum limite atingiu os 50% de utilização.</p>}
+      <p className="panel-subtitle">Estes alertas aparecem nesta página. Notificações automáticas por email ainda não estão implementadas.</p>
+    </section>
+
     <div className="billing-plan-grid">
+      {plans.map((plan) => <section className="panel" key={plan.key}>
+        <div className="panel-title">{plan.name}</div>
+        <div className="billing-price">{plan.price} <span>/ mês</span></div>
+        {plan.key !== "free" && <p className="panel-subtitle">Anual: {plan.annual}</p>}
+        {plan.key !== "free" && <p className="panel-subtitle">Inclui período experimental de 14 dias.</p>}
+        <p className="panel-subtitle">{plan.description}</p>
+        <ul>{plan.limits.map((limit) => <li key={limit}>{limit}</li>)}</ul>
+        {entitlements.plan === plan.key && <span className="tag">Plano atual</span>}
+      </section>)}
       <section className="panel">
-        <div className="panel-title">Free</div><div className="billing-price">€0 <span>/ month</span></div>
-        <p className="panel-subtitle">For trying workflow automation.</p>
-        <ul><li>3 workflows</li><li>100 runs per month</li><li>1 workspace member</li></ul>
-        {entitlements.plan === "free" && <span className="tag">Current plan</span>}
-      </section>
-      <section className="panel">
-        <div className="panel-title">Pro</div><div className="billing-price">€19 <span>/ month</span></div>
-        <p className="panel-subtitle">For individuals and small teams.</p>
-        <ul><li>25 workflows</li><li>5,000 runs per month</li><li>3 workspace members</li><li>100 AI requests per month</li></ul>
-        {entitlements.plan === "pro" && <span className="tag">Current plan</span>}
-      </section>
-      <section className="panel">
-        <div className="panel-title">Team</div><div className="billing-price">€49 <span>/ month</span></div>
-        <p className="panel-subtitle">For growing teams and operations.</p>
-        <ul><li>100 workflows</li><li>25,000 runs per month</li><li>10 workspace members</li><li>500 AI requests per month</li></ul>
-        {entitlements.plan === "team" && <span className="tag">Current plan</span>}
+        <div className="panel-title">Enterprise</div>
+        <div className="billing-price">Personalizado</div>
+        <p className="panel-subtitle">Limites, suporte e condições ajustados ao volume e às necessidades da organização.</p>
       </section>
     </div>
 
     <section className="panel">
-      <div className="panel-title">Subscription management</div>
-      <p className="panel-subtitle">Checkout and subscription changes are processed by Stripe. Workspace access changes only after a verified webhook.</p>
-      <BillingActions checkoutReady={checkoutReady} portalReady={Boolean(customer)} />
+      <div className="panel-title">Gestão da subscrição</div>
+      <p className="panel-subtitle">Checkout e alterações de subscrição são processados pelo Stripe. O acesso só muda após confirmação de um webhook validado. Os preços apresentados são propostas comerciais; o checkout só aparece quando os respetivos preços de teste estiverem configurados.</p>
+      <BillingActions availability={checkoutAvailability} portalReady={Boolean(customer)} />
     </section>
   </div></AppShell>;
 }

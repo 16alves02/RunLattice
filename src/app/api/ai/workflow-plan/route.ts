@@ -103,7 +103,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "AI workflow planning is not included in the Free plan. Upgrade to Pro or Team to use it." }, { status: 402 });
   }
   const configuredLimits = getAIUsageLimits();
-  const limits = { ...configuredLimits, monthlyRequests: Math.min(configuredLimits.monthlyRequests, entitlements.limits.aiRequests) };
+  const limits = {
+    monthlyRequests: Math.min(configuredLimits.monthlyRequests, entitlements.limits.aiRequests),
+    monthlyTokens: Math.min(configuredLimits.monthlyTokens, entitlements.limits.aiTokens),
+  };
   const reservedTokens = estimateReservedTokens(parsed.data.prompt);
   let reservation: AIUsageReservation | null;
   try {

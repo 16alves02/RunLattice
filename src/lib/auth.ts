@@ -4,6 +4,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/prisma";
 import { organization } from "better-auth/plugins";
 import { sendTransactionalEmail } from "@/lib/email";
+import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
 
 const secret = process.env.BETTER_AUTH_SECRET;
 const production = process.env.NODE_ENV === "production";
@@ -62,7 +63,18 @@ export const auth = betterAuth({
       "/request-password-reset": { window: 60, max: 3 },
     },
   },
-  plugins: [organization({ requireEmailVerificationOnInvitation: true, invitationExpiresIn: 60 * 60 * 24 * 7 })],
+  plugins: [organization({
+    requireEmailVerificationOnInvitation: true,
+    invitationExpiresIn: 60 * 60 * 24 * 7,
+    membershipLimit: async (_user, organizationRecord) => {
+      const subscription = await prisma.billingSubscription.findUnique({
+        where: { organizationId: organizationRecord.id },
+        select: { plan: true, status: true, currentPeriodEnd: true },
+      });
+      const plan = resolveEntitledPlan(subscription);
+      return PLAN_LIMITS[plan].members;
+    },
+  })],
   trustedOrigins: process.env.BETTER_AUTH_TRUSTED_ORIGINS
     ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean)
     : ["http://localhost:3000"],
