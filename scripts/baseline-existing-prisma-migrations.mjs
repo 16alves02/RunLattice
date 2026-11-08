@@ -31,7 +31,9 @@ try {
     .filter((entry) => entry.isDirectory() && /^\d{14}_/.test(entry.name))
     .map((entry) => entry.name)
     .sort();
-  const priorMigrations = migrations.filter((name) => name !== pendingMigration);
+  // Only migrations that predate the first post-baseline billing migration
+  // belong to the existing Supabase schema. Newer migrations must run normally.
+  const priorMigrations = migrations.filter((name) => name < pendingMigration);
 
   if (priorMigrations.length !== 12) {
     throw new Error(`Refusing to baseline: expected 12 previously applied migrations, found ${priorMigrations.length}.`);
