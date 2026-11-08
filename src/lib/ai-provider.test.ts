@@ -55,7 +55,7 @@ describe("AI provider abstraction", () => {
 
   it("supports Google Gemini through its OpenAI-compatible endpoint using a supplied workspace key", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      choices: [{ message: { content: "{\\"name\\":\\"Example\\"}" } }],
+      choices: [{ message: { content: "{\"name\":\"Example\"}" } }],
       usage: { prompt_tokens: 12, completion_tokens: 6 },
     }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
