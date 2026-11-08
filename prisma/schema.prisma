@@ -108,6 +108,7 @@ model Organization {
   integrations       IntegrationConnection[]
   aiUsage            AiWorkspaceUsage[]
   aiUsageEvents      AiUsageEvent[]
+  aiProviderCredentials AIProviderCredential[]
   billingCustomer    BillingCustomer?
   billingSubscription BillingSubscription?
   stripeEvents        StripeEvent[]
@@ -247,6 +248,7 @@ model AiUsageEvent {
   provider         String
   model            String
   status           String       @default("RESERVED")
+  billingSource    String       @default("platform")
   reservedTokens   Int
   promptTokens     Int          @default(0)
   completionTokens Int          @default(0)
@@ -255,6 +257,20 @@ model AiUsageEvent {
 
   @@index([organizationId, createdAt])
   @@index([status, createdAt])
+}
+
+model AIProviderCredential {
+  id                    String       @id @default(cuid())
+  organizationId        String
+  provider              String
+  model                 String
+  secretCiphertext      String
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+  @@index([organizationId, updatedAt])
 }
 
 model WebhookDelivery {
