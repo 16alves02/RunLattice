@@ -34,7 +34,7 @@ export default async function BillingPage() {
     { label: "Workflows ativos", used: entitlements.usage.activeWorkflows, limit: entitlements.limits.workflows },
     { label: "Execuções", used: entitlements.usage.monthlyRuns, limit: entitlements.limits.monthlyRuns },
     { label: "Integrações", used: entitlements.usage.integrations, limit: entitlements.limits.integrations },
-    { label: "Créditos de IA", used: entitlements.usage.aiRequests, limit: entitlements.limits.aiRequests },
+    { label: "Créditos de IA", used: entitlements.usage.aiCredits, limit: entitlements.limits.aiRequests },
   ];
   const usageAlerts = usageMeters.flatMap((meter) => {
     const percentage = meter.limit > 0 ? Math.floor((meter.used / meter.limit) * 100) : 0;
@@ -56,13 +56,14 @@ export default async function BillingPage() {
     </div>
 
     <section className="panel">
-      <div className="panel-heading"><div><div className="panel-title">Utilização atual</div><div className="panel-subtitle">As execuções e os créditos de IA renovam no primeiro dia de cada mês (UTC).</div></div></div>
+      <div className="panel-heading"><div><div className="panel-title">Utilização atual</div><div className="panel-subtitle">As execuções e os créditos incluídos renovam no primeiro dia de cada mês (UTC). Modelos económicos consomem 1 crédito, modelos standard 3 e modelos avançados 5; BYOK não consome créditos RunLattice.</div></div></div>
       <div className="billing-usage">
         <div><span>Workflows ativos</span><strong>{entitlements.usage.activeWorkflows} / {entitlements.limits.workflows}</strong></div>
         <div><span>Execuções este mês</span><strong>{entitlements.usage.monthlyRuns.toLocaleString("pt-PT")} / {entitlements.limits.monthlyRuns.toLocaleString("pt-PT")}</strong></div>
         <div><span>Utilizadores</span><strong>{entitlements.usage.members} / {entitlements.limits.members}</strong></div>
         <div><span>Integrações ligadas</span><strong>{entitlements.usage.integrations} / {entitlements.limits.integrations}</strong></div>
-        <div><span>Créditos IA utilizados</span><strong>{entitlements.usage.aiRequests.toLocaleString("pt-PT")} / {entitlements.limits.aiRequests.toLocaleString("pt-PT")}</strong></div>
+        <div><span>Créditos IA utilizados</span><strong>{entitlements.usage.aiCredits.toLocaleString("pt-PT")} / {entitlements.limits.aiRequests.toLocaleString("pt-PT")}</strong></div>
+        <div><span>Pedidos IA este mês</span><strong>{entitlements.usage.aiRequests.toLocaleString("pt-PT")}</strong></div>
         <div><span>Tokens IA utilizados</span><strong>{entitlements.usage.aiTokens.toLocaleString("pt-PT")} / {entitlements.limits.aiTokens.toLocaleString("pt-PT")}</strong></div>
       </div>
       <p className="panel-subtitle" style={{ marginTop: 16 }}>Concorrência máxima: {entitlements.limits.concurrentRuns} execução(ões). Histórico visível: últimos {entitlements.limits.historyDays} dias.</p>
