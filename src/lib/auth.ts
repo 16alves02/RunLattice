@@ -52,6 +52,13 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24,
     cookieCache: { enabled: true, maxAge: 5 * 60 },
   },
+  // Railway overwrites X-Real-IP at its public edge. Do not trust X-Forwarded-For here:
+  // Railway does not guarantee a stable proxy-hop chain for that header.
+  advanced: {
+    ipAddress: {
+      ipAddressHeaders: ["x-real-ip"],
+    },
+  },
   rateLimit: {
     enabled: true,
     window: 60,
