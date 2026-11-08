@@ -34,7 +34,24 @@ export function AIProviderSettings() {
     }
   }, []);
 
-  useEffect(() => { void loadCredentials(); }, [loadCredentials]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/ai/providers", { signal: controller.signal })
+      .then(async (response) => {
+        const result = await response.json() as { data?: Credential[]; error?: string };
+        if (!response.ok) throw new Error(result.error || "Could not load provider settings.");
+        setCredentials(result.data ?? []);
+      })
+      .catch((caught: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(caught instanceof Error ? caught.message : "Could not load provider settings.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
