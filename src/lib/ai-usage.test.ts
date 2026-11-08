@@ -4,6 +4,7 @@ import {
   getUsagePeriodStart,
   markAIUsageFailed,
   reserveAIUsage,
+  recordBYOKAIUsage,
   settleAIUsage,
 } from "@/lib/ai-usage";
 
@@ -74,6 +75,7 @@ describe("workspace AI usage accounting", () => {
       organizationId: "workspace-1",
       periodStart: new Date("2026-11-01T00:00:00.000Z"),
       reservedTokens: 2_000,
+      billingSource: "platform",
     }, { promptTokens: 600, completionTokens: 400 });
 
     expect(transaction.aiWorkspaceUsage.updateMany).toHaveBeenCalledWith({
@@ -93,9 +95,43 @@ describe("workspace AI usage accounting", () => {
       organizationId: "workspace-1",
       periodStart: new Date("2026-11-01T00:00:00.000Z"),
       reservedTokens: 2_000,
+      billingSource: "platform",
     });
     expect(transaction.aiWorkspaceUsage.updateMany).not.toHaveBeenCalled();
     expect(transaction.aiUsageEvent.update).toHaveBeenCalledWith({ where: { id: "event-1" }, data: { status: "FAILED" } });
+  });
+
+
+  it("records BYOK usage without consuming RunLattice AI credits", async () => {
+    const { database, transaction } = createDatabase();
+    const reservation = await recordBYOKAIUsage(database as never, {
+      organizationId: "workspace-1",
+      userId: "user-1",
+      provider: "openai",
+      model: "test-model",
+    });
+    expect(reservation.billingSource).toBe("byok");
+    expect(transaction.aiUsageEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ billingSource: "byok", reservedTokens: 0 }),
+    }));
+    expect(transaction.aiWorkspaceUsage.upsert).not.toHaveBeenCalled();
+    expect(transaction.aiWorkspaceUsage.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("settles BYOK token telemetry without changing included credit usage", async () => {
+    const { database, transaction } = createDatabase();
+    await settleAIUsage(database as never, {
+      eventId: "event-1",
+      organizationId: "workspace-1",
+      periodStart: new Date("2026-11-01T00:00:00.000Z"),
+      reservedTokens: 0,
+      billingSource: "byok",
+    }, { promptTokens: 100, completionTokens: 50 });
+    expect(transaction.aiWorkspaceUsage.updateMany).not.toHaveBeenCalled();
+    expect(transaction.aiUsageEvent.update).toHaveBeenCalledWith({
+      where: { id: "event-1" },
+      data: { status: "SUCCEEDED", promptTokens: 100, completionTokens: 50 },
+    });
   });
 
   it("estimates a bounded reservation for prompts without provider tokenizers", () => {
