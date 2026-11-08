@@ -45,6 +45,7 @@ One workflow run consumes one execution, including failed runs. A duplicate deli
 - Billing page aligned with the proposed monthly prices and quota table.
 - Stripe subscription mapping supports monthly and annual Price IDs for Pro, Teams and Business.
 - Checkout supports a 14-day trial for paid plans and the Customer Portal for subscription self-service.
+- Webhook processing handles subscription lifecycle events, `invoice.paid`, `invoice.payment_failed`, disputes, refunds and early-fraud warnings. Risk-related events are retained for workspace review.
 
 ## Not yet implemented or verified
 
@@ -74,4 +75,4 @@ Do not configure live Stripe keys or enable `STRIPE_LIVE_MODE_ENABLED` during de
 
 ## Stripe and tax safety
 
-Checkout is hosted by Stripe. Subscription state changes only after a verified webhook. Webhook event IDs are stored for deduplication. Automatic tax remains disabled until the business has configured applicable VAT registrations and tax settings. VAT treatment, invoicing, refund policy, terms and displayed prices need review by an accountant before launch.
+Checkout is hosted by Stripe. Subscription state changes only after a verified webhook. Webhook event IDs are stored for deduplication. Configure the sandbox webhook endpoint for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed`, `customer.subscription.trial_will_end`, `invoice.paid`, `invoice.payment_failed`, `charge.dispute.created`, `charge.refunded` and `radar.early_fraud_warning.created`. Automatic tax remains disabled until the business has configured applicable VAT registrations and tax settings. VAT treatment, invoicing, refund policy, terms and displayed prices need review by an accountant before launch.
