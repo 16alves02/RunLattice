@@ -64,6 +64,7 @@ async function deliver(payload: string) {
 
 describe("Stripe subscription synchronization", () => {
   let organizationId: string | undefined;
+  let unconfiguredPriceEventId: string | undefined;
 
   beforeEach(() => {
     process.env.STRIPE_SECRET_KEY = "sk_test_runlattice_integration_key";
@@ -73,6 +74,10 @@ describe("Stripe subscription synchronization", () => {
   });
 
   afterEach(async () => {
+    if (unconfiguredPriceEventId) {
+      await prisma.stripeEvent.deleteMany({ where: { id: unconfiguredPriceEventId } });
+      unconfiguredPriceEventId = undefined;
+    }
     if (organizationId) {
       await prisma.stripeEvent.deleteMany({ where: { organizationId } });
       await prisma.organization.deleteMany({ where: { id: organizationId } });
@@ -115,4 +120,27 @@ describe("Stripe subscription synchronization", () => {
     expect(subscription).toMatchObject({ plan: "pro", billingInterval: "year", status: "active" });
     expect(subscription?.stripePriceId).toBe("price_test_pro_year");
   });
+
+  it("does not grant a paid plan from metadata when the Stripe Price ID is unconfigured", async () => {
+    organizationId = randomUUID();
+    await prisma.organization.create({
+      data: { id: organizationId, name: "Unconfigured price test", slug: `unconfigured-${organizationId}` },
+    });
+    unconfiguredPriceEventId = `evt_unknown_price_${randomUUID()}`;
+
+    const response = await deliver(subscriptionEvent({
+      eventId: unconfiguredPriceEventId,
+      subscriptionId: `sub_unknown_price_${randomUUID()}`,
+      customerId: `cus_unknown_price_${randomUUID()}`,
+      organizationId,
+      priceId: "price_not_configured",
+      interval: "month",
+    }));
+
+    expect(response.status).toBe(500);
+    expect(await prisma.billingSubscription.findUnique({ where: { organizationId } })).toBeNull();
+    const storedEvent = await prisma.stripeEvent.findUnique({ where: { id: unconfiguredPriceEventId } });
+    expect(storedEvent?.processedAt).toBeNull();
+  });
+
 });
