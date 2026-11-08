@@ -124,7 +124,10 @@ describe("RunLattice PostgreSQL, API and worker integration", () => {
     const npm = process.platform === "win32" ? "npm.cmd" : "npm";
     workerProcess = spawn(npm, ["run", "worker"], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, "--import=./tests/mocks/mock-discord-fetch.mjs"].filter(Boolean).join(" "),
+      },
       stdio: "ignore",
       shell: process.platform === "win32",
     });
@@ -143,6 +146,16 @@ describe("RunLattice PostgreSQL, API and worker integration", () => {
   }
 
   it("executes a valid persisted workflow through the real BullMQ worker", async () => {
+    const webhookUrl = `https://discord.com/api/webhooks/123456789012/${randomBytes(24).toString("hex")}`;
+    await prisma.integrationConnection.create({
+      data: {
+        id: successfulConnectionId,
+        organizationId,
+        provider: "discord",
+        name: "Mock Discord",
+        credentialsCiphertext: encryptSecret(JSON.stringify({ webhookUrl }), `${organizationId}:discord`),
+      },
+    });
     await prisma.workflow.create({
       data: {
         id: successfulWorkflowId,
@@ -151,16 +164,27 @@ describe("RunLattice PostgreSQL, API and worker integration", () => {
         status: "ACTIVE",
         triggerType: "MANUAL",
         definition: {
-          nodes: [{
-            id: "trigger",
-            kind: "trigger",
-            title: "Manual trigger",
-            detail: "Trigger · MANUAL",
-            config: { triggerType: "MANUAL" },
-            x: 0,
-            y: 0,
-          }],
-          edges: [],
+          nodes: [
+            {
+              id: "trigger",
+              kind: "trigger",
+              title: "Manual trigger",
+              detail: "Trigger · MANUAL",
+              config: { triggerType: "MANUAL" },
+              x: 0,
+              y: 0,
+            },
+            {
+              id: "discord-action",
+              kind: "action",
+              title: "Send Discord message",
+              detail: "Discord · Send message",
+              config: { integrationId: "discord", actionId: "send_message", connectionId: successfulConnectionId, message: "Integration test succeeded" },
+              x: 320,
+              y: 0,
+            },
+          ],
+          edges: [{ id: "trigger-to-action", from: "trigger", to: "discord-action" }],
         },
         organizationId,
       },
