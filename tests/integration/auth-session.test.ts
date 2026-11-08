@@ -4,7 +4,7 @@ import { auth } from "../../src/lib/auth";
 import { prisma } from "../../src/lib/prisma";
 
 describe("Better Auth registration and session lifecycle", () => {
-  const email = \`auth-\${randomUUID()}@example.test\`;
+  const email = `auth-${randomUUID()}@example.test`;
   const password = "RunLattice-Test-Password-2026!";
   let userId: string | undefined;
 
@@ -34,7 +34,7 @@ describe("Better Auth registration and session lifecycle", () => {
     }));
     expect(signin.status).toBe(200);
     const setCookie = signin.headers.get("set-cookie") ?? "";
-    const sessionCookie = setCookie.match(/(?:__Secure-)?better-auth\\.session_token=[^;]+/)?.[0];
+    const sessionCookie = setCookie.match(/(?:__Secure-)?better-auth\.session_token=[^;]+/)?.[0];
     expect(sessionCookie).toBeTruthy();
 
     const session = await auth.handler(new Request("http://localhost:3000/api/auth/get-session", {
