@@ -62,17 +62,22 @@ export async function syncStripeSubscription(subscription: Stripe.Subscription, 
   const billingItem = subscription.items.data[0];
   const priceId = billingItem?.price.id;
   if (!priceId) throw new Error("Stripe subscription has no recurring price.");
+  const pricePlan: Record<string, BillingPlan> = {
+    [process.env.STRIPE_PRICE_PRO_MONTHLY ?? ""]: "pro",
+    [process.env.STRIPE_PRICE_PRO_ANNUAL ?? ""]: "pro",
+    [process.env.STRIPE_PRICE_TEAM_MONTHLY ?? ""]: "team",
+    [process.env.STRIPE_PRICE_TEAM_ANNUAL ?? ""]: "team",
+    [process.env.STRIPE_PRICE_BUSINESS_MONTHLY ?? ""]: "business",
+    [process.env.STRIPE_PRICE_BUSINESS_ANNUAL ?? ""]: "business",
+  };
+  const mappedPlan = pricePlan[priceId];
   const metadataPlan = subscription.metadata.plan;
-  const plan: BillingPlan | null = metadataPlan === "pro" || metadataPlan === "team" || metadataPlan === "business"
-    ? metadataPlan
-    : priceId === process.env.STRIPE_PRICE_PRO_MONTHLY
-      ? "pro"
-      : priceId === process.env.STRIPE_PRICE_TEAM_MONTHLY
-        ? "team"
-        : priceId === process.env.STRIPE_PRICE_BUSINESS_MONTHLY
-          ? "business"
-          : null;
-  if (!plan) throw new Error("Stripe subscription uses a price that is not mapped to a RunLattice plan.");
+  const plan: BillingPlan | null = mappedPlan
+    ?? (metadataPlan === "pro" || metadataPlan === "team" || metadataPlan === "business" ? metadataPlan : null);
+  if (!plan || (mappedPlan && metadataPlan && mappedPlan !== metadataPlan)) {
+    throw new Error("Stripe subscription uses a price that is not mapped to its RunLattice plan.");
+  }
+  const billingInterval = billingItem?.price.recurring?.interval === "year" ? "year" : "month";
 
   await prisma.billingSubscription.upsert({
     where: { organizationId },
@@ -81,6 +86,7 @@ export async function syncStripeSubscription(subscription: Stripe.Subscription, 
       stripeSubscriptionId: subscription.id,
       stripeCustomerId: customerId,
       stripePriceId: priceId,
+      billingInterval,
       plan,
       status: subscription.status,
       currentPeriodStart: fromUnixTimestamp(billingItem?.current_period_start),
