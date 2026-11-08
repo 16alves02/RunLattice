@@ -282,6 +282,7 @@ model BillingSubscription {
   stripeSubscriptionId String       @unique
   stripeCustomerId     String
   stripePriceId        String
+  billingInterval      String       @default("month")
   plan                 String
   status               String
   currentPeriodStart   DateTime?
