@@ -8,7 +8,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && node --check scripts/baseline-existing-prisma-migrations.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "worker": "tsx worker/index.ts",
