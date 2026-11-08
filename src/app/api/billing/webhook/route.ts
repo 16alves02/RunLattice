@@ -10,7 +10,29 @@ function customerId(customer: string | Stripe.Customer | Stripe.DeletedCustomer 
   return customer ? (typeof customer === "string" ? customer : customer.id) : null;
 }
 
-async function handleEvent(event: Stripe.Event) {
+function invoiceSubscriptionId(invoice: Stripe.Invoice) {
+  const current = invoice as unknown as {
+    subscription?: string | { id: string } | null;
+    parent?: { subscription_details?: { subscription?: string | { id: string } | null } | null } | null;
+  };
+  const value = current.parent?.subscription_details?.subscription ?? current.subscription;
+  return typeof value === "string" ? value : value?.id ?? null;
+}
+
+async function organizationForCustomer(stripeCustomerId: string | null) {
+  if (!stripeCustomerId) return null;
+  const customer = await prisma.billingCustomer.findUnique({
+    where: { stripeCustomerId },
+    select: { organizationId: true },
+  });
+  return customer?.organizationId ?? null;
+}
+
+async function handleEvent(event: Stripe.Event): Promise<{
+  organizationId?: string | null;
+  objectId?: string | null;
+  actionRequired?: boolean;
+}> {
   switch (event.type) {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded": {
@@ -18,7 +40,7 @@ async function handleEvent(event: Stripe.Event) {
       const organizationId = session.metadata?.organizationId || session.client_reference_id;
       const stripeCustomerId = customerId(session.customer as string | Stripe.Customer | Stripe.DeletedCustomer | null);
       const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
-      if (!organizationId || !stripeCustomerId || !subscriptionId) return;
+      if (!organizationId || !stripeCustomerId || !subscriptionId) return {};
       await prisma.billingCustomer.upsert({
         where: { organizationId },
         create: { organizationId, stripeCustomerId },
@@ -26,26 +48,85 @@ async function handleEvent(event: Stripe.Event) {
       });
       const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
       await syncStripeSubscription(subscription, organizationId);
-      return;
+      return { organizationId, objectId: subscriptionId };
     }
     case "customer.subscription.created":
     case "customer.subscription.updated":
     case "customer.subscription.deleted":
-      await syncStripeSubscription(event.data.object as Stripe.Subscription);
-      return;
+    case "customer.subscription.paused":
+    case "customer.subscription.resumed": {
+      const subscription = event.data.object as Stripe.Subscription;
+      await syncStripeSubscription(subscription);
+      const stripeCustomerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+      return {
+        organizationId: await organizationForCustomer(stripeCustomerId),
+        objectId: subscription.id,
+      };
+    }
+    case "customer.subscription.trial_will_end": {
+      const subscription = event.data.object as Stripe.Subscription;
+      const stripeCustomerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+      return {
+        organizationId: await organizationForCustomer(stripeCustomerId),
+        objectId: subscription.id,
+        actionRequired: true,
+      };
+    }
+    case "invoice.paid": {
+      const invoice = event.data.object as Stripe.Invoice;
+      const subscriptionId = invoiceSubscriptionId(invoice);
+      const stripeCustomerId = customerId(invoice.customer as string | Stripe.Customer | Stripe.DeletedCustomer | null);
+      if (subscriptionId) {
+        const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
+        await syncStripeSubscription(subscription);
+      }
+      return {
+        organizationId: await organizationForCustomer(stripeCustomerId),
+        objectId: invoice.id,
+      };
+    }
     case "invoice.payment_failed": {
       const invoice = event.data.object as Stripe.Invoice;
       const stripeCustomerId = customerId(invoice.customer as string | Stripe.Customer | Stripe.DeletedCustomer | null);
+      const organizationId = await organizationForCustomer(stripeCustomerId);
       if (stripeCustomerId) {
         await prisma.billingSubscription.updateMany({
           where: { stripeCustomerId },
           data: { status: "past_due" },
         });
       }
-      return;
+      return { organizationId, objectId: invoice.id, actionRequired: true };
+    }
+    case "charge.dispute.created": {
+      const charge = event.data.object as Stripe.Charge;
+      const stripeCustomerId = customerId(charge.customer as string | Stripe.Customer | Stripe.DeletedCustomer | null);
+      return {
+        organizationId: await organizationForCustomer(stripeCustomerId),
+        objectId: charge.id,
+        actionRequired: true,
+      };
+    }
+    case "charge.refunded": {
+      const charge = event.data.object as Stripe.Charge;
+      const stripeCustomerId = customerId(charge.customer as string | Stripe.Customer | Stripe.DeletedCustomer | null);
+      return {
+        organizationId: await organizationForCustomer(stripeCustomerId),
+        objectId: charge.id,
+        actionRequired: charge.amount_refunded > 0,
+      };
+    }
+    case "radar.early_fraud_warning.created": {
+      const warning = event.data.object as Stripe.Radar.EarlyFraudWarning;
+      const charge = await getStripe().charges.retrieve(warning.charge as string);
+      const stripeCustomerId = customerId(charge.customer as string | Stripe.Customer | Stripe.DeletedCustomer | null);
+      return {
+        organizationId: await organizationForCustomer(stripeCustomerId),
+        objectId: warning.id,
+        actionRequired: true,
+      };
     }
     default:
-      return;
+      return {};
   }
 }
 
@@ -68,11 +149,19 @@ export async function POST(request: Request) {
 
     await prisma.stripeEvent.upsert({
       where: { id: event.id },
-      create: { id: event.id, type: event.type },
+      create: { id: event.id, type: event.type, objectId: (event.data.object as { id?: string }).id ?? null },
       update: {},
     });
-    await handleEvent(event);
-    await prisma.stripeEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } });
+    const context = await handleEvent(event);
+    await prisma.stripeEvent.update({
+      where: { id: event.id },
+      data: {
+        ...(context.organizationId ? { organizationId: context.organizationId } : {}),
+        ...(context.objectId ? { objectId: context.objectId } : {}),
+        actionRequired: context.actionRequired ?? false,
+        processedAt: new Date(),
+      },
+    });
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("[billing] Stripe event processing failed:", error instanceof Error ? error.message : "Unknown error");
