@@ -8,6 +8,7 @@ import { syncWorkflowSchedule } from "@/lib/schedule";
 import type { WorkflowDefinition } from "@/lib/types";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
+import { getWorkspaceEntitlements } from "@/lib/billing";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
