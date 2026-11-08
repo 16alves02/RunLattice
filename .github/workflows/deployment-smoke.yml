@@ -1,0 +1,59 @@
+name: Published deployment smoke test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: published-smoke-main
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Verify published web, database, Redis and auth endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Wait for Railway deployment and verify health
+        env:
+          APP_URL: https://runlattice-web-production.up.railway.app
+        run: |
+          set -euo pipefail
+          healthy=0
+          for attempt in $(seq 1 30); do
+            response="$(curl --silent --show-error --fail --max-time 10 "$APP_URL/api/health" 2>/dev/null || true)"
+            if RESPONSE="$response" node -e '
+              try {
+                const data = JSON.parse(process.env.RESPONSE || "{}");
+                if (data.status === "ok" && data.checks?.database === "ok" && data.checks?.redis === "ok") process.exit(0);
+              } catch {}
+              process.exit(1);
+            '; then
+              echo "Published web, PostgreSQL and Redis are healthy."
+              healthy=1
+              break
+            fi
+            echo "Health check attempt $attempt/30 not ready yet."
+            sleep 20
+          done
+          if [ "$healthy" -ne 1 ]; then
+            echo "::error::Published app did not become healthy within 10 minutes."
+            exit 1
+          fi
+
+      - name: Verify Better Auth session endpoint
+        env:
+          APP_URL: https://runlattice-web-production.up.railway.app
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --output /tmp/auth-response.json --write-out '%{http_code}' --max-time 15 "$APP_URL/api/auth/get-session")"
+          if [ "$status" != "200" ]; then
+            echo "::error::Better Auth session endpoint returned HTTP $status."
+            cat /tmp/auth-response.json
+            exit 1
+          fi
+          echo "Better Auth session endpoint returned HTTP 200."
