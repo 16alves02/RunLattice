@@ -30,7 +30,7 @@ AI-generated workflows are drafts. They must be reviewed and saved by the user; 
 - Real Discord message delivery from a supported workflow, including safe `{{input.path}}` message templates.
 - Signed inbound webhook triggers using timestamped HMAC-SHA256 signatures and replay-window validation.
 - Cron-based scheduled triggers managed by BullMQ with IANA timezone support and worker-side reconciliation.
-- AI workflow planning with OpenAI and Anthropic adapters, disabled by default and returning reviewable drafts.
+- AI workflow planning with OpenAI, Anthropic and Google Gemini adapters, encrypted workspace BYOK keys, disabled by default and returning reviewable drafts.
 - Stripe-hosted subscription Checkout, Customer Portal and signed webhook processing, with Free/Pro/Team workspace entitlements and server-side workflow/run/AI quotas (sandbox credentials and end-to-end verification still required).
 - Workspace monthly AI request/token budgets and atomic per-user/per-workspace request throttling.
 - Vitest unit tests for workflow validation, execution paths, credential encryption, trigger configuration, webhook signatures and subscription entitlement rules.
@@ -61,7 +61,7 @@ Back up the key securely. Losing it makes existing integration credentials undec
 | Data | PostgreSQL, Prisma ORM |
 | Background jobs | Redis, BullMQ |
 | Authentication | Better Auth |
-| AI planning | Server-side OpenAI and Anthropic adapters |
+| AI planning | Server-side OpenAI, Anthropic and Google Gemini adapters with encrypted workspace BYOK |
 | Tests | Vitest |
 | Local services | Docker Compose |
 
