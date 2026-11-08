@@ -73,11 +73,12 @@ export async function syncStripeSubscription(subscription: Stripe.Subscription, 
   };
   const mappedPlan = pricePlan[priceId];
   const metadataPlan = subscription.metadata.plan;
-  const plan: BillingPlan | null = mappedPlan
-    ?? (metadataPlan === "pro" || metadataPlan === "team" || metadataPlan === "business" ? metadataPlan : null);
-  if (!plan || (mappedPlan && metadataPlan && mappedPlan !== metadataPlan)) {
+  // Never grant paid entitlements from metadata alone. A signed event must
+  // reference an explicitly configured Price ID for this exact RunLattice plan.
+  if (!mappedPlan || (metadataPlan && mappedPlan !== metadataPlan)) {
     throw new Error("Stripe subscription uses a price that is not mapped to its RunLattice plan.");
   }
+  const plan: BillingPlan = mappedPlan;
   const billingInterval = billingItem?.price.recurring?.interval === "year" ? "year" : "month";
 
   await prisma.billingSubscription.upsert({
