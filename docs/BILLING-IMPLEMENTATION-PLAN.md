@@ -7,12 +7,12 @@
 | Plan | Monthly | Annual monthly equivalent | Annual charge |
 | --- | ---: | ---: | ---: |
 | Free | €0 | €0 | €0 |
-| Pro | €12.99 | €10.99 | €131.88 |
-| Teams | €29.99 | €24.99 | €299.88 |
-| Business | €79.99 | €69.99 | €839.88 |
+| Pro | €11.99 | €9.99 | €119.88 |
+| Teams | €34.99 | €27.99 | €335.88 |
+| Business | €99.99 | €84.99 | €1,019.88 |
 | Enterprise | Custom | Custom | Custom |
 
-These are proposed prices, not configured Stripe prices. Annual checkout is not implemented yet. Displayed prices and tax treatment require accounting review before launch.
+These are the selected commercial prices from the RunLattice pricing discussion. Annual amounts are monthly-equivalent prices billed once per year. Stripe sandbox Price objects still need to be created and connected; no live price or charge is configured. The 14-day trial is the default for new paid subscriptions. Displayed prices and tax treatment require accounting review before launch.
 
 ## Plan quotas
 
@@ -43,13 +43,14 @@ One workflow run consumes one execution, including failed runs. A duplicate deli
 - Run-history visibility windows in the API. This hides older history from the application; it does not physically delete old database records.
 - Dashboard usage warnings at 50%, 75% and 90% of the workflow, execution, integration and AI credit limits.
 - Billing page aligned with the proposed monthly prices and quota table.
-- Stripe subscription mapping supports a Business monthly Price ID when configured.
+- Stripe subscription mapping supports monthly and annual Price IDs for Pro, Teams and Business.
+- Checkout supports a 14-day trial for paid plans and the Customer Portal for subscription self-service.
 
 ## Not yet implemented or verified
 
 - Physical deletion/archival of run history after the visible-history window.
 - BYOK (customer-owned AI provider keys) and additional credit packs.
-- Annual Stripe Prices and annual checkout.
+- Annual Stripe sandbox Price objects and end-to-end checkout verification.
 - Stripe sandbox Products/Prices, webhook signing secret and end-to-end checkout tests.
 - Automatic usage notifications by email or push at 50%, 75% and 90%.
 - Billing usage reconciliation and finance dashboard.
@@ -63,6 +64,9 @@ One workflow run consumes one execution, including failed runs. A duplicate deli
 - `STRIPE_PRICE_PRO_MONTHLY`: Pro monthly sandbox Price ID.
 - `STRIPE_PRICE_TEAM_MONTHLY`: Teams monthly sandbox Price ID.
 - `STRIPE_PRICE_BUSINESS_MONTHLY`: Business monthly sandbox Price ID.
+- `STRIPE_PRICE_PRO_ANNUAL`: Pro annual sandbox Price ID.
+- `STRIPE_PRICE_TEAM_ANNUAL`: Teams annual sandbox Price ID.
+- `STRIPE_PRICE_BUSINESS_ANNUAL`: Business annual sandbox Price ID.
 - `STRIPE_AUTOMATIC_TAX_ENABLED`: keep `false` until applicable tax registrations and settings are confirmed.
 - `RESEND_API_KEY` and `EMAIL_FROM`: transactional email verification and password recovery.
 
