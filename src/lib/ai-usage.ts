@@ -12,6 +12,7 @@ export interface AIUsageReservation {
   organizationId: string;
   periodStart: Date;
   reservedTokens: number;
+  billingSource: "platform" | "byok";
 }
 
 const DEFAULT_LIMITS: AIUsageLimits = {
@@ -93,8 +94,39 @@ export async function reserveAIUsage(
       organizationId: input.organizationId,
       periodStart,
       reservedTokens: input.reservedTokens,
+      billingSource: "platform",
     };
   });
+}
+
+export async function recordBYOKAIUsage(
+  database: UsageDatabase,
+  input: {
+    organizationId: string;
+    userId: string;
+    provider: string;
+    model: string;
+    now?: Date;
+  },
+): Promise<AIUsageReservation> {
+  const event = await database.aiUsageEvent.create({
+    data: {
+      organizationId: input.organizationId,
+      userId: input.userId,
+      provider: input.provider,
+      model: input.model,
+      reservedTokens: 0,
+      billingSource: "byok",
+    },
+    select: { id: true },
+  });
+  return {
+    eventId: event.id,
+    organizationId: input.organizationId,
+    periodStart: getUsagePeriodStart(input.now),
+    reservedTokens: 0,
+    billingSource: "byok",
+  };
 }
 
 export async function settleAIUsage(
@@ -104,13 +136,15 @@ export async function settleAIUsage(
 ) {
   const actualTokens = Math.max(0, usage.promptTokens) + Math.max(0, usage.completionTokens);
   await database.$transaction(async (transaction) => {
-    const difference = actualTokens - reservation.reservedTokens;
-    await transaction.aiWorkspaceUsage.updateMany({
-      where: { organizationId: reservation.organizationId, periodStart: reservation.periodStart },
-      data: difference >= 0
-        ? { tokensUsed: { increment: difference } }
-        : { tokensUsed: { decrement: Math.abs(difference) } },
-    });
+    if (reservation.billingSource === "platform") {
+      const difference = actualTokens - reservation.reservedTokens;
+      await transaction.aiWorkspaceUsage.updateMany({
+        where: { organizationId: reservation.organizationId, periodStart: reservation.periodStart },
+        data: difference >= 0
+          ? { tokensUsed: { increment: difference } }
+          : { tokensUsed: { decrement: Math.abs(difference) } },
+      });
+    }
     await transaction.aiUsageEvent.update({
       where: { id: reservation.eventId },
       data: {
