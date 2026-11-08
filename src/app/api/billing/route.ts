@@ -6,7 +6,7 @@ import { getAppOrigin, getStripe } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 const requestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("checkout"), plan: z.enum(["pro", "team"]) }),
+  z.object({ action: z.literal("checkout"), plan: z.enum(["pro", "team", "business"]) }),
   z.object({ action: z.literal("portal") }),
 ]);
 
@@ -39,7 +39,9 @@ export async function POST(request: Request) {
 
     const priceId = parsed.data.plan === "pro"
       ? process.env.STRIPE_PRICE_PRO_MONTHLY
-      : process.env.STRIPE_PRICE_TEAM_MONTHLY;
+      : parsed.data.plan === "team"
+        ? process.env.STRIPE_PRICE_TEAM_MONTHLY
+        : process.env.STRIPE_PRICE_BUSINESS_MONTHLY;
     if (!priceId?.startsWith("price_")) {
       return NextResponse.json({ error: "The selected plan is not configured in Stripe yet." }, { status: 503 });
     }
