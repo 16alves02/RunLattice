@@ -14,6 +14,33 @@ describe("workflow definition validation", () => {
     expect(workflowDefinitionSchema.safeParse(validDefinition).success).toBe(true);
   });
 
+
+  it("accepts typed webhook and scheduled triggers", () => {
+    const webhook = {
+      nodes: [{ ...validDefinition.nodes[0], config: { triggerType: "WEBHOOK" } }],
+      edges: [],
+    };
+    const scheduled = {
+      nodes: [{ ...validDefinition.nodes[0], config: { triggerType: "SCHEDULE", cronExpression: "0 9 * * 1-5", timezone: "Europe/Lisbon" } }],
+      edges: [],
+    };
+    expect(workflowDefinitionSchema.safeParse(webhook).success).toBe(true);
+    expect(workflowDefinitionSchema.safeParse(scheduled).success).toBe(true);
+  });
+
+  it("rejects out-of-range cron fields and invalid timezones", () => {
+    const invalidCron = {
+      nodes: [{ ...validDefinition.nodes[0], config: { triggerType: "SCHEDULE", cronExpression: "0 25 * * *", timezone: "UTC" } }],
+      edges: [],
+    };
+    const invalidTimezone = {
+      nodes: [{ ...validDefinition.nodes[0], config: { triggerType: "SCHEDULE", cronExpression: "0 9 * * *", timezone: "Mars/Olympus" } }],
+      edges: [],
+    };
+    expect(workflowDefinitionSchema.safeParse(invalidCron).success).toBe(false);
+    expect(workflowDefinitionSchema.safeParse(invalidTimezone).success).toBe(false);
+  });
+
   it("rejects connections to missing nodes", () => {
     const invalid = { ...validDefinition, edges: [{ id: "edge-1", from: "trigger", to: "missing" }] };
     expect(workflowDefinitionSchema.safeParse(invalid).success).toBe(false);

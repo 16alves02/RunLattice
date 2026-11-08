@@ -9,8 +9,19 @@ import { resolveExecutionPath, validateExecutableWorkflow } from "../src/lib/exe
 import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
 import type { DiscordActionConfig, WorkflowDefinition } from "../src/lib/types";
+import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 
 const prisma = new PrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl || !/^postgres(?:ql)?:\/\//i.test(databaseUrl)) {
+  throw new Error("DATABASE_URL must be a valid PostgreSQL connection URI.");
+}
+void prisma.$connect().then(() => {
+  console.info("[worker] PostgreSQL connection established.");
+}).catch((error: unknown) => {
+  console.error("[worker] PostgreSQL connection failed:", error instanceof Error ? error.message : "Unknown error");
+  process.exit(1);
+});
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl) throw new Error("REDIS_URL is required to start the worker.");
 
@@ -23,7 +34,6 @@ const connection = {
   maxRetriesPerRequest: null,
   ...(parsedUrl.protocol === "rediss:" ? { tls: {} } : {}),
 };
-
 interface WorkflowJob {
   runId: string;
   workflowId: string;
@@ -119,6 +129,66 @@ async function executeAction(node: WorkflowDefinition["nodes"][number], organiza
 }
 
 const dispatchQueue = new Queue<WorkflowJob>("workflow-runs", { connection });
+
+const scheduleWorker = new Worker<{ workflowId: string }>("workflow-schedules", async (job) => {
+  if (job.name !== "scheduled-trigger" || !job.data.workflowId) return { skipped: true };
+  const workflow = await prisma.workflow.findFirst({
+    where: { id: job.data.workflowId, status: "ACTIVE", triggerType: "SCHEDULE" },
+    select: { id: true, definition: true },
+  });
+  if (!workflow) return { skipped: true, reason: "Scheduled workflow is no longer active." };
+
+  const parsed = workflowDefinitionSchema.safeParse(workflow.definition);
+  if (!parsed.success) {
+    console.error("[scheduler] Skipped a workflow with an invalid saved definition.");
+    return { skipped: true };
+  }
+  const trigger = parsed.data.nodes.find((node) => node.kind === "trigger");
+  if (!trigger?.config || !("triggerType" in trigger.config) || trigger.config.triggerType !== "SCHEDULE") {
+    return { skipped: true, reason: "Workflow no longer has a schedule trigger." };
+  }
+
+  const run = await prisma.workflowRun.create({
+    data: {
+      workflowId: workflow.id,
+      input: { triggerType: "SCHEDULE", scheduledAt: new Date().toISOString() },
+      outboxEvent: { create: {} },
+    },
+    select: { id: true },
+  });
+  console.info(`[scheduler] queued scheduled run ${run.id}`);
+  return { runId: run.id };
+}, { connection, concurrency: 5 });
+
+async function syncActiveSchedules() {
+  const workflows = await prisma.workflow.findMany({
+    where: { status: "ACTIVE", triggerType: "SCHEDULE" },
+    select: { id: true, status: true, triggerType: true, definition: true },
+  });
+  for (const workflow of workflows) {
+    try {
+      await syncWorkflowSchedule({
+        workflowId: workflow.id,
+        status: workflow.status,
+        triggerType: workflow.triggerType,
+        definition: workflow.definition as unknown as WorkflowDefinition,
+      });
+    } catch (error) {
+      console.error("[scheduler] Unable to synchronize a scheduled workflow:", error instanceof Error ? error.message : "Unknown error");
+    }
+  }
+}
+
+void syncActiveSchedules().catch((error: unknown) => {
+  console.error("[scheduler] Initial schedule synchronization failed:", error instanceof Error ? error.message : "Unknown error");
+});
+const scheduleSyncTimer = setInterval(() => {
+  void syncActiveSchedules().catch((error: unknown) => {
+    console.error("[scheduler] Schedule synchronization failed:", error instanceof Error ? error.message : "Unknown error");
+  });
+}, 60_000);
+scheduleSyncTimer.unref();
+
 
 const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<WorkflowJob>) => {
   const { runId, workflowId } = job.data;
@@ -304,6 +374,9 @@ async function shutdown(signal: string) {
   console.info(`[worker] ${signal} received; closing gracefully`);
   clearInterval(recoveryTimer);
   clearInterval(outboxTimer);
+  clearInterval(scheduleSyncTimer);
+  await scheduleWorker.close();
+  await getScheduleQueue().close();
   await worker.close();
   await dispatchQueue.close();
   await prisma.$disconnect();
