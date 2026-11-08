@@ -238,7 +238,7 @@ export async function POST(request: Request) {
         periodStart,
       },
     },
-    select: { requestsUsed: true, tokensUsed: true },
+    select: { requestsUsed: true, creditsUsed: true, tokensUsed: true },
   });
 
   return NextResponse.json({
