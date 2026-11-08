@@ -17,7 +17,7 @@ export interface AIProviderOptions {
 }
 
 export function getAIProviderSelection(options: Pick<AIProviderOptions, "provider" | "model"> = {}) {
-  const provider = options.provider ?? (process.env.AI_PROVIDER === "anthropic" || process.env.AI_PROVIDER === "google" ? process.env.AI_PROVIDER : "openai");
+  const provider: AIProviderId = options.provider ?? (process.env.AI_PROVIDER === "anthropic" ? "anthropic" : process.env.AI_PROVIDER === "google" ? "google" : "openai");
   const model = options.model ?? process.env.AI_MODEL ?? (provider === "openai" ? "gpt-4.1-mini" : "");
   const apiKey = provider === "openai"
     ? process.env.OPENAI_API_KEY ?? process.env.AI_API_KEY
@@ -28,7 +28,7 @@ export function getAIProviderSelection(options: Pick<AIProviderOptions, "provide
 }
 
 function resolveProviderConfig(provider?: AIProviderId, model?: string, suppliedApiKey?: string) {
-  const selectedProvider = provider ?? (process.env.AI_PROVIDER === "anthropic" || process.env.AI_PROVIDER === "google" ? process.env.AI_PROVIDER : "openai");
+  const selectedProvider: AIProviderId = provider ?? (process.env.AI_PROVIDER === "anthropic" ? "anthropic" : process.env.AI_PROVIDER === "google" ? "google" : "openai");
   const selectedModel = model ?? process.env.AI_MODEL ?? (selectedProvider === "openai" ? "gpt-4.1-mini" : "");
   const apiKey = suppliedApiKey ?? (selectedProvider === "openai"
     ? process.env.OPENAI_API_KEY ?? process.env.AI_API_KEY
