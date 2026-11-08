@@ -56,7 +56,7 @@ export default async function BillingPage() {
     </div>
 
     <section className="panel">
-      <div className="panel-heading"><div><div className="panel-title">Utilização atual</div><div className="panel-subtitle">As execuções e os créditos incluídos renovam no primeiro dia de cada mês (UTC). Modelos económicos consomem 1 crédito, modelos standard 3 e modelos avançados 5; BYOK não consome créditos RunLattice.</div></div></div>
+      <div className="panel-heading"><div><div className="panel-title">Utilização atual</div><div className="panel-subtitle">As execuções e os créditos incluídos renovam no primeiro dia de cada mês (UTC). Pesos predefinidos: modelos económicos 1 crédito, standard 3 e avançados 5; BYOK não consome créditos RunLattice.</div></div></div>
       <div className="billing-usage">
         <div><span>Workflows ativos</span><strong>{entitlements.usage.activeWorkflows} / {entitlements.limits.workflows}</strong></div>
         <div><span>Execuções este mês</span><strong>{entitlements.usage.monthlyRuns.toLocaleString("pt-PT")} / {entitlements.limits.monthlyRuns.toLocaleString("pt-PT")}</strong></div>
@@ -71,6 +71,11 @@ export default async function BillingPage() {
         Subscription status: <strong>{entitlements.subscription.status}</strong>
         {entitlements.subscription.cancelAtPeriodEnd ? " · Cancels at the end of the current billing period" : ""}
       </p>}
+    </section>
+
+    <section className="panel">
+      <div className="panel-title">Limites iniciais dos planos</div>
+      <p className="panel-subtitle">Os limites de workflows, execuções, utilizadores e créditos apresentados são valores iniciais de configuração e ainda devem ser calibrados com custos reais, utilização e feedback dos primeiros clientes. Os preços mensais e anuais são a tabela comercial selecionada.</p>
     </section>
 
     <section className="panel">
