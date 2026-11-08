@@ -44,6 +44,29 @@ try {
     execFileSync(process.execPath, [prismaCli, "migrate", "resolve", "--applied", migration], { stdio: "inherit" });
   }
 
+
+  // Prisma creates its own metadata table before applying migrations. Keep it
+  // private too; the dedicated Prisma role bypasses RLS for migrations.
+  await prisma.$executeRaw`ALTER TABLE public."_prisma_migrations" ENABLE ROW LEVEL SECURITY`;
+  const [apiRoles] = await prisma.$queryRaw`
+    SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+       AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') AS present
+  `;
+  if (apiRoles.present) {
+    await prisma.$executeRaw`REVOKE ALL PRIVILEGES ON TABLE public."_prisma_migrations" FROM anon, authenticated`;
+    const [policyState] = await prisma.$queryRaw`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename = '_prisma_migrations'
+          AND policyname = 'deny_supabase_data_api_roles'
+      ) AS present
+    `;
+    if (!policyState.present) {
+      await prisma.$executeRaw`CREATE POLICY deny_supabase_data_api_roles ON public."_prisma_migrations" FOR ALL TO anon, authenticated USING (false) WITH CHECK (false)`;
+    }
+  }
+
   const [billingState] = await prisma.$queryRaw`
     SELECT count(*)::int AS count
     FROM pg_tables
