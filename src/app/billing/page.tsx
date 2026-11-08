@@ -14,10 +14,15 @@ export const metadata: Metadata = {
 export default async function BillingPage() {
   const workspace = await requireServerWorkspace();
   const entitlements = await getWorkspaceEntitlements(workspace.organizationId);
-  const customer = await prisma.billingCustomer.findUnique({
-    where: { organizationId: workspace.organizationId },
-    select: { id: true },
-  });
+  const [customer, openBillingAlerts] = await Promise.all([
+    prisma.billingCustomer.findUnique({
+      where: { organizationId: workspace.organizationId },
+      select: { id: true },
+    }),
+    prisma.stripeEvent.count({
+      where: { organizationId: workspace.organizationId, actionRequired: true },
+    }),
+  ]);
   const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
   const checkoutAvailability = {
     pro: { month: stripeConfigured && Boolean(process.env.STRIPE_PRICE_PRO_MONTHLY), year: stripeConfigured && Boolean(process.env.STRIPE_PRICE_PRO_ANNUAL) },
@@ -91,6 +96,11 @@ export default async function BillingPage() {
         <p className="panel-subtitle">Limites, suporte e condições ajustados ao volume e às necessidades da organização.</p>
       </section>
     </div>
+
+    {openBillingAlerts > 0 && <section className="panel" role="status">
+      <div className="panel-title">Revisão de faturação necessária</div>
+      <p className="panel-subtitle">{openBillingAlerts} evento(s) de pagamento, reembolso ou risco requerem revisão. Consulte o Stripe Dashboard para investigar e resolver estes eventos.</p>
+    </section>}
 
     <section className="panel">
       <div className="panel-title">Gestão da subscrição</div>
