@@ -54,7 +54,7 @@ export function getAIModelCreditCost(model: string) {
   }
   const normalized = model.toLowerCase();
   if (/(mini|nano|haiku|flash)/.test(normalized)) return 1;
-  if (/(opus|\\bo[1-9]|reasoner|\\bpro\\b)/.test(normalized)) return 5;
+  if (/(opus|\bo[1-9]|reasoner|\bpro\b)/.test(normalized)) return 5;
   return 3;
 }
 
