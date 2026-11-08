@@ -18,15 +18,12 @@ export default async function BillingPage() {
     where: { organizationId: workspace.organizationId },
     select: { id: true },
   });
-  const checkoutReady = Boolean(
-    process.env.STRIPE_SECRET_KEY
-    && process.env.STRIPE_PRICE_PRO_MONTHLY
-    && process.env.STRIPE_PRICE_TEAM_MONTHLY,
-  );
-  const businessReady = Boolean(
-    process.env.STRIPE_SECRET_KEY
-    && process.env.STRIPE_PRICE_BUSINESS_MONTHLY,
-  );
+  const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
+  const checkoutAvailability = {
+    pro: { month: stripeConfigured && Boolean(process.env.STRIPE_PRICE_PRO_MONTHLY), year: stripeConfigured && Boolean(process.env.STRIPE_PRICE_PRO_ANNUAL) },
+    team: { month: stripeConfigured && Boolean(process.env.STRIPE_PRICE_TEAM_MONTHLY), year: stripeConfigured && Boolean(process.env.STRIPE_PRICE_TEAM_ANNUAL) },
+    business: { month: stripeConfigured && Boolean(process.env.STRIPE_PRICE_BUSINESS_MONTHLY), year: stripeConfigured && Boolean(process.env.STRIPE_PRICE_BUSINESS_ANNUAL) },
+  };
 
   const usageMeters = [
     { label: "Workflows ativos", used: entitlements.usage.activeWorkflows, limit: entitlements.limits.workflows },
@@ -42,9 +39,9 @@ export default async function BillingPage() {
 
   const plans = [
     { key: "free", name: "Free", price: "€0", description: "Para experimentar e automatizar tarefas simples.", limits: ["3 workflows ativos", "100 execuções/mês", "1 utilizador", "1 integração", "10 créditos de IA/mês", "Histórico visível: 7 dias"] },
-    { key: "pro", name: "Pro", price: "€12,99", description: "Para utilização individual regular.", limits: ["20 workflows ativos", "1.000 execuções/mês", "1 utilizador", "5 integrações", "100 créditos de IA/mês", "Histórico visível: 30 dias"] },
-    { key: "team", name: "Teams", price: "€29,99", description: "Para pequenas equipas que trabalham em conjunto.", limits: ["100 workflows ativos", "5.000 execuções/mês", "5 utilizadores", "15 integrações", "400 créditos de IA/mês", "Histórico visível: 90 dias"] },
-    { key: "business", name: "Business", price: "€79,99", description: "Para operações com maior volume.", limits: ["500 workflows ativos", "20.000 execuções/mês", "15 utilizadores", "50 integrações", "1.200 créditos de IA/mês", "Histórico visível: 180 dias"] },
+    { key: "pro", name: "Pro", price: "€11,99", annual: "€9,99/mês · €119,88/ano", description: "Para utilização individual regular.", limits: ["20 workflows ativos", "1.000 execuções/mês", "1 utilizador", "5 integrações", "100 créditos de IA/mês", "Histórico visível: 30 dias"] },
+    { key: "team", name: "Teams", price: "€34,99", annual: "€27,99/mês · €335,88/ano", description: "Para pequenas equipas que trabalham em conjunto.", limits: ["100 workflows ativos", "5.000 execuções/mês", "5 utilizadores", "15 integrações", "400 créditos de IA/mês", "Histórico visível: 90 dias"] },
+    { key: "business", name: "Business", price: "€99,99", annual: "€84,99/mês · €1.019,88/ano", description: "Para operações com maior volume.", limits: ["500 workflows ativos", "20.000 execuções/mês", "15 utilizadores", "50 integrações", "1.200 créditos de IA/mês", "Histórico visível: 180 dias"] },
   ];
 
   return <AppShell active="Billing"><div className="page">
@@ -82,6 +79,8 @@ export default async function BillingPage() {
       {plans.map((plan) => <section className="panel" key={plan.key}>
         <div className="panel-title">{plan.name}</div>
         <div className="billing-price">{plan.price} <span>/ mês</span></div>
+        {plan.key !== "free" && <p className="panel-subtitle">Anual: {plan.annual}</p>}
+        {plan.key !== "free" && <p className="panel-subtitle">Inclui período experimental de 14 dias.</p>}
         <p className="panel-subtitle">{plan.description}</p>
         <ul>{plan.limits.map((limit) => <li key={limit}>{limit}</li>)}</ul>
         {entitlements.plan === plan.key && <span className="tag">Plano atual</span>}
@@ -96,7 +95,7 @@ export default async function BillingPage() {
     <section className="panel">
       <div className="panel-title">Gestão da subscrição</div>
       <p className="panel-subtitle">Checkout e alterações de subscrição são processados pelo Stripe. O acesso só muda após confirmação de um webhook validado. Os preços apresentados são propostas comerciais; o checkout só aparece quando os respetivos preços de teste estiverem configurados.</p>
-      <BillingActions checkoutReady={checkoutReady} businessReady={businessReady} portalReady={Boolean(customer)} />
+      <BillingActions availability={checkoutAvailability} portalReady={Boolean(customer)} />
     </section>
   </div></AppShell>;
 }
