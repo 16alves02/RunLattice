@@ -8,7 +8,6 @@ BEGIN
     SELECT schemaname, tablename
     FROM pg_tables
     WHERE schemaname = 'public'
-      AND tablename <> '_prisma_migrations'
   LOOP
     EXECUTE format('ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY', item.schemaname, item.tablename);
   END LOOP;
@@ -28,7 +27,6 @@ BEGIN
       SELECT schemaname, tablename
       FROM pg_tables
       WHERE schemaname = 'public'
-      AND tablename <> '_prisma_migrations'
     LOOP
       IF NOT EXISTS (
         SELECT 1 FROM pg_policies
