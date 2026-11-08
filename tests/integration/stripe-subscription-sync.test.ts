@@ -74,6 +74,7 @@ describe("Stripe subscription synchronization", () => {
 
   afterEach(async () => {
     if (organizationId) {
+      await prisma.stripeEvent.deleteMany({ where: { organizationId } });
       await prisma.organization.deleteMany({ where: { id: organizationId } });
       organizationId = undefined;
     }
