@@ -1,14 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRequestWorkspace } from "@/lib/workspace";
+import { getWorkspaceEntitlements } from "@/lib/billing";
 
 export async function GET(request: Request) {
   const access = await getRequestWorkspace(request);
   if (access.response) return access.response;
 
   try {
+    const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
+    const historyStart = new Date(Date.now() - entitlements.limits.historyDays * 24 * 60 * 60 * 1000);
     const runs = await prisma.workflowRun.findMany({
-      where: { workflow: { organizationId: access.context.organizationId } },
+      where: {
+        workflow: { organizationId: access.context.organizationId },
+        createdAt: { gte: historyStart },
+      },
       orderBy: { createdAt: "desc" },
       take: 8,
       include: { workflow: { select: { name: true } } },

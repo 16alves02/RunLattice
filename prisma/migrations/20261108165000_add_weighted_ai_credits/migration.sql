@@ -1,0 +1,5 @@
+ALTER TABLE "AiWorkspaceUsage"
+  ADD COLUMN "creditsUsed" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "AiUsageEvent"
+  ADD COLUMN "creditCost" INTEGER NOT NULL DEFAULT 1;

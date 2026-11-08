@@ -2,19 +2,22 @@
   "name": "runlattice",
   "version": "0.1.0",
   "private": true,
-  "description": "A workflow automation platform built as a full-stack portfolio project.",
+  "description": "A workspace-based workflow automation platform with visual editing, durable execution and extensible integrations.",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && node --check scripts/baseline-existing-prisma-migrations.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "worker": "tsx worker/index.ts",
     "worker:watch": "tsx watch worker/index.ts",
     "db:generate": "prisma generate",
-    "db:deploy": "prisma migrate deploy"
+    "db:deploy": "prisma migrate deploy",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "db:baseline": "node scripts/baseline-existing-prisma-migrations.mjs",
+    "worker:start": "npm run db:baseline && npm run db:deploy && npm run worker"
   },
   "dependencies": {
     "@prisma/client": "^6.7.0",
@@ -22,21 +25,30 @@
     "bullmq": "^5.50.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
-    "next": "^15.3.0",
+    "next": "^16.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zod": "^3.24.2"
+    "stripe": "^23.1.0",
+    "zod": "^4.6.7",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "eslint": "^9.22.0",
-    "eslint-config-next": "^15.3.0",
+    "eslint-config-next": "^16.4.5",
     "prisma": "^6.7.0",
     "typescript": "^5.8.2",
     "tsx": "^4.19.3",
-    "vitest": "^3.0.8",
+    "vitest": "^5.1.0",
     "@eslint/eslintrc": "^3.3.1"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0",
+    "minimatch": "^11.0.1",
+    "@eslint/eslintrc": {
+      "minimatch": "^3.1.4"
+    }
   }
 }

@@ -1,0 +1,94 @@
+import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { decryptSecret } from "@/lib/secrets";
+import { verifyWebhookSignature } from "@/lib/webhook-signature";
+import { workflowRunInputSchema } from "@/lib/validation";
+import { createQuotaBoundWorkflowRun } from "@/lib/run-quota";
+
+export const runtime = "nodejs";
+type RouteContext = { params: Promise<{ workflowId: string }> };
+
+export async function POST(request: Request, context: RouteContext) {
+  const { workflowId } = await context.params;
+  let rawBody: string;
+  try {
+    rawBody = await request.text();
+  } catch {
+    return NextResponse.json({ error: "Request body could not be read." }, { status: 400 });
+  }
+  if (Buffer.byteLength(rawBody, "utf8") > 32_768) {
+    return NextResponse.json({ error: "Webhook payload must be 32 KB or smaller." }, { status: 413 });
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "Webhook payload must be valid JSON." }, { status: 400 });
+  }
+  const parsed = workflowRunInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Webhook payload must be a JSON object of 32 KB or smaller." }, { status: 400 });
+  }
+
+  try {
+    const workflow = await prisma.workflow.findFirst({
+      where: { id: workflowId, status: "ACTIVE", triggerType: "WEBHOOK" },
+      select: { id: true, organizationId: true, webhookSecretCiphertext: true },
+    });
+    if (!workflow?.organizationId || !workflow.webhookSecretCiphertext) {
+      return NextResponse.json({ error: "Webhook endpoint is unavailable." }, { status: 404 });
+    }
+
+    let secret: string;
+    try {
+      secret = decryptSecret(
+        workflow.webhookSecretCiphertext,
+        `${workflow.organizationId}:workflow-webhook:${workflow.id}`,
+      );
+    } catch {
+      return NextResponse.json({ error: "Webhook endpoint is not configured." }, { status: 503 });
+    }
+
+    const deliveryId = request.headers.get("x-runlattice-delivery-id");
+    if (!deliveryId) return NextResponse.json({ error: "A unique x-runlattice-delivery-id header is required." }, { status: 400 });
+
+    const valid = verifyWebhookSignature({
+      secret,
+      timestamp: request.headers.get("x-runlattice-timestamp"),
+      deliveryId,
+      signature: request.headers.get("x-runlattice-signature"),
+      rawBody,
+    });
+    if (!valid) return NextResponse.json({ error: "Invalid or expired webhook signature." }, { status: 401 });
+
+    const quota = await createQuotaBoundWorkflowRun({
+      organizationId: workflow.organizationId,
+      create: async (transaction) => {
+        await transaction.webhookDelivery.create({ data: { workflowId: workflow.id, deliveryId } });
+        return transaction.workflowRun.create({
+          data: {
+            workflowId: workflow.id,
+            input: parsed.data as Prisma.InputJsonValue,
+            outboxEvent: { create: {} },
+          },
+          select: { id: true, status: true, createdAt: true },
+        });
+      },
+    });
+    if (!quota.allowed) {
+      return NextResponse.json({
+        error: "This workspace has reached its monthly run limit.",
+        usage: { used: quota.used, limit: quota.limit },
+      }, { status: 402 });
+    }
+    return NextResponse.json({ data: quota.data }, { status: 202 });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+      return NextResponse.json({ error: "This webhook delivery has already been processed." }, { status: 409 });
+    }
+    console.error("Unable to accept signed workflow webhook:", error instanceof Error ? error.message : "Unknown error");
+    return NextResponse.json({ error: "The webhook could not be queued." }, { status: 503 });
+  }
+}

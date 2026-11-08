@@ -4,13 +4,26 @@ import { PrismaClient, type Prisma } from "@prisma/client";
 import { decryptSecret } from "../src/lib/secrets";
 import { recoverStaleWorkflowRuns } from "../src/lib/run-recovery";
 import { dispatchPendingWorkflowRuns } from "../src/lib/outbox";
+import { createQuotaBoundWorkflowRun } from "../src/lib/run-quota";
+import { PLAN_LIMITS, resolveEntitledPlan } from "../src/lib/billing-core";
 import { renderInputTemplate } from "../src/lib/template";
 import { resolveExecutionPath, validateExecutableWorkflow } from "../src/lib/execution";
 import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
 import type { DiscordActionConfig, WorkflowDefinition } from "../src/lib/types";
+import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 
 const prisma = new PrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl || !/^postgres(?:ql)?:\/\//i.test(databaseUrl)) {
+  throw new Error("DATABASE_URL must be a valid PostgreSQL connection URI.");
+}
+void prisma.$connect().then(() => {
+  console.info("[worker] PostgreSQL connection established.");
+}).catch((error: unknown) => {
+  console.error("[worker] PostgreSQL connection failed:", error instanceof Error ? error.message : "Unknown error");
+  process.exit(1);
+});
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl) throw new Error("REDIS_URL is required to start the worker.");
 
@@ -23,7 +36,6 @@ const connection = {
   maxRetriesPerRequest: null,
   ...(parsedUrl.protocol === "rediss:" ? { tls: {} } : {}),
 };
-
 interface WorkflowJob {
   runId: string;
   workflowId: string;
@@ -120,6 +132,74 @@ async function executeAction(node: WorkflowDefinition["nodes"][number], organiza
 
 const dispatchQueue = new Queue<WorkflowJob>("workflow-runs", { connection });
 
+const scheduleWorker = new Worker<{ workflowId: string }>("workflow-schedules", async (job) => {
+  if (job.name !== "scheduled-trigger" || !job.data.workflowId) return { skipped: true };
+  const workflow = await prisma.workflow.findFirst({
+    where: { id: job.data.workflowId, status: "ACTIVE", triggerType: "SCHEDULE" },
+    select: { id: true, organizationId: true, definition: true },
+  });
+  if (!workflow) return { skipped: true, reason: "Scheduled workflow is no longer active." };
+
+  const parsed = workflowDefinitionSchema.safeParse(workflow.definition);
+  if (!parsed.success) {
+    console.error("[scheduler] Skipped a workflow with an invalid saved definition.");
+    return { skipped: true };
+  }
+  const trigger = parsed.data.nodes.find((node) => node.kind === "trigger");
+  if (!trigger?.config || !("triggerType" in trigger.config) || trigger.config.triggerType !== "SCHEDULE") {
+    return { skipped: true, reason: "Workflow no longer has a schedule trigger." };
+  }
+
+  if (!workflow.organizationId) return { skipped: true, reason: "Scheduled workflow has no workspace." };
+  const quota = await createQuotaBoundWorkflowRun({
+    organizationId: workflow.organizationId,
+    create: (transaction) => transaction.workflowRun.create({
+      data: {
+        workflowId: workflow.id,
+        input: { triggerType: "SCHEDULE", scheduledAt: new Date().toISOString() },
+        outboxEvent: { create: {} },
+      },
+      select: { id: true },
+    }),
+  });
+  if (!quota.allowed) {
+    console.warn(`[scheduler] skipped scheduled run for workspace at monthly quota (${quota.used}/${quota.limit})`);
+    return { skipped: true, reason: "Workspace monthly run quota reached." };
+  }
+  console.info(`[scheduler] queued scheduled run ${quota.data.id}`);
+  return { runId: quota.data.id };
+}, { connection, concurrency: 5 });
+
+async function syncActiveSchedules() {
+  const workflows = await prisma.workflow.findMany({
+    where: { status: "ACTIVE", triggerType: "SCHEDULE" },
+    select: { id: true, status: true, triggerType: true, definition: true },
+  });
+  for (const workflow of workflows) {
+    try {
+      await syncWorkflowSchedule({
+        workflowId: workflow.id,
+        status: workflow.status,
+        triggerType: workflow.triggerType,
+        definition: workflow.definition as unknown as WorkflowDefinition,
+      });
+    } catch (error) {
+      console.error("[scheduler] Unable to synchronize a scheduled workflow:", error instanceof Error ? error.message : "Unknown error");
+    }
+  }
+}
+
+void syncActiveSchedules().catch((error: unknown) => {
+  console.error("[scheduler] Initial schedule synchronization failed:", error instanceof Error ? error.message : "Unknown error");
+});
+const scheduleSyncTimer = setInterval(() => {
+  void syncActiveSchedules().catch((error: unknown) => {
+    console.error("[scheduler] Schedule synchronization failed:", error instanceof Error ? error.message : "Unknown error");
+  });
+}, 60_000);
+scheduleSyncTimer.unref();
+
+
 const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<WorkflowJob>) => {
   const { runId, workflowId } = job.data;
   const run = await prisma.workflowRun.findUnique({ where: { id: runId } });
@@ -128,13 +208,64 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
     return { skipped: true };
   }
 
-  // A fresh lease token fences every later write from this worker attempt.
-  const leaseToken = randomUUID();
-  const claimed = await prisma.workflowRun.updateMany({
-    where: { id: runId, workflowId, status: "QUEUED" },
-    data: { status: "RUNNING", startedAt: new Date(), heartbeatAt: new Date(), leaseToken, error: null },
+  const admissionWorkflow = await prisma.workflow.findUnique({
+    where: { id: workflowId },
+    select: { status: true, organizationId: true },
   });
-  if (claimed.count === 0) return { skipped: true, reason: "Run was already claimed or completed." };
+  if (!admissionWorkflow || admissionWorkflow.status !== "ACTIVE" || !admissionWorkflow.organizationId) {
+    await prisma.workflowRun.updateMany({
+      where: { id: runId, workflowId, status: "QUEUED" },
+      data: { status: "CANCELLED", finishedAt: new Date(), error: "Workflow is unavailable, inactive or not assigned to a workspace." },
+    });
+    return { skipped: true, reason: "Workflow is unavailable, inactive or not assigned to a workspace." };
+  }
+
+  // Admission and the RUNNING transition share a workspace lock, so workers
+  // cannot race past the plan's concurrency ceiling.
+  const leaseToken = randomUUID();
+  const admission = await prisma.$transaction(async (transaction) => {
+    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${admissionWorkflow.organizationId!}, 0))::text AS lock_value`;
+    const subscription = await transaction.billingSubscription.findUnique({
+      where: { organizationId: admissionWorkflow.organizationId! },
+      select: { plan: true, status: true, currentPeriodEnd: true },
+    });
+    const plan = resolveEntitledPlan(subscription);
+    const limit = PLAN_LIMITS[plan].concurrentRuns;
+    const running = await transaction.workflowRun.count({
+      where: { status: "RUNNING", workflow: { organizationId: admissionWorkflow.organizationId! } },
+    });
+    if (running >= limit) return { claimed: false, capacityReached: true as const };
+
+    const result = await transaction.workflowRun.updateMany({
+      where: { id: runId, workflowId, status: "QUEUED" },
+      data: { status: "RUNNING", startedAt: new Date(), heartbeatAt: new Date(), leaseToken, error: null },
+    });
+    return { claimed: result.count === 1, capacityReached: false as const };
+  });
+
+  if (!admission.claimed && admission.capacityReached) {
+    try {
+      await dispatchQueue.add(
+        "execute-workflow",
+        { runId, workflowId },
+        {
+          jobId: `${runId}-capacity-${Math.floor(Date.now() / 5_000)}`,
+          delay: 5_000,
+          attempts: 1,
+          removeOnComplete: 500,
+          removeOnFail: 1_000,
+        },
+      );
+      return { deferred: true, reason: "Workspace concurrency limit reached; run deferred." };
+    } catch (error) {
+      await prisma.workflowRun.updateMany({
+        where: { id: runId, workflowId, status: "QUEUED" },
+        data: { status: "FAILED", finishedAt: new Date(), error: "The run could not be deferred while the workspace concurrency limit was reached." },
+      });
+      throw error;
+    }
+  }
+  if (!admission.claimed) return { skipped: true, reason: "Run was already claimed or completed." };
 
   const heartbeatTimer = setInterval(() => {
     void prisma.workflowRun.updateMany({
@@ -264,7 +395,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
   } finally {
     clearInterval(heartbeatTimer);
   }
-}, { connection, concurrency: 5 });
+}, { connection, concurrency: 10 });
 
 worker.on("completed", (job) => console.info(`[worker] run ${job.id} processed`));
 worker.on("failed", (job, error) => console.error(`[worker] queue job ${job?.id ?? "unknown"} failed: ${error.message}`));
@@ -304,6 +435,9 @@ async function shutdown(signal: string) {
   console.info(`[worker] ${signal} received; closing gracefully`);
   clearInterval(recoveryTimer);
   clearInterval(outboxTimer);
+  clearInterval(scheduleSyncTimer);
+  await scheduleWorker.close();
+  await getScheduleQueue().close();
   await worker.close();
   await dispatchQueue.close();
   await prisma.$disconnect();

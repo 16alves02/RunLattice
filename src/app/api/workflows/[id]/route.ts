@@ -3,8 +3,12 @@ import { WorkflowStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { workflowDefinitionSchema } from "@/lib/validation";
 import { validateExecutableWorkflow } from "@/lib/execution";
+import { inferTriggerType, getTriggerConfig } from "@/lib/trigger-type";
+import { syncWorkflowSchedule } from "@/lib/schedule";
 import type { WorkflowDefinition } from "@/lib/types";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
+import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
+import { getWorkspaceEntitlements } from "@/lib/billing";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -14,12 +18,21 @@ export async function GET(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   try {
+    const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
+    const historyStart = new Date(Date.now() - entitlements.limits.historyDays * 24 * 60 * 60 * 1000);
     const workflow = await prisma.workflow.findFirst({
       where: { id, organizationId: access.context.organizationId },
-      include: { runs: { orderBy: { createdAt: "desc" }, take: 20 } },
+      include: {
+        runs: {
+          where: { createdAt: { gte: historyStart } },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        },
+      },
     });
     if (!workflow) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
-    return NextResponse.json({ data: workflow });
+    const safeWorkflow = { ...workflow, webhookSecretCiphertext: undefined };
+    return NextResponse.json({ data: safeWorkflow });
   } catch (error) {
     console.error("Unable to retrieve workflow:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "The workflow service is unavailable." }, { status: 503 });
@@ -66,6 +79,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Invalid workflow definition.", issues: definition.error.issues }, { status: 400 });
     }
     data.definition = definition.data as Prisma.InputJsonValue;
+    data.triggerType = inferTriggerType(definition.data as WorkflowDefinition);
   }
   if (!Object.keys(data).length) {
     return NextResponse.json({ error: "No supported fields were provided." }, { status: 400 });
@@ -74,16 +88,29 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const existing = await prisma.workflow.findFirst({
       where: { id, organizationId: access.context.organizationId },
-      select: { status: true, definition: true },
+      select: { status: true, definition: true, triggerType: true, webhookSecretCiphertext: true },
     });
     if (!existing) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
 
     const nextStatus = typeof input.status === "string" ? input.status : existing.status;
+    const candidateDefinition = "definition" in input ? input.definition : existing.definition;
+    const parsedForTrigger = workflowDefinitionSchema.safeParse(candidateDefinition);
+    const nextTriggerType = "definition" in input && parsedForTrigger.success
+      ? inferTriggerType(parsedForTrigger.data as WorkflowDefinition)
+      : existing.triggerType;
+    if (nextTriggerType !== "WEBHOOK" && existing.triggerType === "WEBHOOK") data.webhookSecretCiphertext = null;
     if (nextStatus === "ACTIVE") {
       const candidateDefinition = "definition" in input ? input.definition : existing.definition;
       const parsedDefinition = workflowDefinitionSchema.safeParse(candidateDefinition);
       if (!parsedDefinition.success) {
         return NextResponse.json({ error: "The workflow definition is invalid.", issues: parsedDefinition.error.issues }, { status: 400 });
+      }
+      const triggerConfig = getTriggerConfig(parsedDefinition.data as WorkflowDefinition);
+      if (triggerConfig.triggerType === "WEBHOOK" && !existing.webhookSecretCiphertext) {
+        return NextResponse.json({ error: "Generate a webhook signing secret before activating this workflow." }, { status: 409 });
+      }
+      if (triggerConfig.triggerType === "SCHEDULE" && !triggerConfig.cronExpression) {
+        return NextResponse.json({ error: "A valid cron expression is required before activating this schedule." }, { status: 400 });
       }
       let executablePath: WorkflowDefinition["nodes"];
       try {
@@ -115,16 +142,57 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
-    const result = await prisma.workflow.updateMany({
-      where: { id, organizationId: access.context.organizationId },
-      data,
+    const updateResult = await prisma.$transaction(async (transaction) => {
+      if (nextStatus === "ACTIVE" && existing.status !== "ACTIVE") {
+        await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${access.context.organizationId}, 0))::text AS lock_value`;
+        const subscription = await transaction.billingSubscription.findUnique({
+          where: { organizationId: access.context.organizationId },
+          select: { plan: true, status: true, currentPeriodEnd: true },
+        });
+        const plan = resolveEntitledPlan(subscription);
+        const limit = PLAN_LIMITS[plan].workflows;
+        const used = await transaction.workflow.count({
+          where: { organizationId: access.context.organizationId, status: "ACTIVE" },
+        });
+        if (used >= limit) return { quotaExceeded: true as const, used, limit };
+      }
+      const result = await transaction.workflow.updateMany({
+        where: { id, organizationId: access.context.organizationId },
+        data,
+      });
+      return { quotaExceeded: false as const, result };
     });
-    if (result.count === 0) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
+    if (updateResult.quotaExceeded) {
+      return NextResponse.json({
+        error: "Your workspace has reached its active workflow limit. Upgrade your plan to activate more.",
+        usage: { used: updateResult.used, limit: updateResult.limit },
+      }, { status: 402 });
+    }
+    if (updateResult.result.count === 0) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
 
     const workflow = await prisma.workflow.findFirst({
       where: { id, organizationId: access.context.organizationId },
     });
-    return NextResponse.json({ data: workflow });
+    if (!workflow) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
+    try {
+      await syncWorkflowSchedule({
+        workflowId: workflow.id,
+        status: workflow.status,
+        triggerType: workflow.triggerType,
+        definition: workflow.definition as unknown as WorkflowDefinition,
+      });
+    } catch (scheduleError) {
+      if (workflow.status === "ACTIVE" && workflow.triggerType === "SCHEDULE") {
+        await prisma.workflow.updateMany({
+          where: { id, organizationId: access.context.organizationId },
+          data: { status: "PAUSED" },
+        });
+        return NextResponse.json({ error: "The schedule service is unavailable. The workflow was paused to prevent an unscheduled activation." }, { status: 503 });
+      }
+      console.error("Unable to synchronize workflow schedule:", scheduleError instanceof Error ? scheduleError.message : "Unknown error");
+    }
+    const safeWorkflow = { ...workflow, webhookSecretCiphertext: undefined };
+    return NextResponse.json({ data: safeWorkflow });
   } catch (error) {
     console.error("Unable to update workflow:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "The workflow could not be updated." }, { status: 503 });
@@ -140,6 +208,7 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   try {
+    await syncWorkflowSchedule({ workflowId: id, status: "DRAFT", triggerType: "MANUAL", definition: { nodes: [], edges: [] } });
     const result = await prisma.workflow.deleteMany({
       where: { id, organizationId: access.context.organizationId },
     });

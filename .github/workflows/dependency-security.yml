@@ -1,0 +1,54 @@
+name: Dependency security
+
+on:
+  push:
+    branches: [main, "feature/**", "fix/**", "release/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dependency-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit-and-safe-fixes:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+      - name: Install current dependency graph
+        run: npm install --no-audit --no-fund
+      - name: Apply non-breaking security fixes only
+        run: npm audit fix --no-fund || true
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Enforce no high or critical advisories
+        run: npm audit --audit-level=high
+      - name: Commit safe dependency and lockfile updates
+        run: |
+          git add package.json package-lock.json
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "security: apply compatible dependency fixes and lock versions"
+            git reset --hard HEAD
+            git clean -fd
+            git fetch origin "$GITHUB_REF_NAME"
+            git rebase "origin/$GITHUB_REF_NAME"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          else
+            echo "No dependency or lockfile changes required."
+          fi
