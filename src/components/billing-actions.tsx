@@ -2,11 +2,21 @@
 
 import { useState } from "react";
 
-export function BillingActions({ checkoutReady, portalReady }: { checkoutReady: boolean; portalReady: boolean }) {
-  const [busy, setBusy] = useState<"pro" | "team" | "portal" | null>(null);
+type CheckoutPlan = "pro" | "team" | "business";
+
+export function BillingActions({
+  checkoutReady,
+  businessReady,
+  portalReady,
+}: {
+  checkoutReady: boolean;
+  businessReady: boolean;
+  portalReady: boolean;
+}) {
+  const [busy, setBusy] = useState<CheckoutPlan | "portal" | null>(null);
   const [error, setError] = useState("");
 
-  async function redirectTo(action: "checkout" | "portal", plan?: "pro" | "team") {
+  async function redirectTo(action: "checkout" | "portal", plan?: CheckoutPlan) {
     setError("");
     setBusy(plan ?? "portal");
     try {
@@ -30,9 +40,12 @@ export function BillingActions({ checkoutReady, portalReady }: { checkoutReady: 
         {busy === "pro" ? "Opening checkout…" : "Choose Pro"}
       </button>
       <button className="btn" disabled={busy !== null} onClick={() => void redirectTo("checkout", "team")}>
-        {busy === "team" ? "Opening checkout…" : "Choose Team"}
+        {busy === "team" ? "Opening checkout…" : "Choose Teams"}
       </button>
     </> : <p className="panel-subtitle">Stripe sandbox setup is pending. Checkout is not enabled yet.</p>}
+    {businessReady && <button className="btn" disabled={busy !== null} onClick={() => void redirectTo("checkout", "business")}>
+      {busy === "business" ? "Opening checkout…" : "Choose Business"}
+    </button>}
     {portalReady && <button className="btn" disabled={busy !== null} onClick={() => void redirectTo("portal")}>
       {busy === "portal" ? "Opening portal…" : "Manage subscription"}
     </button>}
