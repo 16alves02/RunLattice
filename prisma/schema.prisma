@@ -110,6 +110,7 @@ model Organization {
   aiUsageEvents      AiUsageEvent[]
   billingCustomer    BillingCustomer?
   billingSubscription BillingSubscription?
+  stripeEvents        StripeEvent[]
 }
 
 model Member {
@@ -298,10 +299,15 @@ model BillingSubscription {
 }
 
 model StripeEvent {
-  id          String    @id
-  type        String
-  createdAt   DateTime  @default(now())
-  processedAt DateTime?
+  id             String        @id
+  type           String
+  organizationId String?
+  objectId       String?
+  actionRequired Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  processedAt    DateTime?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@index([type, createdAt])
+  @@index([organizationId, actionRequired, createdAt])
 }
