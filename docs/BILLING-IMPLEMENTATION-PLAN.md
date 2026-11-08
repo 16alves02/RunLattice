@@ -1,6 +1,6 @@
 # RunLattice — Plans, quotas and Stripe Billing
 
-**Status:** Plan entitlements and server-side quota enforcement are being implemented on `feature/plan-quotas-enforcement`. Stripe Checkout and webhook code exists, but sandbox end-to-end verification is still pending. No live billing is enabled by this work.
+**Status:** Plan entitlements, server-side quota enforcement, Stripe Checkout and webhook handling are consolidated in `main`. CI validates the billing lifecycle and signed subscription events. Production schema rollout and Stripe Sandbox end-to-end verification remain launch gates. No live billing is enabled.
 
 ## Proposed customer-facing pricing
 
@@ -29,7 +29,7 @@ Monthly execution and AI counters reset at 00:00 UTC on the first day of each ca
 | Visible run history | 7 days | 30 days | 90 days | 180 days |
 | Concurrent executions | 1 | 2 | 5 | 10 |
 
-One workflow run consumes one execution, including failed runs. A duplicate delivery is rejected by the existing webhook idempotency constraint. Technical retries of the same run do not create a second billable run. Each AI workflow-plan request consumes one credit; token usage is separately capped to prevent oversized requests.
+One workflow run consumes one execution, including failed runs. A duplicate delivery is rejected by the existing webhook idempotency constraint. Technical retries of the same run do not create a second billable run. Each AI workflow-plan request consumes model-weighted AI credits; token usage is separately capped to prevent oversized requests. The selected hybrid model includes monthly RunLattice-funded credits and optional BYOK credentials, so customers can pay their AI provider directly.
 
 ## Implemented in this branch
 
@@ -53,7 +53,6 @@ One workflow run consumes one execution, including failed runs. A duplicate deli
 - Physical deletion/archival of run history after the visible-history window.
 - Additional prepaid AI credit packs, with Stripe one-time checkout and usage reconciliation still pending. Pack sizes and prices have not been approved and are deliberately not exposed in checkout.
 - Annual Stripe sandbox Price objects and end-to-end checkout verification.
-- Stripe sandbox Products/Prices, webhook signing secret and end-to-end checkout tests.
 - Automatic usage notifications by email or push at 50%, 75% and 90%.
 - Billing usage reconciliation and finance dashboard.
 - Full race-condition and load tests across multiple worker instances.
