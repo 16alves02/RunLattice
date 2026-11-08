@@ -22,7 +22,6 @@ export function AIProviderSettings() {
   const [error, setError] = useState("");
 
   const loadCredentials = useCallback(async () => {
-    setLoading(true);
     try {
       const response = await fetch("/api/ai/providers");
       const result = await response.json() as { data?: Credential[]; error?: string };
