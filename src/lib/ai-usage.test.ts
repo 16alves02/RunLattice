@@ -63,7 +63,7 @@ describe("workspace AI usage accounting", () => {
       provider: "openai",
       model: "test-model",
       reservedTokens: 2_000,
-      limits: { monthlyRequests: 10, monthlyTokens: 10_000 },
+      limits: { monthlyRequests: 10, monthlyCredits: 20, monthlyTokens: 10_000 },
     });
 
     expect(result).toBeNull();
