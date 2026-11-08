@@ -232,6 +232,7 @@ model AiWorkspaceUsage {
   organizationId String
   periodStart    DateTime
   requestsUsed   Int          @default(0)
+  creditsUsed    Int          @default(0)
   tokensUsed     Int          @default(0)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -249,6 +250,7 @@ model AiUsageEvent {
   model            String
   status           String       @default("RESERVED")
   billingSource    String       @default("platform")
+  creditCost       Int          @default(1)
   reservedTokens   Int
   promptTokens     Int          @default(0)
   completionTokens Int          @default(0)
