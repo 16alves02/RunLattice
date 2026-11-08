@@ -98,11 +98,12 @@ async function handleEvent(event: Stripe.Event): Promise<{
       return { organizationId, objectId: invoice.id, actionRequired: true };
     }
     case "charge.dispute.created": {
-      const charge = event.data.object as Stripe.Charge;
+      const dispute = event.data.object as Stripe.Dispute;
+      const charge = await getStripe().charges.retrieve(dispute.charge as string);
       const stripeCustomerId = customerId(charge.customer as string | Stripe.Customer | Stripe.DeletedCustomer | null);
       return {
         organizationId: await organizationForCustomer(stripeCustomerId),
-        objectId: charge.id,
+        objectId: dispute.id,
         actionRequired: true,
       };
     }
