@@ -14,10 +14,10 @@ RunLattice is a workflow-automation service. Depending on features used, it proc
 - Account: name, email, authentication records, session identifiers and preferences.
 - Workspace: names, memberships, roles and invitations.
 - Automation: workflow definitions, triggers, execution inputs/outputs, statuses, timestamps and error information.
-- Integrations: provider identifiers and credentials/tokens supplied by workspace administrators. Credentials are encrypted before storage and accessed server-side.
+- Integrations and AI BYOK: provider identifiers, API credentials/tokens and model preferences supplied by workspace administrators. Credentials are encrypted before storage and accessed server-side.
 - Security/diagnostics: rate-limit records, request metadata, IP address/user-agent where collected, security events and operational logs.
 - Billing: Stripe customer/subscription identifiers, plan and billing status. Full card details are handled by Stripe and are not intended to be stored by RunLattice.
-- AI: only if enabled, prompts and workflow context required to generate a proposal may be sent to the configured AI provider. Do not submit secrets or sensitive personal data.
+- AI: only if enabled, prompts and workflow context required to generate a proposal may be sent to the configured AI provider. Where BYOK is enabled, the workspace's selected provider receives those prompts using the workspace-owned key; the key is encrypted at rest by RunLattice and is not displayed again. Do not submit secrets or sensitive personal data in prompts.
 
 Confirm exact fields, log contents and retention against the deployed application before publication.
 
