@@ -29,10 +29,10 @@ export default async function BillingPage() {
   );
 
   const plans = [
-    { key: "free", name: "Free", price: "€0", description: "Para experimentar e automatizar tarefas simples.", limits: ["3 workflows ativos", "100 execuções/mês", "1 utilizador", "1 integração", "10 créditos de IA/mês", "Histórico de 7 dias"] },
-    { key: "pro", name: "Pro", price: "€12,99", description: "Para utilização individual regular.", limits: ["20 workflows ativos", "1.000 execuções/mês", "1 utilizador", "5 integrações", "100 créditos de IA/mês", "Histórico de 30 dias"] },
-    { key: "team", name: "Teams", price: "€29,99", description: "Para pequenas equipas que trabalham em conjunto.", limits: ["100 workflows ativos", "5.000 execuções/mês", "5 utilizadores", "15 integrações", "400 créditos de IA/mês", "Histórico de 90 dias"] },
-    { key: "business", name: "Business", price: "€79,99", description: "Para operações com maior volume.", limits: ["500 workflows ativos", "20.000 execuções/mês", "15 utilizadores", "50 integrações", "1.200 créditos de IA/mês", "Histórico de 180 dias"] },
+    { key: "free", name: "Free", price: "€0", description: "Para experimentar e automatizar tarefas simples.", limits: ["3 workflows ativos", "100 execuções/mês", "1 utilizador", "1 integração", "10 créditos de IA/mês", "Histórico visível: 7 dias"] },
+    { key: "pro", name: "Pro", price: "€12,99", description: "Para utilização individual regular.", limits: ["20 workflows ativos", "1.000 execuções/mês", "1 utilizador", "5 integrações", "100 créditos de IA/mês", "Histórico visível: 30 dias"] },
+    { key: "team", name: "Teams", price: "€29,99", description: "Para pequenas equipas que trabalham em conjunto.", limits: ["100 workflows ativos", "5.000 execuções/mês", "5 utilizadores", "15 integrações", "400 créditos de IA/mês", "Histórico visível: 90 dias"] },
+    { key: "business", name: "Business", price: "€79,99", description: "Para operações com maior volume.", limits: ["500 workflows ativos", "20.000 execuções/mês", "15 utilizadores", "50 integrações", "1.200 créditos de IA/mês", "Histórico visível: 180 dias"] },
   ];
 
   return <AppShell active="Billing"><div className="page">
@@ -51,7 +51,7 @@ export default async function BillingPage() {
         <div><span>Créditos IA utilizados</span><strong>{entitlements.usage.aiRequests.toLocaleString("pt-PT")} / {entitlements.limits.aiRequests.toLocaleString("pt-PT")}</strong></div>
         <div><span>Tokens IA utilizados</span><strong>{entitlements.usage.aiTokens.toLocaleString("pt-PT")} / {entitlements.limits.aiTokens.toLocaleString("pt-PT")}</strong></div>
       </div>
-      <p className="panel-subtitle" style={{ marginTop: 16 }}>Concorrência máxima: {entitlements.limits.concurrentRuns} execução(ões). Retenção do histórico: {entitlements.limits.historyDays} dias.</p>
+      <p className="panel-subtitle" style={{ marginTop: 16 }}>Concorrência máxima: {entitlements.limits.concurrentRuns} execução(ões). Histórico visível: últimos {entitlements.limits.historyDays} dias.</p>
       {entitlements.subscription && <p className="panel-subtitle" style={{ marginTop: 8 }}>
         Subscription status: <strong>{entitlements.subscription.status}</strong>
         {entitlements.subscription.cancelAtPeriodEnd ? " · Cancels at the end of the current billing period" : ""}
