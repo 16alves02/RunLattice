@@ -41,6 +41,7 @@ One workflow run consumes one execution, including failed runs. A duplicate deli
 - Better Auth organization membership limit, resolved from the workspace's current subscription.
 - AI request and token reservations before provider calls, with plan-specific ceilings and provider-reported usage settlement.
 - Run-history visibility windows in the API. This hides older history from the application; it does not physically delete old database records.
+- Dashboard usage warnings at 50%, 75% and 90% of the workflow, execution, integration and AI credit limits.
 - Billing page aligned with the proposed monthly prices and quota table.
 - Stripe subscription mapping supports a Business monthly Price ID when configured.
 
@@ -50,7 +51,7 @@ One workflow run consumes one execution, including failed runs. A duplicate deli
 - BYOK (customer-owned AI provider keys) and additional credit packs.
 - Annual Stripe Prices and annual checkout.
 - Stripe sandbox Products/Prices, webhook signing secret and end-to-end checkout tests.
-- Automated usage alerts at 50%, 75% and 90%.
+- Automatic usage notifications by email or push at 50%, 75% and 90%.
 - Billing usage reconciliation and finance dashboard.
 - Full race-condition and load tests across multiple worker instances.
 - Enterprise contract and custom limit administration.
