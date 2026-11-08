@@ -12,6 +12,7 @@ const organizationId = `integration-org-${randomBytes(8).toString("hex")}`;
 const webhookWorkflowId = `integration-webhook-${randomBytes(8).toString("hex")}`;
 const workerWorkflowId = `integration-worker-${randomBytes(8).toString("hex")}`;
 const successfulWorkflowId = `integration-success-${randomBytes(8).toString("hex")}`;
+const successfulConnectionId = `integration-connection-${randomBytes(8).toString("hex")}`;
 let workerProcess: ChildProcess | undefined;
 
 describe("RunLattice PostgreSQL, API and worker integration", () => {
