@@ -7,7 +7,7 @@ import { inferTriggerType, getTriggerConfig } from "@/lib/trigger-type";
 import { syncWorkflowSchedule } from "@/lib/schedule";
 import type { WorkflowDefinition } from "@/lib/types";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
-import { getWorkspaceEntitlements } from "@/lib/billing";
+import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -91,15 +91,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       : existing.triggerType;
     if (nextTriggerType !== "WEBHOOK" && existing.triggerType === "WEBHOOK") data.webhookSecretCiphertext = null;
     if (nextStatus === "ACTIVE") {
-      if (existing.status !== "ACTIVE") {
-        const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
-        if (!entitlements.canActivateWorkflow) {
-          return NextResponse.json({
-            error: "Your workspace has reached its active workflow limit. Upgrade your plan to activate more.",
-            usage: { used: entitlements.usage.activeWorkflows, limit: entitlements.limits.workflows },
-          }, { status: 402 });
-        }
-      }
       const candidateDefinition = "definition" in input ? input.definition : existing.definition;
       const parsedDefinition = workflowDefinitionSchema.safeParse(candidateDefinition);
       if (!parsedDefinition.success) {
@@ -142,11 +133,33 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
-    const result = await prisma.workflow.updateMany({
-      where: { id, organizationId: access.context.organizationId },
-      data,
+    const updateResult = await prisma.$transaction(async (transaction) => {
+      if (nextStatus === "ACTIVE" && existing.status !== "ACTIVE") {
+        await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${access.context.organizationId}, 0))`;
+        const subscription = await transaction.billingSubscription.findUnique({
+          where: { organizationId: access.context.organizationId },
+          select: { plan: true, status: true, currentPeriodEnd: true },
+        });
+        const plan = resolveEntitledPlan(subscription);
+        const limit = PLAN_LIMITS[plan].workflows;
+        const used = await transaction.workflow.count({
+          where: { organizationId: access.context.organizationId, status: "ACTIVE" },
+        });
+        if (used >= limit) return { quotaExceeded: true as const, used, limit };
+      }
+      const result = await transaction.workflow.updateMany({
+        where: { id, organizationId: access.context.organizationId },
+        data,
+      });
+      return { quotaExceeded: false as const, result };
     });
-    if (result.count === 0) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
+    if (updateResult.quotaExceeded) {
+      return NextResponse.json({
+        error: "Your workspace has reached its active workflow limit. Upgrade your plan to activate more.",
+        usage: { used: updateResult.used, limit: updateResult.limit },
+      }, { status: 402 });
+    }
+    if (updateResult.result.count === 0) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
 
     const workflow = await prisma.workflow.findFirst({
       where: { id, organizationId: access.context.organizationId },
