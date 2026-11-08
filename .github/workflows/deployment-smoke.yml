@@ -29,11 +29,11 @@ jobs:
             if RESPONSE="$response" node -e '
               try {
                 const data = JSON.parse(process.env.RESPONSE || "{}");
-                if (data.status === "ok" && data.checks?.database === "ok" && data.checks?.redis === "ok") process.exit(0);
+                if (data.status === "ok" && data.checks?.database === "ok" && data.checks?.redis === "ok" && data.checks?.worker === "ok") process.exit(0);
               } catch {}
               process.exit(1);
             '; then
-              echo "Published web, PostgreSQL and Redis are healthy."
+              echo "Published web, PostgreSQL, Redis and workflow worker are healthy."
               healthy=1
               break
             fi
