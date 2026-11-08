@@ -224,7 +224,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
   // cannot race past the plan's concurrency ceiling.
   const leaseToken = randomUUID();
   const admission = await prisma.$transaction(async (transaction) => {
-    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${admissionWorkflow.organizationId!}, 0))`;
+    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${admissionWorkflow.organizationId!}, 0))::text AS lock_value`;
     const subscription = await transaction.billingSubscription.findUnique({
       where: { organizationId: admissionWorkflow.organizationId! },
       select: { plan: true, status: true, currentPeriodEnd: true },
