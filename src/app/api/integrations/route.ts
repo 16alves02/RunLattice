@@ -4,7 +4,7 @@ import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { encryptSecret } from "@/lib/secrets";
 import { createIntegrationConnectionSchema } from "@/lib/validation";
 import { integrationCatalog } from "@/lib/integrations";
-import { getWorkspaceEntitlements } from "@/lib/billing";
+import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
 
 export async function GET(request: Request) {
   const access = await getRequestWorkspace(request);
@@ -46,25 +46,38 @@ export async function POST(request: Request) {
   }
 
   try {
-    const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
-    if (!entitlements.canConnectIntegration) {
-      return NextResponse.json({
-        error: "Your workspace has reached its integration connection limit. Upgrade your plan to connect more services.",
-        usage: { used: entitlements.usage.integrations, limit: entitlements.limits.integrations },
-      }, { status: 402 });
-    }
+    const result = await prisma.$transaction(async (transaction) => {
+      await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${access.context.organizationId}, 0))`;
+      const subscription = await transaction.billingSubscription.findUnique({
+        where: { organizationId: access.context.organizationId },
+        select: { plan: true, status: true, currentPeriodEnd: true },
+      });
+      const plan = resolveEntitledPlan(subscription);
+      const limit = PLAN_LIMITS[plan].integrations;
+      const used = await transaction.integrationConnection.count({
+        where: { organizationId: access.context.organizationId },
+      });
+      if (used >= limit) return { allowed: false as const, used, limit };
 
-    const connection = await prisma.integrationConnection.create({
-      data: {
-        organizationId: access.context.organizationId,
-        provider: parsed.data.provider,
-        name: parsed.data.name,
-        credentialsCiphertext: encryptSecret(JSON.stringify({ webhookUrl: parsed.data.webhookUrl }), `${access.context.organizationId}:${parsed.data.provider}`),
-      },
-      select: { id: true, provider: true, name: true, createdAt: true },
+      const connection = await transaction.integrationConnection.create({
+        data: {
+          organizationId: access.context.organizationId,
+          provider: parsed.data.provider,
+          name: parsed.data.name,
+          credentialsCiphertext: encryptSecret(JSON.stringify({ webhookUrl: parsed.data.webhookUrl }), `${access.context.organizationId}:${parsed.data.provider}`),
+        },
+        select: { id: true, provider: true, name: true, createdAt: true },
+      });
+      return { allowed: true as const, connection };
     });
 
-    return NextResponse.json({ data: connection }, { status: 201 });
+    if (!result.allowed) {
+      return NextResponse.json({
+        error: "Your workspace has reached its integration connection limit. Upgrade your plan to connect more services.",
+        usage: { used: result.used, limit: result.limit },
+      }, { status: 402 });
+    }
+    return NextResponse.json({ data: result.connection }, { status: 201 });
   } catch {
     console.error("Unable to save integration connection.");
     return NextResponse.json({ error: "The integration connection could not be saved. Check the encryption key configuration." }, { status: 503 });
