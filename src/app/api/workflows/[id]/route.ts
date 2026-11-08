@@ -7,6 +7,7 @@ import { inferTriggerType, getTriggerConfig } from "@/lib/trigger-type";
 import { syncWorkflowSchedule } from "@/lib/schedule";
 import type { WorkflowDefinition } from "@/lib/types";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
+import { getWorkspaceEntitlements } from "@/lib/billing";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -90,6 +91,15 @@ export async function PATCH(request: Request, context: RouteContext) {
       : existing.triggerType;
     if (nextTriggerType !== "WEBHOOK" && existing.triggerType === "WEBHOOK") data.webhookSecretCiphertext = null;
     if (nextStatus === "ACTIVE") {
+      if (existing.status !== "ACTIVE") {
+        const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
+        if (!entitlements.canActivateWorkflow) {
+          return NextResponse.json({
+            error: "Your workspace has reached its active workflow limit. Upgrade your plan to activate more.",
+            usage: { used: entitlements.usage.activeWorkflows, limit: entitlements.limits.workflows },
+          }, { status: 402 });
+        }
+      }
       const candidateDefinition = "definition" in input ? input.definition : existing.definition;
       const parsedDefinition = workflowDefinitionSchema.safeParse(candidateDefinition);
       if (!parsedDefinition.success) {
