@@ -28,6 +28,18 @@ export default async function BillingPage() {
     && process.env.STRIPE_PRICE_BUSINESS_MONTHLY,
   );
 
+  const usageMeters = [
+    { label: "Workflows ativos", used: entitlements.usage.activeWorkflows, limit: entitlements.limits.workflows },
+    { label: "Execuções", used: entitlements.usage.monthlyRuns, limit: entitlements.limits.monthlyRuns },
+    { label: "Integrações", used: entitlements.usage.integrations, limit: entitlements.limits.integrations },
+    { label: "Créditos de IA", used: entitlements.usage.aiRequests, limit: entitlements.limits.aiRequests },
+  ];
+  const usageAlerts = usageMeters.flatMap((meter) => {
+    const percentage = meter.limit > 0 ? Math.floor((meter.used / meter.limit) * 100) : 0;
+    const threshold = percentage >= 90 ? 90 : percentage >= 75 ? 75 : percentage >= 50 ? 50 : null;
+    return threshold ? [{ ...meter, percentage, threshold }] : [];
+  });
+
   const plans = [
     { key: "free", name: "Free", price: "€0", description: "Para experimentar e automatizar tarefas simples.", limits: ["3 workflows ativos", "100 execuções/mês", "1 utilizador", "1 integração", "10 créditos de IA/mês", "Histórico visível: 7 dias"] },
     { key: "pro", name: "Pro", price: "€12,99", description: "Para utilização individual regular.", limits: ["20 workflows ativos", "1.000 execuções/mês", "1 utilizador", "5 integrações", "100 créditos de IA/mês", "Histórico visível: 30 dias"] },
@@ -56,6 +68,14 @@ export default async function BillingPage() {
         Subscription status: <strong>{entitlements.subscription.status}</strong>
         {entitlements.subscription.cancelAtPeriodEnd ? " · Cancels at the end of the current billing period" : ""}
       </p>}
+    </section>
+
+    <section className="panel">
+      <div className="panel-title">Alertas de utilização</div>
+      {usageAlerts.length > 0
+        ? <ul>{usageAlerts.map((alert) => <li key={alert.label}>{alert.label}: {alert.percentage}% utilizado. Atingiu o patamar de alerta de {alert.threshold}% ({alert.used.toLocaleString("pt-PT")} / {alert.limit.toLocaleString("pt-PT")}).</li>)}</ul>
+        : <p className="panel-subtitle">Nenhum limite atingiu os 50% de utilização.</p>}
+      <p className="panel-subtitle">Estes alertas aparecem nesta página. Notificações automáticas por email ainda não estão implementadas.</p>
     </section>
 
     <div className="billing-plan-grid">
