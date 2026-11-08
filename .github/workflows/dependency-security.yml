@@ -44,8 +44,11 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "security: apply compatible dependency fixes and lock versions"
-            git pull --rebase origin "$GITHUB_REF_NAME"
-            git push
+            git reset --hard HEAD
+            git clean -fd
+            git fetch origin "$GITHUB_REF_NAME"
+            git rebase "origin/$GITHUB_REF_NAME"
+            git push origin "HEAD:$GITHUB_REF_NAME"
           else
             echo "No dependency or lockfile changes required."
           fi
