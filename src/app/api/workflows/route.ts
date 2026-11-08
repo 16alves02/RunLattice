@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { createWorkflowSchema } from "@/lib/validation";
 import { inferTriggerType } from "@/lib/trigger-type";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
-import { getWorkspaceEntitlements } from "@/lib/billing";
 
 export async function GET(request: Request) {
   const access = await getRequestWorkspace(request);
@@ -41,11 +40,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    const entitlements = await getWorkspaceEntitlements(access.context.organizationId);
-    if (!entitlements.canCreateWorkflow) {
-      return NextResponse.json({ error: "Your workspace has reached its workflow limit. Upgrade your plan to create more." }, { status: 402 });
-    }
-
     const workflow = await prisma.workflow.create({
       data: {
         userId: access.context.userId,
