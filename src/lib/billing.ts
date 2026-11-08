@@ -6,24 +6,42 @@ function fromUnixTimestamp(value: number | null | undefined) {
   return typeof value === "number" ? new Date(value * 1000) : null;
 }
 
+export function getBillingPeriodStart(now = new Date()) {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
 export async function getWorkspaceEntitlements(organizationId: string, now = new Date()) {
-  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const [subscription, workflows, monthlyRuns, members] = await Promise.all([
+  const periodStart = getBillingPeriodStart(now);
+  const [subscription, activeWorkflows, monthlyRuns, members, integrations, aiUsage] = await Promise.all([
     prisma.billingSubscription.findUnique({ where: { organizationId } }),
-    prisma.workflow.count({ where: { organizationId } }),
+    prisma.workflow.count({ where: { organizationId, status: "ACTIVE" } }),
     prisma.workflowRun.count({ where: { workflow: { organizationId }, createdAt: { gte: periodStart } } }),
     prisma.member.count({ where: { organizationId } }),
+    prisma.integrationConnection.count({ where: { organizationId } }),
+    prisma.aiWorkspaceUsage.findUnique({
+      where: { organizationId_periodStart: { organizationId, periodStart } },
+      select: { requestsUsed: true, tokensUsed: true },
+    }),
   ]);
   const plan = resolveEntitledPlan(subscription, now);
   const limits = PLAN_LIMITS[plan];
+  const usage = {
+    activeWorkflows,
+    monthlyRuns,
+    members,
+    integrations,
+    aiRequests: aiUsage?.requestsUsed ?? 0,
+    aiTokens: aiUsage?.tokensUsed ?? 0,
+  };
   return {
     plan,
     limits,
-    usage: { workflows, monthlyRuns, members },
+    usage,
     subscription,
-    canCreateWorkflow: workflows < limits.workflows,
+    canActivateWorkflow: activeWorkflows < limits.workflows,
     canRunWorkflow: monthlyRuns < limits.monthlyRuns,
     canInviteMember: members < limits.members,
+    canConnectIntegration: integrations < limits.integrations,
   };
 }
 
@@ -45,13 +63,15 @@ export async function syncStripeSubscription(subscription: Stripe.Subscription, 
   const priceId = billingItem?.price.id;
   if (!priceId) throw new Error("Stripe subscription has no recurring price.");
   const metadataPlan = subscription.metadata.plan;
-  const plan: BillingPlan | null = metadataPlan === "pro" || metadataPlan === "team"
+  const plan: BillingPlan | null = metadataPlan === "pro" || metadataPlan === "team" || metadataPlan === "business"
     ? metadataPlan
     : priceId === process.env.STRIPE_PRICE_PRO_MONTHLY
       ? "pro"
       : priceId === process.env.STRIPE_PRICE_TEAM_MONTHLY
         ? "team"
-        : null;
+        : priceId === process.env.STRIPE_PRICE_BUSINESS_MONTHLY
+          ? "business"
+          : null;
   if (!plan) throw new Error("Stripe subscription uses a price that is not mapped to a RunLattice plan.");
 
   await prisma.billingSubscription.upsert({
