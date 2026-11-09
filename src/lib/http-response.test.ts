@@ -25,7 +25,7 @@ describe("HTTP JSON response mapping", () => {
   });
 
   it("does not persist mapped response values in workflow run history", () => {
-    expect(toPersistableHttpActionResult({ httpStatus: 201, responseValue: "sensitive-token" } as { httpStatus: number }))
+    expect(toPersistableHttpActionResult({ httpStatus: 201, responseValue: "sensitive-token" }))
       .toEqual({ httpStatus: 201 });
   });
 
