@@ -148,11 +148,23 @@ async function executeHttpAction(config: HttpActionConfig, organizationId: strin
   if (!credentials || typeof credentials !== "object" || !("apiKey" in credentials)
     || typeof credentials.apiKey !== "string" || !credentials.apiKey
     || !("apiKeyHeader" in credentials)
-    || (credentials.apiKeyHeader !== "authorization" && credentials.apiKeyHeader !== "x-api-key")) {
+    || (credentials.apiKeyHeader !== "authorization" && credentials.apiKeyHeader !== "x-api-key")
+    || !("baseUrl" in credentials) || typeof credentials.baseUrl !== "string") {
     throw new Error("The stored HTTP API credentials are invalid.");
   }
 
   const url = renderInputTemplate(config.url, input, 2_000);
+  let allowedHost: string;
+  let requestedHost: string;
+  try {
+    allowedHost = new URL(credentials.baseUrl).hostname.toLowerCase();
+    requestedHost = new URL(url).hostname.toLowerCase();
+  } catch {
+    throw new Error("The HTTP action destination URL is invalid.");
+  }
+  if (allowedHost !== requestedHost) {
+    throw new Error("The HTTP action destination must use the host configured for this API connection.");
+  }
   const body = config.body ? renderInputTemplate(config.body, input, 65_536, true) : "";
   if (body) {
     try { JSON.parse(body); }
