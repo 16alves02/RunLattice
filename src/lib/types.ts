@@ -14,6 +14,7 @@ export interface HttpActionConfig {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   url: string;
   body?: string;
+  responsePath?: string;
 }
 
 export type ConditionOperator = "equals" | "not_equals" | "contains" | "greater_than" | "less_than" | "exists";
