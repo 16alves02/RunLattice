@@ -297,7 +297,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
             <textarea id="http-body" className="field-input" rows={5} maxLength={65536}
               value={selectedHttpActionConfig.body ?? ""} onChange={(event) => updateSelectedHttpActionConfig({ body: event.target.value })}
               placeholder={'{"event": {{input.event.name}}}'} />
-            <div className="editor-help">HTTPS only. Private/local destinations, redirects, oversized payloads and requests taking over 10 seconds are blocked. Use JSON values with placeholders unquoted, for example: {\"name\": {{input.customer.name}}}. Requests are restricted to the configured API origin and base path.</div>
+            <div className="editor-help">HTTPS only. Private/local destinations, redirects, oversized payloads and requests taking over 10 seconds are blocked. Use JSON values with placeholders unquoted; insert dynamic values as JSON values, not inside quotation marks. Requests are restricted to the configured API origin and base path.</div>
             {connections.filter((connection) => connection.provider === "http").length === 0 && <Link href="/integrations" className="editor-help">Create an HTTP API key connection in Integrations first.</Link>}
           </> : <>
             <label className="field-label" htmlFor="action-connection">Discord connection</label>
