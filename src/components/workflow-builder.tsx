@@ -297,7 +297,11 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
             <textarea id="http-body" className="field-input" rows={5} maxLength={65536}
               value={selectedHttpActionConfig.body ?? ""} onChange={(event) => updateSelectedHttpActionConfig({ body: event.target.value })}
               placeholder={'{"event": {{input.event.name}}}'} />
-            <div className="editor-help">HTTPS only. Private/local destinations, redirects, oversized payloads and requests taking over 10 seconds are blocked. Use JSON values with placeholders unquoted; insert dynamic values as JSON values, not inside quotation marks. Requests are restricted to the configured API origin and base path.</div>
+            <label className="field-label" htmlFor="http-response-path">Response JSON path (optional)</label>
+            <input id="http-response-path" className="field-input" type="text" maxLength={200}
+              value={selectedHttpActionConfig.responsePath ?? ""} onChange={(event) => updateSelectedHttpActionConfig({ responsePath: event.target.value })}
+              placeholder="data.id" />
+            <div className="editor-help">When configured, only the selected scalar value (string, number, boolean or null) is made available to later steps. Complex objects and full response bodies are never forwarded. HTTPS only. Private/local destinations, redirects, oversized payloads and requests taking over 10 seconds are blocked. Use JSON values with placeholders unquoted; insert dynamic values as JSON values, not inside quotation marks. Requests are restricted to the configured API origin and base path.</div>
             {connections.filter((connection) => connection.provider === "http").length === 0 && <Link href="/integrations" className="editor-help">Create an HTTP API key connection in Integrations first.</Link>}
           </> : <>
             <label className="field-label" htmlFor="action-connection">Discord connection</label>
