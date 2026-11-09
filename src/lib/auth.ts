@@ -24,12 +24,10 @@ export const auth = betterAuth({
     autoSignIn: !production,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
-      void sendTransactionalEmail({
+      await sendTransactionalEmail({
         to: user.email,
         subject: "Reset your RunLattice password",
         text: `Use this secure link to reset your password: ${url}\n\nIf you did not request this, ignore this email.`,
-      }).catch((error: unknown) => {
-        console.error("[auth] Password reset email could not be sent:", error instanceof Error ? error.message : "Unknown error");
       });
     },
   },
@@ -39,12 +37,10 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60 * 24,
     sendVerificationEmail: async ({ user, url }) => {
-      void sendTransactionalEmail({
+      await sendTransactionalEmail({
         to: user.email,
         subject: "Verify your RunLattice email",
         text: `Verify your email address to activate your RunLattice account: ${url}\n\nThis link expires in 24 hours.`,
-      }).catch((error: unknown) => {
-        console.error("[auth] Verification email could not be sent:", error instanceof Error ? error.message : "Unknown error");
       });
     },
   },
