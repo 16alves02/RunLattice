@@ -19,8 +19,8 @@ export default function TwoFactorPage() {
     setLoading(true);
     try {
       const result = method === "totp"
-        ? await authClient.twoFactor.verifyTotp({ code: code.trim() })
-        : await authClient.twoFactor.verifyBackupCode({ code: code.trim() });
+        ? await authClient.twoFactor.verifyTotp({ code: code.trim(), trustDevice: false })
+        : await authClient.twoFactor.verifyBackupCode({ code: code.trim(), trustDevice: false });
       if (result.error) throw new Error(result.error.message || "The verification code is invalid.");
       router.replace("/");
     } catch (cause) {
