@@ -305,8 +305,9 @@ describe("RunLattice PostgreSQL, API and worker integration", () => {
     });
 
     startWorkerProcess();
-    expect(await waitForRunStatus(run.id, "SUCCEEDED")).toBe("SUCCEEDED");
+    const status = await waitForRunStatus(run.id, "SUCCEEDED");
     const completed = await prisma.workflowRun.findUnique({ where: { id: run.id } });
+    expect(status, `HTTP workflow failed: ${completed?.error ?? "no worker error was persisted"}`).toBe("SUCCEEDED");
     const persistedSteps = await prisma.workflowRunStep.findMany({
       where: { runId: run.id },
       orderBy: { startedAt: "asc" },
