@@ -24,6 +24,7 @@ export function IntegrationGallery() {
   const [showHttpForm, setShowHttpForm] = useState(false);
   const [httpConnectionName, setHttpConnectionName] = useState("External API");
   const [httpApiKey, setHttpApiKey] = useState("");
+  const [httpBaseUrl, setHttpBaseUrl] = useState("https://api.example.com");
   const [httpApiKeyHeader, setHttpApiKeyHeader] = useState<"authorization" | "x-api-key">("authorization");
   const [connectionName, setConnectionName] = useState("Discord alerts");
   const [webhookUrl, setWebhookUrl] = useState("");
@@ -90,6 +91,7 @@ export function IntegrationGallery() {
         body: JSON.stringify({
           provider: "http",
           name: httpConnectionName,
+          baseUrl: httpBaseUrl,
           apiKey: httpApiKey,
           apiKeyHeader: httpApiKeyHeader,
         }),
@@ -149,6 +151,8 @@ export function IntegrationGallery() {
           {showHttpForm && <form className="editor-panel" onSubmit={(event) => { event.preventDefault(); void connectHttp(); }}>
             <label className="field-label" htmlFor="http-connection-name">Connection name</label>
             <input id="http-connection-name" className="field-input" value={httpConnectionName} onChange={(event) => setHttpConnectionName(event.target.value)} minLength={2} maxLength={60} required/>
+            <label className="field-label" htmlFor="http-base-url">Allowed API base URL</label>
+            <input id="http-base-url" className="field-input" type="url" value={httpBaseUrl} onChange={(event) => setHttpBaseUrl(event.target.value)} placeholder="https://api.example.com" required/>
             <label className="field-label" htmlFor="http-api-key">API key / bearer token</label>
             <input id="http-api-key" className="field-input" type="password" autoComplete="new-password" value={httpApiKey} onChange={(event) => setHttpApiKey(event.target.value)} maxLength={4096} required/>
             <label className="field-label" htmlFor="http-api-key-header">Authentication header</label>
@@ -156,7 +160,7 @@ export function IntegrationGallery() {
               <option value="authorization">Authorization (enter full value, e.g. Bearer …)</option>
               <option value="x-api-key">X-API-Key</option>
             </select>
-            <p className="editor-help">The key is encrypted at rest and scoped to this workspace. Requests are HTTPS-only and cannot reach private or local network addresses.</p>
+            <p className="editor-help">The key is encrypted at rest and scoped to this workspace. Requests are restricted to this exact API host, use HTTPS, and cannot reach private or local network addresses.</p>
             <button className="btn btn-primary" type="submit" disabled={saving || !canManage}>{saving ? "Connecting…" : "Save API connection"}</button>
           </form>}
         </> : item.id === "discord" && item.status === "available" ? <>
