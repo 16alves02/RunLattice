@@ -280,3 +280,6 @@ h1 { font-size:27px; line-height:1.2; letter-spacing:-1px; margin:0 0 8px; }
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; }
 }
+
+.consent-settings { position:fixed; z-index:60; right:16px; bottom:16px; padding:8px 11px; border:1px solid var(--border); border-radius:8px; background:#191d22; color:#b7bdc5; font-size:10px; cursor:pointer; }
+@media(max-width:720px) { .consent-settings { bottom:78px; right:10px; } }
