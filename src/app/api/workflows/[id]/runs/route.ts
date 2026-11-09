@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { workflowRunInputSchema } from "@/lib/validation";
 import { createQuotaBoundWorkflowRun } from "@/lib/run-quota";
+import { readBoundedRequestBody } from "@/lib/read-bounded-body";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -17,10 +18,14 @@ export async function POST(request: Request, context: RouteContext) {
   const { id } = await context.params;
   let input: Record<string, unknown> = {};
   try {
-    const rawBody = await request.text();
-    if (rawBody.length > 32_768) {
-      return NextResponse.json({ error: "Workflow input must be 32 KB or smaller." }, { status: 413 });
+    const bodyResult = await readBoundedRequestBody(request, 32_768);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.reason === "too_large" ? "Workflow input must be 32 KB or smaller." : "Workflow input could not be read as valid UTF-8." },
+        { status: bodyResult.reason === "too_large" ? 413 : 400 },
+      );
     }
+    const rawBody = bodyResult.body;
     if (rawBody.trim()) {
       let body: unknown;
       try {

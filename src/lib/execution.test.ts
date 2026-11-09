@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveExecutionPath, validateExecutableWorkflow } from "@/lib/execution";
+import { resolveExecutionPath, resolveNextExecutionNode, validateExecutableWorkflow } from "@/lib/execution";
 import type { WorkflowDefinition } from "@/lib/types";
 
 const actionConfig = {
@@ -78,6 +78,58 @@ describe("workflow execution path", () => {
   it("follows the false branch when the condition does not match", () => {
     expect(resolveExecutionPath(conditionalDefinition, { customer: { score: 20 } }).map((node) => node.id))
       .toEqual(["trigger", "condition", "false-action"]);
+  });
+
+  it("routes a condition using a mapped response from a completed HTTP action", () => {
+    const responseDefinition: WorkflowDefinition = {
+      nodes: [
+        definition.nodes[0],
+        {
+          id: "http_action",
+          kind: "action",
+          title: "Get invoice",
+          detail: "",
+          config: {
+            integrationId: "http",
+            actionId: "request",
+            connectionId: "http-connection",
+            method: "GET",
+            url: "https://api.example.com/invoices",
+            responsePath: "data.amount",
+          },
+          x: 100,
+          y: 0,
+        },
+        {
+          id: "condition",
+          kind: "condition",
+          title: "Check invoice amount",
+          detail: "",
+          config: { path: "steps.http_action.responseValue", operator: "greater_than", value: 100 },
+          x: 200,
+          y: 0,
+        },
+        { id: "true-action", kind: "action", title: "High value", detail: "", config: actionConfig, x: 300, y: -80 },
+        { id: "false-action", kind: "action", title: "Low value", detail: "", config: actionConfig, x: 300, y: 80 },
+      ],
+      edges: [
+        { id: "start-http", from: "trigger", to: "http_action" },
+        { id: "http-condition", from: "http_action", to: "condition" },
+        { id: "condition-true", from: "condition", to: "true-action", branch: "true" },
+        { id: "condition-false", from: "condition", to: "false-action", branch: "false" },
+      ],
+    };
+    const trigger = responseDefinition.nodes[0];
+    const httpAction = resolveNextExecutionNode(responseDefinition, trigger);
+    expect(httpAction?.id).toBe("http_action");
+    const condition = resolveNextExecutionNode(responseDefinition, httpAction!, {
+      steps: { http_action: { httpStatus: 200, responseValue: 150 } },
+    });
+    expect(condition?.id).toBe("condition");
+    const selected = resolveNextExecutionNode(responseDefinition, condition!, {
+      steps: { http_action: { httpStatus: 200, responseValue: 150 } },
+    });
+    expect(selected?.id).toBe("true-action");
   });
 
   it("rejects a condition without both branch connections", () => {

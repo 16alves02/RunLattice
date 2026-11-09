@@ -22,6 +22,10 @@ export async function getRequestWorkspace(request: Request): Promise<
     return { response: NextResponse.json({ error: "Authentication required." }, { status: 401 }) };
   }
 
+  if (!session.user.twoFactorEnabled) {
+    return { response: NextResponse.json({ error: "Two-factor authentication setup is required.", code: "MFA_REQUIRED" }, { status: 403 }) };
+  }
+
   const activeOrganizationId = session.session.activeOrganizationId;
   const membership = activeOrganizationId
     ? await prisma.member.findFirst({
@@ -56,6 +60,7 @@ export async function requireServerWorkspace(): Promise<WorkspaceContext> {
   const session = await auth.api.getSession({ headers: requestHeaders });
 
   if (!session) redirect("/sign-in");
+  if (!session.user.twoFactorEnabled) redirect("/security");
 
   const activeOrganizationId = session.session.activeOrganizationId;
   const membership = activeOrganizationId

@@ -7,8 +7,25 @@ const discordActionConfigSchema = z.object({
   message: z.string().max(2000).optional(),
 });
 
+const httpActionConfigSchema = z.object({
+  integrationId: z.literal("http"),
+  actionId: z.literal("request"),
+  connectionId: z.string().max(80).optional(),
+  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
+  url: z.string().trim().min(1).max(2_000),
+  body: z.string().max(65_536).optional(),
+  responsePath: z.string().trim().max(200).regex(/^[A-Za-z_$][A-Za-z0-9_$-]*(\.[A-Za-z_$][A-Za-z0-9_$-]*)*$/).optional().or(z.literal("")),
+}).superRefine((config, context) => {
+  if (config.method === "GET" && config.body?.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "GET requests cannot include a request body." });
+  }
+  if (config.responsePath?.split(".").some((segment) => ["__proto__", "prototype", "constructor"].includes(segment))) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["responsePath"], message: "Response paths cannot access prototype properties." });
+  }
+});
+
 const conditionConfigSchema = z.object({
-  path: z.string().trim().min(1).max(200).regex(/^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$/),
+  path: z.string().trim().min(1).max(200).regex(/^[A-Za-z_$][A-Za-z0-9_$-]*(\.[A-Za-z_$][A-Za-z0-9_$-]*)*$/),
   operator: z.enum(["equals", "not_equals", "contains", "greater_than", "less_than", "exists"]),
   value: z.union([z.string().max(1000), z.number().finite(), z.boolean(), z.null()]).optional(),
 }).superRefine((config, context) => {
@@ -68,7 +85,7 @@ const nodeSchema = z.object({
   kind: z.enum(["trigger", "condition", "action"]),
   title: z.string().trim().min(1).max(100),
   detail: z.string().max(500).default(""),
-  config: z.union([discordActionConfigSchema, conditionConfigSchema, triggerConfigSchema]).optional(),
+  config: z.union([discordActionConfigSchema, httpActionConfigSchema, conditionConfigSchema, triggerConfigSchema]).optional(),
   x: z.number().finite().min(0).max(5000),
   y: z.number().finite().min(0).max(5000),
 }).superRefine((node, context) => {
@@ -156,7 +173,7 @@ export const createWorkflowSchema = z.object({
   definition: workflowDefinitionSchema,
 });
 
-export const createIntegrationConnectionSchema = z.object({
+const discordConnectionSchema = z.object({
   provider: z.literal("discord"),
   name: z.string().trim().min(2).max(60),
   webhookUrl: z.string().url().max(1000).refine((value) => {
@@ -171,3 +188,25 @@ export const createIntegrationConnectionSchema = z.object({
     }
   }, "Use a valid HTTPS Discord webhook URL."),
 });
+
+const httpConnectionSchema = z.object({
+  provider: z.literal("http"),
+  name: z.string().trim().min(2).max(60),
+  baseUrl: z.string().url().max(2_000).refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && Boolean(url.hostname)
+        && (!url.port || url.port === "443") && !url.username && !url.password
+        && !url.search && !url.hash;
+    } catch {
+      return false;
+    }
+  }, "Use an HTTPS API base URL on the standard port, without credentials, query strings or fragments."),
+  apiKey: z.string().min(1).max(4_096).refine((value) => !/[\x00-\x1f\x7f]/.test(value), "API keys cannot contain control characters."),
+  apiKeyHeader: z.enum(["authorization", "x-api-key"]).default("authorization"),
+});
+
+export const createIntegrationConnectionSchema = z.discriminatedUnion("provider", [
+  discordConnectionSchema,
+  httpConnectionSchema,
+]);

@@ -2,7 +2,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/prisma";
-import { organization } from "better-auth/plugins";
+import { organization, twoFactor } from "better-auth/plugins";
 import { sendTransactionalEmail } from "@/lib/email";
 import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
 
@@ -10,7 +10,24 @@ const secret = process.env.BETTER_AUTH_SECRET;
 const production = process.env.NODE_ENV === "production";
 const emailConfigured = Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
 
+// Never allow production authentication to fall back to a public development secret
+// or a localhost-only origin configuration.
+const trustedOrigins = process.env.BETTER_AUTH_TRUSTED_ORIGINS
+  ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean)
+  : [];
+
+if (production && (!secret || secret.length < 32)) {
+  throw new Error("BETTER_AUTH_SECRET must be configured with at least 32 characters in production.");
+}
+if (production && !process.env.BETTER_AUTH_URL) {
+  throw new Error("BETTER_AUTH_URL must be configured in production.");
+}
+if (production && trustedOrigins.length === 0) {
+  throw new Error("BETTER_AUTH_TRUSTED_ORIGINS must contain at least one trusted origin in production.");
+}
+
 export const auth = betterAuth({
+  appName: "RunLattice",
   secret: secret || "runlattice-local-development-secret-change-before-deploy",
   ...(process.env.BETTER_AUTH_URL ? { baseURL: process.env.BETTER_AUTH_URL } : {}),
   database: prismaAdapter(prisma, { provider: "postgresql" }),
@@ -23,12 +40,10 @@ export const auth = betterAuth({
     autoSignIn: !production,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
-      void sendTransactionalEmail({
+      await sendTransactionalEmail({
         to: user.email,
         subject: "Reset your RunLattice password",
         text: `Use this secure link to reset your password: ${url}\n\nIf you did not request this, ignore this email.`,
-      }).catch((error: unknown) => {
-        console.error("[auth] Password reset email could not be sent:", error instanceof Error ? error.message : "Unknown error");
       });
     },
   },
@@ -38,19 +53,17 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60 * 24,
     sendVerificationEmail: async ({ user, url }) => {
-      void sendTransactionalEmail({
+      await sendTransactionalEmail({
         to: user.email,
         subject: "Verify your RunLattice email",
         text: `Verify your email address to activate your RunLattice account: ${url}\n\nThis link expires in 24 hours.`,
-      }).catch((error: unknown) => {
-        console.error("[auth] Verification email could not be sent:", error instanceof Error ? error.message : "Unknown error");
       });
     },
   },
   session: {
-    expiresIn: 60 * 60 * 24 * 7,
-    updateAge: 60 * 60 * 24,
-    cookieCache: { enabled: true, maxAge: 5 * 60 },
+    expiresIn: 60 * 60 * 24,
+    updateAge: 60 * 60,
+    cookieCache: { enabled: false },
   },
   rateLimit: {
     enabled: true,
@@ -63,7 +76,7 @@ export const auth = betterAuth({
       "/request-password-reset": { window: 60, max: 3 },
     },
   },
-  plugins: [organization({
+  plugins: [twoFactor({ issuer: "RunLattice", backupCodeOptions: { storeBackupCodes: "encrypted" }, accountLockout: { enabled: true, maxFailedAttempts: 5, durationSeconds: 1800 } }), organization({
     requireEmailVerificationOnInvitation: true,
     invitationExpiresIn: 60 * 60 * 24 * 7,
     membershipLimit: async (_user, organizationRecord) => {
@@ -75,7 +88,12 @@ export const auth = betterAuth({
       return PLAN_LIMITS[plan].members;
     },
   })],
-  trustedOrigins: process.env.BETTER_AUTH_TRUSTED_ORIGINS
-    ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean)
-    : ["http://localhost:3000"],
+  // Railway's public HTTP edge overwrites X-Real-IP with the connecting client IP.
+  // Do not use X-Forwarded-For here: Railway may add proxy hops to that header.
+  advanced: {
+    ipAddress: {
+      ipAddressHeaders: ["x-real-ip"],
+    },
+  },
+  trustedOrigins: trustedOrigins.length > 0 ? trustedOrigins : ["http://localhost:3000"],
 });

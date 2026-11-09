@@ -1,9 +1,17 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { NextRequest, NextResponse } from "next/server";
 
-const publicPaths = ["/sign-in", "/sign-up", "/api/auth", "/api/health"];
+const publicPaths = [
+  "/sign-in",
+  "/sign-up",
+  "/forgot-password",
+  "/reset-password",
+  "/two-factor",
+  "/api/auth",
+  "/api/health",
+];
 
-function isPublicPath(pathname: string) {
+export function isPublicPath(pathname: string) {
   return publicPaths.some((path) => pathname === path || pathname.startsWith(path + "/"));
 }
 

@@ -34,7 +34,7 @@ Legacy workflows with no user owner remain unassigned and are not visible to nor
 ## API boundaries
 
 - `/api/auth/*` is handled by Better Auth.
-- `/api/health` is public and verifies PostgreSQL with `SELECT 1`; it does not prove Redis or Worker health.
+- `/api/health` is public and checks PostgreSQL (`SELECT 1`), Redis (`PING`) and the worker's recent Redis heartbeat. It returns only component status values, never connection details. It does not verify external providers or prove that workflow actions succeed.
 - `/api/billing` creates owner/admin-only Stripe Checkout and Customer Portal sessions.
 - `/api/billing/webhook` verifies the raw request signature and deduplicates Stripe event IDs.
 - Workflow, run and integration APIs require a valid session and workspace membership.
@@ -107,3 +107,25 @@ The application uses Stripe-hosted Checkout and Customer Portal sessions. Checko
 Stripe webhook signatures are verified against the raw request body. Event IDs are stored in StripeEvent and already-processed events are acknowledged without reapplying changes. Subscription status and price metadata determine workspace plan entitlements. Workflow creation, monthly workflow runs and AI requests are enforced server-side; UI-only limits are not trusted. The initial plans are Free, Pro and Team. Stripe Price IDs, webhook signing secret, Customer Portal settings and test-mode end-to-end verification are still required before billing is enabled.
 
 The new billing migration enables RLS on BillingCustomer, BillingSubscription and StripeEvent and creates explicit deny-all policies for Supabase Data API roles. It also revokes default table/sequence privileges for those roles on future Prisma-owned objects.
+
+## Client IP and authentication rate limits on Railway
+
+Better Auth authentication rate limiting reads the `X-Real-IP` header. The Railway public HTTP edge overwrites this header with the connecting client IP, so the application does not rely on the caller-controlled leftmost value of `X-Forwarded-For`. This is used only as a rate-limit key, not as an identity or authorization factor.
+
+This trust assumption applies to requests arriving through Railway's public HTTP edge. Requests sent over `*.railway.internal` bypass that edge and can supply their own forwarding headers; do not treat `X-Real-IP` from private-network callers as a verified end-user address. If the topology changes (for example, adding another proxy or routing authentication through private networking), revalidate the IP-header trust configuration before release.
+
+References:
+- [Railway public networking request headers](https://docs.railway.com/networking/public-networking/specs-and-limits)
+- [Better Auth IP address configuration](https://better-auth.com/docs/concepts/rate-limit)
+
+## Bounded request body handling
+
+Application API routes that accept JSON or raw payloads use a streaming reader with endpoint-specific byte limits. The reader checks a declared Content-Length as an early rejection hint, enforces the limit against bytes actually received, cancels oversized streams and rejects invalid UTF-8/JSON. The current limits are 8 KiB for billing, integration and AI-provider credential requests; 10 KB for AI planning; 32 KiB for workflow run inputs and signed workflow webhooks; 64 KiB for AI dry-run simulations; 256 KiB for workflow definitions; and 1 MiB for Stripe webhook events. Authentication routes are handled by Better Auth and remain subject to its own request handling and upstream platform limits.
+
+## Outbound HTTP transport safeguards
+
+The generic HTTP action uses the shared outbound HTTPS transport. It enforces HTTPS on port 443, rejects local hostnames and non-public IP literals, resolves DNS before connecting, rejects the entire hostname if any returned address is non-public, and pins the selected validated address into the TLS connection to prevent a second DNS lookup from reaching a different destination. Redirects are rejected rather than followed. Request bodies are limited to 64 KB, responses to 1 MB, and requests time out after 10 seconds. Only a small allow-list of request headers is accepted.
+
+HTTP API credentials are encrypted at rest and scoped to a workspace. Each connection stores an approved HTTPS base URL, and the worker requires every action to target that exact hostname before making a request; DNS/IP checks are then repeated for the destination. This prevents a workflow editor from attaching a workspace API key to an arbitrary public host. API key values are never returned to the browser or written to run output. By default the action records only the HTTP status. An optional validated JSON path can expose one scalar response value (maximum 2,000 characters) to later workflow actions and runtime condition nodes; full response bodies, arrays and objects are never forwarded or persisted as action output.
+
+The action is available in the workflow editor, but it remains a limited first version: one API key per connection, Authorization or X-API-Key header, JSON request bodies, and explicit scalar-only response mapping. Complete controlled end-to-end tests against a dedicated test API before enabling this for production workloads.

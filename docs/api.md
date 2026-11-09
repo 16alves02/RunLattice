@@ -48,13 +48,15 @@ Names must contain 2–80 characters. A definition contains 1–100 nodes and up
 
 ## Queue a run
 
-`POST /api/workflows/:id/runs` queues a run for an active workflow. An optional JSON object can be supplied as the request body and is stored as the run input; the body is limited to 32 KB. An empty body remains valid and creates an empty input object. Arrays, primitives, malformed JSON and oversized bodies are rejected. The input is persisted on the run record and is available to Discord message templates using `{{input.customer.name}}` path syntax. Only string, number and boolean values are inserted; missing paths, object values, prototype-related path segments and rendered messages over Discord’s 2,000-character limit fail the step. Templates do not evaluate JavaScript or arbitrary expressions. Condition nodes evaluate the stored run input using a restricted operator set: equals, not_equals, contains, greater_than, less_than and exists. A condition node must have exactly one outgoing true edge and one outgoing false edge; only the matching branch executes. The endpoint creates the run and its outbox event in one database transaction, then returns `202 Accepted`. The worker dispatcher delivers pending outbox events to BullMQ. The worker then claims the run atomically, validates the stored workflow and persists step-level results.
+`POST /api/workflows/:id/runs` queues a run for an active workflow. An optional JSON object can be supplied as the request body and is stored as the run input; the body is limited to 32 KB. An empty body remains valid and creates an empty input object. Arrays, primitives, malformed JSON and oversized bodies are rejected. The input is persisted on the run record and is available to Discord message templates using `{{input.customer.name}}` path syntax. Only string, number and boolean values are inserted; missing paths, object values, prototype-related path segments and rendered Discord messages over 2,000 characters fail the step; HTTP URL templates are limited to 2,000 characters and HTTP bodies to 64 KB. Templates do not evaluate JavaScript or arbitrary expressions. HTTP JSON request bodies support the same input paths as JSON values (placeholders are written without surrounding quotes); rendered payloads must remain valid JSON and are limited to 64 KB. An optional `responsePath` (for example `data.invoiceId`) extracts one scalar JSON value from the response; only strings up to 2,000 characters, numbers, booleans or null are made available to later actions as `{{input.steps.<nodeId>.responseValue}}`. Full response bodies, arrays and objects are not forwarded. Condition nodes evaluate the original run input plus outputs from completed preceding steps, using a restricted operator set: equals, not_equals, contains, greater_than, less_than and exists. This allows a condition to inspect a mapped HTTP response at `steps.<nodeId>.responseValue`. Branches are resolved at runtime, after preceding actions complete. A condition node must have exactly one outgoing true edge and one outgoing false edge; only the matching branch executes. The endpoint creates the run and its outbox event in one database transaction, then returns `202 Accepted`. The worker dispatcher delivers pending outbox events to BullMQ. The worker then claims the run atomically, validates the stored workflow and persists step-level results.
 
 ## Integration connections
 
 `GET /api/integrations` lists the integration catalog and current workspace connections. Credential material is never included.
 
-`POST /api/integrations` creates a Discord webhook connection for workspace owners/admins:
+`POST /api/integrations` creates a Discord webhook or HTTP API connection for workspace owners/admins.
+
+Discord example:
 
 ```json
 {
@@ -64,15 +66,27 @@ Names must contain 2–80 characters. A definition contains 1–100 nodes and up
 }
 ```
 
-Only HTTPS webhook URLs on the official `discord.com` or `discordapp.com` hosts are accepted. The URL is encrypted at rest with AES-256-GCM. Configure `INTEGRATION_ENCRYPTION_KEY` as a unique base64-encoded 32-byte key before creating connections.
+HTTP API example:
+
+```json
+{
+  "provider": "http",
+  "name": "Billing API",
+  "baseUrl": "https://api.example.com/v1",
+  "apiKey": "Bearer …",
+  "apiKeyHeader": "authorization"
+}
+```
+
+HTTP connections accept HTTPS base URLs on port 443 without embedded credentials, query strings or fragments. Requests must stay on the exact configured origin and inside its base path. Credentials are encrypted at rest with AES-256-GCM and never returned by the API. Configure `INTEGRATION_ENCRYPTION_KEY` as a unique base64-encoded 32-byte key before creating connections.
 
 `DELETE /api/integrations/:id` removes a connection belonging to the active workspace. Owners/admins only.
 
 ## Live execution limits
 
-The live worker supports a manual trigger, Discord send-message actions and declarative condition nodes. Conditions read the persisted run input through safe own-property paths and never evaluate JavaScript. Operators are equals, not_equals, contains, greater_than, less_than and exists. A condition must connect to exactly one true and one false branch; only the selected branch executes. Both branches are validated before activation. Arbitrary code, inbound webhooks, scheduled triggers and other integrations cannot be activated.
+The live worker supports manual, signed webhook and scheduled triggers, Discord send-message actions, secured HTTP/REST requests and declarative condition nodes. Conditions read the persisted run input through safe own-property paths and never evaluate JavaScript. Operators are equals, not_equals, contains, greater_than, less_than and exists. A condition must connect to exactly one true and one false branch; only the selected branch executes. Both branches are validated before activation. Arbitrary code, inbound webhooks, scheduled triggers and other integrations cannot be activated.
 
-External actions are not automatically retried because the Discord webhook action does not provide an idempotency key. The worker updates a run heartbeat every 20 seconds. A recovery sweep marks runs with no heartbeat for more than five minutes as `FAILED`, with a warning that the external action may already have occurred. It never automatically replays an interrupted run. This is stale-run detection, not durable resumption or exactly-once delivery.
+External actions are not automatically retried because the Discord webhook and generic HTTP request actions do not guarantee idempotency. The worker updates a run heartbeat every 20 seconds. A recovery sweep marks runs with no heartbeat for more than five minutes as `FAILED`, with a warning that the external action may already have occurred. It never automatically replays an interrupted run. This is stale-run detection, not durable resumption or exactly-once delivery.
 
 ## AI workflow planning
 

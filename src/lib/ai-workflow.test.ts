@@ -69,6 +69,25 @@ describe("AI workflow planning validation", () => {
     expect(systemPrompt).toContain("Never reveal or request passwords");
   });
 
+  it("validates HTTP action setup against the workspace connection", () => {
+    const definition = workflowDefinitionSchema.parse({
+      nodes: [
+        { id: "trigger", kind: "trigger", title: "Manual", detail: "", x: 0, y: 0 },
+        { id: "http", kind: "action", title: "Call API", detail: "", config: {
+          integrationId: "http", actionId: "request", connectionId: "http-connection",
+          method: "POST", url: "https://api.example.com/v1/events", body: '{"ok":true}',
+        }, x: 250, y: 0 },
+      ],
+      edges: [{ id: "edge-1", from: "trigger", to: "http" }],
+    });
+    expect(findUnconfiguredActionTitles(definition, [
+      { id: "http-connection", provider: "http" },
+    ])).toEqual([]);
+    expect(findUnconfiguredActionTitles(definition, [
+      { id: "http-connection", provider: "discord" },
+    ])).toEqual(["Call API"]);
+  });
+
   it("requires action connections to belong to the current workspace and provider", () => {
     const definition = workflowDefinitionSchema.parse({
       nodes: [

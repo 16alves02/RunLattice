@@ -20,7 +20,7 @@ export const integrationCatalog: IntegrationDefinition[] = [
   { id: "shopify", name: "Shopify", category: "E-commerce", description: "Build order and inventory workflows for online stores.", auth: "OAuth 2.0", triggers: ["New order", "Order updated"], actions: ["Get order", "Update order"], status: "planned" },
   { id: "stripe", name: "Stripe", category: "Payments", description: "React to payment and subscription events.", auth: "OAuth 2.0", triggers: ["Payment succeeded", "Subscription updated"], actions: ["Retrieve payment", "Create refund"], status: "planned" },
   { id: "github", name: "GitHub", category: "Development", description: "Connect repository activity to engineering workflows.", auth: "OAuth 2.0", triggers: ["New issue", "Pull request opened"], actions: ["Create issue", "Add comment"], status: "planned" },
-  { id: "http", name: "HTTP / REST API", category: "Development", description: "Connect services that expose an HTTP API.", auth: "API key", triggers: ["Webhook received"], actions: ["Send HTTP request"], status: "planned" },
+  { id: "http", name: "HTTP / REST API", category: "Development", description: "Send secured HTTPS requests to external APIs with workspace-scoped API keys.", auth: "API key", triggers: [], actions: ["Send HTTP request"], status: "available" },
 ];
 
 export function getIntegration(id: string) {

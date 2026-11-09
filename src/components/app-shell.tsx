@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Blocks, BookOpen, Bot, CircleHelp, CreditCard, GitBranch, LayoutDashboard, LayoutTemplate, Plug, Settings, Workflow } from "lucide-react";
+import { Activity, Blocks, BookOpen, Bot, CircleHelp, CreditCard, GitBranch, LayoutDashboard, LayoutTemplate, Plug, Settings, ShieldCheck, Workflow } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
 import { BrandLogo } from "@/components/brand-logo";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/integrations", label: "Integrations", icon: Plug },
   { href: "/ai-assistant", label: "AI assistant", icon: Bot },
   { href: "/settings/ai", label: "AI provider keys", icon: Settings },
+  { href: "/security", label: "Security", icon: ShieldCheck },
   { href: "/runs", label: "Execution history", icon: Activity },
   { href: "/billing", label: "Billing", icon: CreditCard },
 ];

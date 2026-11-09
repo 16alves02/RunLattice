@@ -26,6 +26,7 @@ import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { consumeAIRequestRateLimit } from "@/lib/ai-rate-limit";
 import { getWorkspaceEntitlements } from "@/lib/billing";
 import { decryptSecret } from "@/lib/secrets";
+import { readBoundedRequestBody } from "@/lib/read-bounded-body";
 import type { AIProviderId } from "@/lib/ai-provider";
 
 export const runtime = "nodejs";
@@ -42,10 +43,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "The AI assistant is not enabled on this deployment." }, { status: 503 });
   }
 
-  const rawBody = await request.text();
-  if (new TextEncoder().encode(rawBody).byteLength > 10_000) {
-    return NextResponse.json({ error: "AI planning requests must be 10 KB or smaller." }, { status: 413 });
+  const bodyResult = await readBoundedRequestBody(request, 10_000);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.reason === "too_large" ? "AI planning requests must be 10 KB or smaller." : "Request body could not be read as valid UTF-8." },
+      { status: bodyResult.reason === "too_large" ? 413 : 400 },
+    );
   }
+  const rawBody = bodyResult.body;
 
   let body: unknown;
   try {

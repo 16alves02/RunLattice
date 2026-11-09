@@ -15,6 +15,74 @@ describe("workflow definition validation", () => {
   });
 
 
+
+  it("accepts a configured HTTP request action", () => {
+    const definition = {
+      nodes: [
+        validDefinition.nodes[0],
+        {
+          ...validDefinition.nodes[1],
+          config: {
+            integrationId: "http",
+            actionId: "request",
+            connectionId: "connection-1",
+            method: "POST",
+            url: "https://api.example.com/v1/events",
+            body: '{"event": "created"}',
+          },
+        },
+      ],
+      edges: validDefinition.edges,
+    };
+    expect(workflowDefinitionSchema.safeParse(definition).success).toBe(true);
+  });
+
+  it("accepts bounded HTTP response paths and rejects unsafe paths", () => {
+    const base = {
+      ...validDefinition.nodes[1],
+      config: {
+        integrationId: "http",
+        actionId: "request",
+        connectionId: "connection-1",
+        method: "GET",
+        url: "https://api.example.com/v1/events",
+        responsePath: "data.invoiceId",
+      },
+    };
+    expect(workflowDefinitionSchema.safeParse({
+      nodes: [validDefinition.nodes[0], base],
+      edges: validDefinition.edges,
+    }).success).toBe(true);
+    for (const responsePath of ["data.__proto__.id", "data.constructor", "x".repeat(201), "data..id"]) {
+      expect(workflowDefinitionSchema.safeParse({
+        nodes: [validDefinition.nodes[0], { ...base, config: { ...base.config, responsePath } }],
+        edges: validDefinition.edges,
+      }).success).toBe(false);
+    }
+  });
+
+  it("rejects HTTP actions with a GET body or invalid method", () => {
+    const base = {
+      ...validDefinition.nodes[1],
+      config: {
+        integrationId: "http",
+        actionId: "request",
+        connectionId: "connection-1",
+        method: "GET",
+        url: "https://api.example.com/v1/events",
+        body: '{"event": "created"}',
+      },
+    };
+    expect(workflowDefinitionSchema.safeParse({
+      nodes: [validDefinition.nodes[0], base],
+      edges: validDefinition.edges,
+    }).success).toBe(false);
+    expect(workflowDefinitionSchema.safeParse({
+      nodes: [validDefinition.nodes[0], { ...base, config: { ...base.config, method: "TRACE" } }],
+      edges: validDefinition.edges,
+    }).success).toBe(false);
+  });
+
   it("accepts typed webhook and scheduled triggers", () => {
     const webhook = {
       nodes: [{ ...validDefinition.nodes[0], config: { triggerType: "WEBHOOK" } }],
@@ -81,6 +149,48 @@ describe("workflow definition validation", () => {
       ],
       edges: [
         { id: "start", from: "trigger", to: "condition" },
+        { id: "yes", from: "condition", to: "true-action", branch: "true" },
+        { id: "no", from: "condition", to: "false-action", branch: "false" },
+      ],
+    };
+    expect(workflowDefinitionSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("accepts condition paths that reference hyphenated workflow node IDs", () => {
+    const valid = {
+      nodes: [
+        validDefinition.nodes[0],
+        {
+          id: "http-action",
+          kind: "action",
+          title: "Get invoice",
+          detail: "",
+          config: {
+            integrationId: "http",
+            actionId: "request",
+            connectionId: "http-connection",
+            method: "GET",
+            url: "https://api.example.com/v1/invoices",
+            responsePath: "data.amount",
+          },
+          x: 100,
+          y: 0,
+        },
+        {
+          id: "condition",
+          kind: "condition",
+          title: "Check amount",
+          detail: "",
+          config: { path: "steps.http-action.responseValue", operator: "greater_than", value: 100 },
+          x: 200,
+          y: 0,
+        },
+        { ...validDefinition.nodes[1], id: "true-action" },
+        { ...validDefinition.nodes[1], id: "false-action" },
+      ],
+      edges: [
+        { id: "start", from: "trigger", to: "http-action" },
+        { id: "http-condition", from: "http-action", to: "condition" },
         { id: "yes", from: "condition", to: "true-action", branch: "true" },
         { id: "no", from: "condition", to: "false-action", branch: "false" },
       ],
@@ -163,6 +273,64 @@ describe("Discord integration connection validation", () => {
   });
 });
 
+
+
+describe("HTTP API integration connection validation", () => {
+  it("accepts a bounded API key and supported auth header", () => {
+    expect(createIntegrationConnectionSchema.safeParse({
+      provider: "http",
+      name: "Billing API",
+      baseUrl: "https://api.billing.example",
+      apiKey: "Bearer test-token",
+      apiKeyHeader: "authorization",
+    }).success).toBe(true);
+    expect(createIntegrationConnectionSchema.safeParse({
+      provider: "http",
+      name: "Inventory API",
+      baseUrl: "https://inventory.example",
+      apiKey: "test-token",
+      apiKeyHeader: "x-api-key",
+    }).success).toBe(true);
+  });
+
+  it("rejects insecure or credential-bearing API base URLs", () => {
+    for (const baseUrl of [
+      "http://api.example.com",
+      "https://user:pass@api.example.com",
+      "https://api.example.com:8443",
+      "https://api.example.com?token=secret",
+      "https://api.example.com#fragment",
+    ]) {
+      expect(createIntegrationConnectionSchema.safeParse({
+        provider: "http",
+        name: "Invalid API",
+        baseUrl,
+        apiKey: "secret",
+        apiKeyHeader: "authorization",
+      }).success).toBe(false);
+    }
+  });
+
+  it("rejects API keys containing control characters", () => {
+    expect(createIntegrationConnectionSchema.safeParse({
+      provider: "http",
+      name: "Invalid API",
+      baseUrl: "https://api.example.com",
+      apiKey: "Bearer\nInjected",
+      apiKeyHeader: "authorization",
+    }).success).toBe(false);
+  });
+
+  it("rejects empty credentials and arbitrary header names", () => {
+    expect(createIntegrationConnectionSchema.safeParse({
+      provider: "http",
+      name: "Broken API",
+      baseUrl: "https://api.example.com",
+      apiKey: "",
+      apiKeyHeader: "x-forwarded-for",
+    }).success).toBe(false);
+  });
+});
 
 describe("workflow run input validation", () => {
   it("accepts a bounded JSON object", () => {

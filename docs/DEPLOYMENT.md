@@ -81,16 +81,16 @@ Automatic Stripe Tax is disabled by default. Configure tax registrations and obt
 2. Configure all required variables in Railway Web and Worker.
 3. Confirm that the exact Git commit has passed TypeScript, ESLint, unit tests, PostgreSQL/Redis integration tests, database migration tests and production build.
 4. For the existing Supabase database, run npm run worker:start once the approved commit is deployed. It safely baselines historical migrations, applies pending migrations and starts the worker. For a fresh database, run npx prisma migrate deploy.
-5. Deploy Web from the same verified commit and confirm /api/health returns status=ok with checks.database=ok.
+5. Deploy Web from the same verified commit and confirm /api/health returns status=ok with checks.database=ok, checks.redis=ok and checks.worker=ok. The worker check requires a heartbeat newer than 90 seconds.
 6. Confirm Worker logs show PostgreSQL connection established and the worker is processing the queue. Confirm Redis is online.
 7. Test sign-up, verification email, sign-in, session persistence, sign-out, password reset and workspace isolation.
-8. Test a real workflow in the preview environment using only a controlled Discord destination. Verify manual, webhook and scheduled triggers.
+8. Test real workflows in the preview environment using a controlled Discord destination and a dedicated HTTPS test API. For HTTP actions, verify the configured origin/base-path boundary, API-key secrecy, redirect and private-IP blocking, timeout and payload limits. Verify manual, signed webhook and scheduled triggers.
 9. Test Stripe Checkout, Customer Portal, subscription lifecycle, failed payment, cancellation, duplicate webhooks and workspace entitlement changes in test mode.
 10. Configure backups and test a restore before accepting customer data.
 
 ## Health and operations
 
-GET /api/health checks PostgreSQL with SELECT 1 and returns HTTP 503 when the database is unavailable. It does not prove Redis, the worker or external integrations are healthy. Monitor:
+GET /api/health checks PostgreSQL with SELECT 1, Redis with PING and the worker heartbeat (updated every 30 seconds, considered healthy for 90 seconds). It returns HTTP 503 if any component is degraded. It does not verify external integrations or guarantee successful workflow execution. Monitor:
 - Railway Web and Worker deployment state, restarts and logs.
 - Redis availability and BullMQ queue depth.
 - PostgreSQL connectivity, capacity and migration state.

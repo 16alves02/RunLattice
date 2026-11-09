@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
 import { aiWorkflowDryRunRequestSchema, simulateAIWorkflow } from "@/lib/ai-dry-run";
 import { getRequestWorkspace } from "@/lib/workspace";
+import { readBoundedRequestBody } from "@/lib/read-bounded-body";
 
 export async function POST(request: Request) {
   const access = await getRequestWorkspace(request);
   if (access.response) return access.response;
 
-  const rawBody = await request.text();
-  if (new TextEncoder().encode(rawBody).byteLength > 65_536) {
-    return NextResponse.json({ error: "Workflow simulations must be 64 KB or smaller." }, { status: 413 });
+  const bodyResult = await readBoundedRequestBody(request, 65_536);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.reason === "too_large" ? "Workflow simulations must be 64 KB or smaller." : "Request body could not be read as valid UTF-8." },
+      { status: bodyResult.reason === "too_large" ? 413 : 400 },
+    );
   }
+  const rawBody = bodyResult.body;
   let body: unknown;
   try { body = JSON.parse(rawBody); }
   catch { return NextResponse.json({ error: "Request body must contain valid JSON." }, { status: 400 }); }

@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
 import { syncStripeSubscription } from "@/lib/billing";
+import { readBoundedRequestBody } from "@/lib/read-bounded-body";
 
 export const runtime = "nodejs";
 
@@ -136,9 +137,17 @@ export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!signature || !webhookSecret) return NextResponse.json({ error: "Stripe webhook is not configured." }, { status: 400 });
 
+  const bodyResult = await readBoundedRequestBody(request, 1_048_576);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.reason === "too_large" ? "Stripe webhook payload is too large." : "Stripe webhook payload could not be read." },
+      { status: bodyResult.reason === "too_large" ? 413 : 400 },
+    );
+  }
+
   let event: Stripe.Event;
   try {
-    event = getStripe().webhooks.constructEvent(await request.text(), signature, webhookSecret);
+    event = getStripe().webhooks.constructEvent(bodyResult.body, signature, webhookSecret);
   } catch (error) {
     console.warn("[billing] Invalid Stripe webhook signature:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ error: "Invalid webhook signature." }, { status: 400 });

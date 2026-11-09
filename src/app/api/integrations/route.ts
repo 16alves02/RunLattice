@@ -5,6 +5,7 @@ import { encryptSecret } from "@/lib/secrets";
 import { createIntegrationConnectionSchema } from "@/lib/validation";
 import { integrationCatalog } from "@/lib/integrations";
 import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
+import { readBoundedJsonRequest } from "@/lib/read-bounded-body";
 
 export async function GET(request: Request) {
   const access = await getRequestWorkspace(request);
@@ -36,8 +37,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Workspace administrator permission required." }, { status: 403 });
   }
 
-  const body: unknown = await request.json().catch(() => null);
-  const parsed = createIntegrationConnectionSchema.safeParse(body);
+  const bodyResult = await readBoundedJsonRequest(request, 8_192);
+  if (!bodyResult.ok) return NextResponse.json({ error: "Invalid or oversized integration request." }, { status: bodyResult.reason === "too_large" ? 413 : 400 });
+  const parsed = createIntegrationConnectionSchema.safeParse(bodyResult.value);
   if (!parsed.success) {
     return NextResponse.json({
       error: "Invalid integration connection.",
@@ -64,7 +66,11 @@ export async function POST(request: Request) {
           organizationId: access.context.organizationId,
           provider: parsed.data.provider,
           name: parsed.data.name,
-          credentialsCiphertext: encryptSecret(JSON.stringify({ webhookUrl: parsed.data.webhookUrl }), `${access.context.organizationId}:${parsed.data.provider}`),
+          credentialsCiphertext: encryptSecret(JSON.stringify(
+            parsed.data.provider === "discord"
+              ? { webhookUrl: parsed.data.webhookUrl }
+              : { baseUrl: parsed.data.baseUrl, apiKey: parsed.data.apiKey, apiKeyHeader: parsed.data.apiKeyHeader },
+          ), `${access.context.organizationId}:${parsed.data.provider}`),
         },
         select: { id: true, provider: true, name: true, createdAt: true },
       });

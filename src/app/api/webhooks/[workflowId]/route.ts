@@ -5,21 +5,21 @@ import { decryptSecret } from "@/lib/secrets";
 import { verifyWebhookSignature } from "@/lib/webhook-signature";
 import { workflowRunInputSchema } from "@/lib/validation";
 import { createQuotaBoundWorkflowRun } from "@/lib/run-quota";
+import { readBoundedRequestBody } from "@/lib/read-bounded-body";
 
 export const runtime = "nodejs";
 type RouteContext = { params: Promise<{ workflowId: string }> };
 
 export async function POST(request: Request, context: RouteContext) {
   const { workflowId } = await context.params;
-  let rawBody: string;
-  try {
-    rawBody = await request.text();
-  } catch {
-    return NextResponse.json({ error: "Request body could not be read." }, { status: 400 });
+  const bodyResult = await readBoundedRequestBody(request, 32_768);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.reason === "too_large" ? "Webhook payload must be 32 KB or smaller." : "Webhook payload could not be read as valid UTF-8." },
+      { status: bodyResult.reason === "too_large" ? 413 : 400 },
+    );
   }
-  if (Buffer.byteLength(rawBody, "utf8") > 32_768) {
-    return NextResponse.json({ error: "Webhook payload must be 32 KB or smaller." }, { status: 413 });
-  }
+  const rawBody = bodyResult.body;
 
   let body: unknown;
   try {

@@ -7,10 +7,12 @@ import { dispatchPendingWorkflowRuns } from "../src/lib/outbox";
 import { createQuotaBoundWorkflowRun } from "../src/lib/run-quota";
 import { PLAN_LIMITS, resolveEntitledPlan } from "../src/lib/billing-core";
 import { renderInputTemplate } from "../src/lib/template";
-import { resolveExecutionPath, validateExecutableWorkflow } from "../src/lib/execution";
+import { resolveNextExecutionNode, validateExecutableWorkflow } from "../src/lib/execution";
 import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
-import type { DiscordActionConfig, WorkflowDefinition } from "../src/lib/types";
+import type { DiscordActionConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
+import { isWithinAllowedHttpsBase, requestPublicHttps } from "../src/lib/safe-http";
+import { extractJsonResponseValue, toPersistableHttpActionResult } from "../src/lib/http-response";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 
 const prisma = new PrismaClient();
@@ -79,9 +81,11 @@ function getSafeWebhookUrl(ciphertext: string, connectionName: string, organizat
     name: connectionName,
     webhookUrl,
   });
-  if (!validated.success) throw new Error("The stored Discord webhook URL is invalid.");
+  if (!validated.success || typeof webhookUrl !== "string") {
+    throw new Error("The stored Discord webhook URL is invalid.");
+  }
 
-  return validated.data.webhookUrl;
+  return webhookUrl;
 }
 
 async function executeDiscordAction(config: DiscordActionConfig, organizationId: string, input: unknown) {
@@ -122,10 +126,80 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
   return { httpStatus: response.status };
 }
 
+async function executeHttpAction(config: HttpActionConfig, organizationId: string, input: unknown) {
+  if (!config.connectionId || !config.url.trim()) {
+    throw new Error("The HTTP action is missing its connection or destination URL.");
+  }
+
+  const integrationConnection = await prisma.integrationConnection.findFirst({
+    where: {
+      id: config.connectionId,
+      organizationId,
+      provider: "http",
+    },
+    select: { credentialsCiphertext: true },
+  });
+  if (!integrationConnection) throw new Error("The HTTP API connection is unavailable in this workspace.");
+
+  let credentials: unknown;
+  try {
+    credentials = JSON.parse(decryptSecret(integrationConnection.credentialsCiphertext, `${organizationId}:http`));
+  } catch {
+    throw new Error("The stored HTTP API credentials could not be decrypted.");
+  }
+
+  if (!credentials || typeof credentials !== "object" || !("apiKey" in credentials)
+    || typeof credentials.apiKey !== "string" || !credentials.apiKey
+    || !("apiKeyHeader" in credentials)
+    || (credentials.apiKeyHeader !== "authorization" && credentials.apiKeyHeader !== "x-api-key")
+    || !("baseUrl" in credentials) || typeof credentials.baseUrl !== "string") {
+    throw new Error("The stored HTTP API credentials are invalid.");
+  }
+
+  const url = renderInputTemplate(config.url, input, 2_000);
+  if (!isWithinAllowedHttpsBase(credentials.baseUrl, url)) {
+    throw new Error("The HTTP action destination must remain inside the HTTPS origin and base path configured for this API connection.");
+  }
+  const body = config.body ? renderInputTemplate(config.body, input, 65_536, true) : "";
+  if (body) {
+    try { JSON.parse(body); }
+    catch { throw new Error("The rendered HTTP request body must be valid JSON."); }
+  }
+  let response;
+  try {
+    response = await requestPublicHttps({
+      url,
+      method: config.method,
+      headers: {
+        [credentials.apiKeyHeader]: credentials.apiKey,
+        ...(body ? { "content-type": "application/json" } : {}),
+      },
+      ...(body ? { body } : {}),
+    });
+  } catch {
+    throw new Error("The external HTTPS request failed or was blocked by RunLattice security controls.");
+  }
+
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`The external API returned HTTP ${response.status}.`);
+  }
+  if (config.responsePath?.trim()) {
+    const responseValue = extractJsonResponseValue(response.body, config.responsePath.trim());
+    return { httpStatus: response.status, responseValue };
+  }
+  return { httpStatus: response.status };
+}
+
 async function executeAction(node: WorkflowDefinition["nodes"][number], organizationId: string, input: unknown) {
-  if (!node.config || !("integrationId" in node.config) || !node.config.connectionId || !node.config.message?.trim()) throw new Error(`Action "${node.title}" has not been configured.`);
+  if (!node.config || !("integrationId" in node.config) || !node.config.connectionId) {
+    throw new Error(`Action "${node.title}" has not been configured.`);
+  }
   if (node.config.integrationId === "discord" && node.config.actionId === "send_message") {
+    if (!node.config.message?.trim()) throw new Error("The Discord action is missing its message.");
     return executeDiscordAction(node.config, organizationId, input);
+  }
+  if (node.config.integrationId === "http" && node.config.actionId === "request") {
+    return executeHttpAction(node.config, organizationId, input);
   }
   throw new Error(`Action "${node.title}" is not supported by this worker version.`);
 }
@@ -317,17 +391,24 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
   }
 
   const steps: ExecutionStep[] = [];
+  const executionContext: Record<string, unknown> = run.input && typeof run.input === "object" && !Array.isArray(run.input)
+    ? { ...(run.input as Record<string, unknown>), steps: {} }
+    : { value: run.input, steps: {} };
   try {
     const parsedDefinition = workflowDefinitionSchema.safeParse(workflow.definition);
     if (!parsedDefinition.success) throw new Error("The saved workflow definition is invalid.");
 
     const definition = parsedDefinition.data as WorkflowDefinition;
     validateExecutableWorkflow(definition);
-    const path = resolveExecutionPath(definition, run.input);
-    for (const node of path) {
+    let currentNode = definition.nodes.find((node) => node.kind === "trigger");
+    const visitedNodes = new Set<string>();
+    while (currentNode) {
+      const node = currentNode;
+      if (visitedNodes.has(node.id)) throw new Error("Workflow connections contain a cycle.");
+      visitedNodes.add(node.id);
       const startedAt = new Date().toISOString();
       if (!(await ownsLease())) throw new Error("Execution lease was lost; this worker stopped.");
-      await job.updateProgress({ currentNode: node.id, completed: steps.length, total: path.length });
+      await job.updateProgress({ currentNode: node.id, completed: steps.length, total: definition.nodes.length });
       const ledgerStep = await prisma.workflowRunStep.create({
         data: { runId, nodeId: node.id, title: node.title, kind: node.kind, status: "RUNNING" },
       });
@@ -338,15 +419,22 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
           result = {};
         } else if (node.kind === "condition") {
           if (!node.config || !("operator" in node.config)) throw new Error(`Condition "${node.title}" has no valid rule.`);
-          result = { condition: evaluateCondition(node.config, run.input) };
+          result = { condition: evaluateCondition(node.config, executionContext) };
         } else {
           if (!(await ownsLease())) throw new Error("Execution lease was lost before the external action.");
-          result = await executeAction(node, workflow.organizationId, run.input);
+          result = await executeAction(node, workflow.organizationId, executionContext);
         }
 
+        if (result && typeof result === "object" && !Array.isArray(result)) {
+          (executionContext.steps as Record<string, unknown>)[node.id] = result;
+        }
+        const persistedResult = result && typeof result === "object" && !Array.isArray(result)
+          && "responseValue" in result
+          ? toPersistableHttpActionResult(result as { httpStatus: number; responseValue?: string | number | boolean | null })
+          : result;
         await prisma.workflowRunStep.update({
           where: { id: ledgerStep.id, run: { is: { status: "RUNNING", leaseToken } } },
-          data: { status: "SUCCEEDED", finishedAt: new Date(), result: result ?? {} },
+          data: { status: "SUCCEEDED", finishedAt: new Date(), result: persistedResult ?? {} },
         });
         steps.push({
           nodeId: node.id,
@@ -354,7 +442,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
           status: "SUCCEEDED",
           startedAt,
           finishedAt: new Date().toISOString(),
-          ...(result ? { result } : {}),
+          ...(persistedResult ? { result: persistedResult } : {}),
         });
       } catch (error) {
         const safeMessage = error instanceof Error ? error.message : "The workflow step failed.";
@@ -381,6 +469,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
         where: { id: runId, status: "RUNNING", leaseToken },
         data: { output: { executionMode: "LIVE", steps: serializeSteps(steps) } },
       });
+      currentNode = resolveNextExecutionNode(definition, node, executionContext);
     }
 
     const output = {

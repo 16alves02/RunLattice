@@ -26,9 +26,22 @@ describe("workspace membership authorization", () => {
     expect(findFirst).not.toHaveBeenCalled();
   });
 
+  it("rejects authenticated users until MFA is enabled", async () => {
+    getSession.mockResolvedValue({
+      user: { id: "user-unprotected", twoFactorEnabled: false },
+      session: { activeOrganizationId: "org-1" },
+    });
+
+    const result = await getRequestWorkspace(new Request("http://localhost/api/workflows"));
+
+    expect(result.response?.status).toBe(403);
+    expect(result.response?.headers.get("content-type")).toContain("application/json");
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+
   it("rejects an active organization that the user does not belong to", async () => {
     getSession.mockResolvedValue({
-      user: { id: "user-1" },
+      user: { id: "user-1", twoFactorEnabled: true },
       session: { activeOrganizationId: "org-outside" },
     });
     findFirst.mockResolvedValue(null);
@@ -44,7 +57,7 @@ describe("workspace membership authorization", () => {
 
   it("returns a workspace only after membership is verified", async () => {
     getSession.mockResolvedValue({
-      user: { id: "user-1" },
+      user: { id: "user-1", twoFactorEnabled: true },
       session: { activeOrganizationId: "org-1" },
     });
     findFirst.mockResolvedValue({ organizationId: "org-1", role: "owner" });
@@ -57,7 +70,7 @@ describe("workspace membership authorization", () => {
 
   it("uses a verified membership when the session has no active organization", async () => {
     getSession.mockResolvedValue({
-      user: { id: "user-2" },
+      user: { id: "user-2", twoFactorEnabled: true },
       session: { activeOrganizationId: null },
     });
     findFirst.mockResolvedValue({ organizationId: "org-2", role: "member" });
