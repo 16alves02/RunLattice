@@ -27,7 +27,8 @@ export function CookieConsent() {
     try { window.localStorage.setItem(STORAGE_KEY, value); } catch { /* Keep the in-memory choice for this visit. */ }
     setConsent(value);
   }
-  if (!ready || consent !== null) return null;
+  if (!ready) return null;
+  if (consent !== null) return <button type="button" className="consent-settings" onClick={() => setConsent(null)} aria-label="Change privacy preferences">Privacy settings</button>;
   return <aside className="consent-banner" aria-label="Privacy preferences" role="region">
     <div><strong>Privacy preferences</strong><p>Essential storage keeps your account secure. Optional analytics remain off unless you allow them.</p></div>
     <div className="consent-actions"><button type="button" className="btn btn-quiet" onClick={() => choose("rejected")}>Reject optional</button><button type="button" className="btn btn-primary" onClick={() => choose("accepted")}>Allow analytics</button></div>
