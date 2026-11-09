@@ -44,7 +44,6 @@ describe("bounded request body reader", () => {
       pull(controller) {
         emitted += 1;
         controller.enqueue(new Uint8Array(4));
-        if (emitted === 3) controller.close();
       },
       cancel,
     });
