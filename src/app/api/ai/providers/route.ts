@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret } from "@/lib/secrets";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
+import { readBoundedJsonRequest } from "@/lib/read-bounded-body";
 
 export const runtime = "nodejs";
 
@@ -35,8 +36,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Workspace owner or administrator permission required." }, { status: 403 });
   }
 
-  const body = await request.json().catch(() => null);
-  const parsed = saveSchema.safeParse(body);
+  const bodyResult = await readBoundedJsonRequest(request, 8_192);
+  if (!bodyResult.ok) return NextResponse.json({ error: "Invalid or oversized request body." }, { status: bodyResult.reason === "too_large" ? 413 : 400 });
+  const parsed = saveSchema.safeParse(bodyResult.value);
   if (!parsed.success) return NextResponse.json({ error: "Provide a supported provider, model and valid API key." }, { status: 400 });
 
   try {
