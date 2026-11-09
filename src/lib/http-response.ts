@@ -42,6 +42,6 @@ export function extractJsonResponseValue(body: string, path: string): JsonScalar
  * Runtime-mapped values are passed only in memory to later steps.
  * Run history stores the HTTP status, never the selected response value.
  */
-export function toPersistableHttpActionResult(result: { httpStatus: number }): { httpStatus: number } {
+export function toPersistableHttpActionResult(result: { httpStatus: number; responseValue?: JsonScalar }): { httpStatus: number } {
   return { httpStatus: result.httpStatus };
 }
