@@ -156,6 +156,48 @@ describe("workflow definition validation", () => {
     expect(workflowDefinitionSchema.safeParse(valid).success).toBe(true);
   });
 
+  it("accepts condition paths that reference hyphenated workflow node IDs", () => {
+    const valid = {
+      nodes: [
+        validDefinition.nodes[0],
+        {
+          id: "http-action",
+          kind: "action",
+          title: "Get invoice",
+          detail: "",
+          config: {
+            integrationId: "http",
+            actionId: "request",
+            connectionId: "http-connection",
+            method: "GET",
+            url: "https://api.example.com/v1/invoices",
+            responsePath: "data.amount",
+          },
+          x: 100,
+          y: 0,
+        },
+        {
+          id: "condition",
+          kind: "condition",
+          title: "Check amount",
+          detail: "",
+          config: { path: "steps.http-action.responseValue", operator: "greater_than", value: 100 },
+          x: 200,
+          y: 0,
+        },
+        { ...validDefinition.nodes[1], id: "true-action" },
+        { ...validDefinition.nodes[1], id: "false-action" },
+      ],
+      edges: [
+        { id: "start", from: "trigger", to: "http-action" },
+        { id: "http-condition", from: "http-action", to: "condition" },
+        { id: "yes", from: "condition", to: "true-action", branch: "true" },
+        { id: "no", from: "condition", to: "false-action", branch: "false" },
+      ],
+    };
+    expect(workflowDefinitionSchema.safeParse(valid).success).toBe(true);
+  });
+
   it("rejects prototype paths in condition rules", () => {
     const invalid = {
       nodes: [
