@@ -13,6 +13,8 @@ const webhookWorkflowId = `integration-webhook-${randomBytes(8).toString("hex")}
 const workerWorkflowId = `integration-worker-${randomBytes(8).toString("hex")}`;
 const successfulWorkflowId = `integration-success-${randomBytes(8).toString("hex")}`;
 const successfulConnectionId = `integration-connection-${randomBytes(8).toString("hex")}`;
+const httpWorkflowId = `integration-http-${randomBytes(8).toString("hex")}`;
+const httpConnectionId = `integration-http-connection-${randomBytes(8).toString("hex")}`;
 let workerProcess: ChildProcess | undefined;
 
 describe("RunLattice PostgreSQL, API and worker integration", () => {
@@ -127,7 +129,7 @@ describe("RunLattice PostgreSQL, API and worker integration", () => {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        NODE_OPTIONS: [process.env.NODE_OPTIONS, "--import=./tests/mocks/mock-discord-fetch.mjs"].filter(Boolean).join(" "),
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, "--import=./tests/mocks/mock-discord-fetch.mjs", "--import=./tests/mocks/mock-http-https.mjs"].filter(Boolean).join(" "),
       },
       stdio: "ignore",
       shell: process.platform === "win32",
@@ -199,6 +201,122 @@ describe("RunLattice PostgreSQL, API and worker integration", () => {
     const completed = await prisma.workflowRun.findUnique({ where: { id: run.id } });
     expect(completed?.finishedAt).toBeInstanceOf(Date);
     expect(completed?.output).toMatchObject({ executionMode: "LIVE", message: "Workflow actions completed successfully." });
+  });
+
+  it("executes a secured HTTP request and routes a condition from its mapped response in the real worker", async () => {
+    const baseUrl = "https://93.184.216.34/v1";
+    await prisma.integrationConnection.create({
+      data: {
+        id: httpConnectionId,
+        organizationId,
+        provider: "http",
+        name: "Mock HTTP API",
+        credentialsCiphertext: encryptSecret(JSON.stringify({
+          baseUrl,
+          apiKey: "integration-test-secret",
+          apiKeyHeader: "authorization",
+        }), `${organizationId}:http`),
+      },
+    });
+    await prisma.workflow.create({
+      data: {
+        id: httpWorkflowId,
+        name: "HTTP response condition integration",
+        description: "",
+        status: "ACTIVE",
+        triggerType: "MANUAL",
+        organizationId,
+        definition: {
+          nodes: [
+            {
+              id: "trigger",
+              kind: "trigger",
+              title: "Manual trigger",
+              detail: "Trigger · MANUAL",
+              config: { triggerType: "MANUAL" },
+              x: 0,
+              y: 0,
+            },
+            {
+              id: "http-action",
+              kind: "action",
+              title: "Get invoice",
+              detail: "HTTP · Request",
+              config: {
+                integrationId: "http",
+                actionId: "request",
+                connectionId: httpConnectionId,
+                method: "GET",
+                url: `${baseUrl}/invoices/123`,
+                responsePath: "data.amount",
+              },
+              x: 320,
+              y: 0,
+            },
+            {
+              id: "condition",
+              kind: "condition",
+              title: "Check invoice amount",
+              detail: "Condition · greater than 100",
+              config: { path: "steps.http-action.responseValue", operator: "greater_than", value: 100 },
+              x: 640,
+              y: 0,
+            },
+            {
+              id: "high-action",
+              kind: "action",
+              title: "Notify high-value invoice",
+              detail: "Discord · Send message",
+              config: {
+                integrationId: "discord",
+                actionId: "send_message",
+                connectionId: successfulConnectionId,
+                message: "High-value invoice: {{input.steps.http-action.responseValue}}",
+              },
+              x: 960,
+              y: -100,
+            },
+            {
+              id: "low-action",
+              kind: "action",
+              title: "Notify low-value invoice",
+              detail: "Discord · Send message",
+              config: {
+                integrationId: "discord",
+                actionId: "send_message",
+                connectionId: successfulConnectionId,
+                message: "Low-value invoice",
+              },
+              x: 960,
+              y: 100,
+            },
+          ],
+          edges: [
+            { id: "start-http", from: "trigger", to: "http-action" },
+            { id: "http-condition", from: "http-action", to: "condition" },
+            { id: "condition-true", from: "condition", to: "high-action", branch: "true" },
+            { id: "condition-false", from: "condition", to: "low-action", branch: "false" },
+          ],
+        },
+      },
+    });
+    const run = await prisma.workflowRun.create({
+      data: { workflowId: httpWorkflowId, input: {}, outboxEvent: { create: {} } },
+    });
+
+    startWorkerProcess();
+    expect(await waitForRunStatus(run.id, "SUCCEEDED")).toBe("SUCCEEDED");
+    const completed = await prisma.workflowRun.findUnique({ where: { id: run.id } });
+    const persistedSteps = await prisma.workflowRunStep.findMany({
+      where: { runId: run.id },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(persistedSteps.map((step) => step.nodeId)).toEqual([
+      "trigger", "http-action", "condition", "high-action",
+    ]);
+    expect(persistedSteps.find((step) => step.nodeId === "http-action")?.result).toEqual({ httpStatus: 200 });
+    expect(JSON.stringify(completed?.output)).not.toContain("inv_mock_123");
+    expect(JSON.stringify(completed?.output)).not.toContain("integration-test-secret");
   });
 
   it("records an invalid workflow failure safely in the real BullMQ worker", async () => {
