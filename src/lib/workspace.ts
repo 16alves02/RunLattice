@@ -55,7 +55,7 @@ export async function requireServerWorkspace(): Promise<WorkspaceContext> {
   const requestHeaders = await headers();
   const session = await auth.api.getSession({ headers: requestHeaders });
 
-  if (!session) redirect("/sign-in");
+  if (!session) redirect("/sign-in");\n  if (!session.user.twoFactorEnabled) redirect("/security");
 
   const activeOrganizationId = session.session.activeOrganizationId;
   const membership = activeOrganizationId
