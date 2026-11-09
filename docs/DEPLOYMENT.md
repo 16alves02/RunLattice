@@ -84,7 +84,7 @@ Automatic Stripe Tax is disabled by default. Configure tax registrations and obt
 5. Deploy Web from the same verified commit and confirm /api/health returns status=ok with checks.database=ok, checks.redis=ok and checks.worker=ok. The worker check requires a heartbeat newer than 90 seconds.
 6. Confirm Worker logs show PostgreSQL connection established and the worker is processing the queue. Confirm Redis is online.
 7. Test sign-up, verification email, sign-in, session persistence, sign-out, password reset and workspace isolation.
-8. Test a real workflow in the preview environment using only a controlled Discord destination. Verify manual, webhook and scheduled triggers.
+8. Test real workflows in the preview environment using a controlled Discord destination and a dedicated HTTPS test API. For HTTP actions, verify the configured origin/base-path boundary, API-key secrecy, redirect and private-IP blocking, timeout and payload limits. Verify manual, signed webhook and scheduled triggers.
 9. Test Stripe Checkout, Customer Portal, subscription lifecycle, failed payment, cancellation, duplicate webhooks and workspace entitlement changes in test mode.
 10. Configure backups and test a restore before accepting customer data.
 
