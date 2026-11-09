@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractJsonResponseValue } from "@/lib/http-response";
+import { extractJsonResponseValue, toPersistableHttpActionResult } from "@/lib/http-response";
 
 describe("HTTP JSON response mapping", () => {
   it("extracts an explicitly selected string, number, boolean or null", () => {
@@ -22,6 +22,11 @@ describe("HTTP JSON response mapping", () => {
     expect(() => extractJsonResponseValue("{", "data.id")).toThrow(/valid JSON/);
     expect(() => extractJsonResponseValue('{"data":{"id":"x"}}', "data.__proto__.id")).toThrow(/invalid/);
     expect(() => extractJsonResponseValue('{"data":{"id":"x"}}', "data.constructor")).toThrow(/invalid/);
+  });
+
+  it("does not persist mapped response values in workflow run history", () => {
+    expect(toPersistableHttpActionResult({ httpStatus: 201, responseValue: "sensitive-token" } as { httpStatus: number }))
+      .toEqual({ httpStatus: 201 });
   });
 
   it("rejects invalid scalar values and invalid path lengths", () => {
