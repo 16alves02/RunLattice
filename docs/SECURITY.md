@@ -117,3 +117,7 @@ This trust assumption applies to requests arriving through Railway's public HTTP
 References:
 - [Railway public networking request headers](https://docs.railway.com/networking/public-networking/specs-and-limits)
 - [Better Auth IP address configuration](https://better-auth.com/docs/concepts/rate-limit)
+
+## Bounded request body handling
+
+Application API routes that accept JSON or raw payloads use a streaming reader with endpoint-specific byte limits. The reader checks a declared Content-Length as an early rejection hint, enforces the limit against bytes actually received, cancels oversized streams and rejects invalid UTF-8/JSON. The current limits are 8 KiB for billing, integration and AI-provider credential requests; 10 KB for AI planning; 32 KiB for workflow run inputs and signed workflow webhooks; 64 KiB for AI dry-run simulations; 256 KiB for workflow definitions; and 1 MiB for Stripe webhook events. Authentication routes are handled by Better Auth and remain subject to its own request handling and upstream platform limits.
