@@ -274,7 +274,7 @@ describe("RunLattice PostgreSQL, API and worker integration", () => {
                 message: "High-value invoice: {{input.steps.http-action.responseValue}}",
               },
               x: 960,
-              y: -100,
+              y: 200,
             },
             {
               id: "low-action",
