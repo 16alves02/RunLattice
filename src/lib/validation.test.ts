@@ -15,6 +15,50 @@ describe("workflow definition validation", () => {
   });
 
 
+
+  it("accepts a configured HTTP request action", () => {
+    const definition = {
+      nodes: [
+        validDefinition.nodes[0],
+        {
+          ...validDefinition.nodes[1],
+          config: {
+            integrationId: "http",
+            actionId: "request",
+            connectionId: "connection-1",
+            method: "POST",
+            url: "https://api.example.com/v1/events",
+            body: '{"event": "created"}',
+          },
+        },
+      ],
+      edges: validDefinition.edges,
+    };
+    expect(workflowDefinitionSchema.safeParse(definition).success).toBe(true);
+  });
+
+  it("rejects HTTP actions with a GET body or invalid method", () => {
+    const base = {
+      ...validDefinition.nodes[1],
+      config: {
+        integrationId: "http",
+        actionId: "request",
+        connectionId: "connection-1",
+        method: "GET",
+        url: "https://api.example.com/v1/events",
+        body: '{"event": "created"}',
+      },
+    };
+    expect(workflowDefinitionSchema.safeParse({
+      nodes: [validDefinition.nodes[0], base],
+      edges: validDefinition.edges,
+    }).success).toBe(false);
+    expect(workflowDefinitionSchema.safeParse({
+      nodes: [validDefinition.nodes[0], { ...base, config: { ...base.config, method: "TRACE" } }],
+      edges: validDefinition.edges,
+    }).success).toBe(false);
+  });
+
   it("accepts typed webhook and scheduled triggers", () => {
     const webhook = {
       nodes: [{ ...validDefinition.nodes[0], config: { triggerType: "WEBHOOK" } }],
@@ -163,6 +207,33 @@ describe("Discord integration connection validation", () => {
   });
 });
 
+
+
+describe("HTTP API integration connection validation", () => {
+  it("accepts a bounded API key and supported auth header", () => {
+    expect(createIntegrationConnectionSchema.safeParse({
+      provider: "http",
+      name: "Billing API",
+      apiKey: "Bearer test-token",
+      apiKeyHeader: "authorization",
+    }).success).toBe(true);
+    expect(createIntegrationConnectionSchema.safeParse({
+      provider: "http",
+      name: "Inventory API",
+      apiKey: "test-token",
+      apiKeyHeader: "x-api-key",
+    }).success).toBe(true);
+  });
+
+  it("rejects empty credentials and arbitrary header names", () => {
+    expect(createIntegrationConnectionSchema.safeParse({
+      provider: "http",
+      name: "Broken API",
+      apiKey: "",
+      apiKeyHeader: "x-forwarded-for",
+    }).success).toBe(false);
+  });
+});
 
 describe("workflow run input validation", () => {
   it("accepts a bounded JSON object", () => {
