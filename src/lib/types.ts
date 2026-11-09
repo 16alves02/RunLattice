@@ -7,6 +7,15 @@ export interface DiscordActionConfig {
   message?: string;
 }
 
+export interface HttpActionConfig {
+  integrationId: "http";
+  actionId: "request";
+  connectionId?: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  url: string;
+  body?: string;
+}
+
 export type ConditionOperator = "equals" | "not_equals" | "contains" | "greater_than" | "less_than" | "exists";
 
 export interface ConditionConfig {
@@ -26,7 +35,7 @@ export interface WorkflowNode {
   kind: NodeKind;
   title: string;
   detail: string;
-  config?: DiscordActionConfig | ConditionConfig | TriggerConfig;
+  config?: DiscordActionConfig | HttpActionConfig | ConditionConfig | TriggerConfig;
   x: number;
   y: number;
 }
