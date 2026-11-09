@@ -208,6 +208,14 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   try {
+    // Confirm workspace ownership before touching the shared scheduler.
+    // Otherwise a caller could remove another workspace's scheduled job by ID.
+    const existing = await prisma.workflow.findFirst({
+      where: { id, organizationId: access.context.organizationId },
+      select: { id: true },
+    });
+    if (!existing) return NextResponse.json({ error: "Workflow not found." }, { status: 404 });
+
     await syncWorkflowSchedule({ workflowId: id, status: "DRAFT", triggerType: "MANUAL", definition: { nodes: [], edges: [] } });
     const result = await prisma.workflow.deleteMany({
       where: { id, organizationId: access.context.organizationId },
