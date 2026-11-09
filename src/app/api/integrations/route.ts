@@ -66,7 +66,11 @@ export async function POST(request: Request) {
           organizationId: access.context.organizationId,
           provider: parsed.data.provider,
           name: parsed.data.name,
-          credentialsCiphertext: encryptSecret(JSON.stringify({ webhookUrl: parsed.data.webhookUrl }), `${access.context.organizationId}:${parsed.data.provider}`),
+          credentialsCiphertext: encryptSecret(JSON.stringify(
+            parsed.data.provider === "discord"
+              ? { webhookUrl: parsed.data.webhookUrl }
+              : { apiKey: parsed.data.apiKey, apiKeyHeader: parsed.data.apiKeyHeader },
+          ), `${access.context.organizationId}:${parsed.data.provider}`),
         },
         select: { id: true, provider: true, name: true, createdAt: true },
       });
