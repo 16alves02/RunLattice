@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   isPublicIpAddress,
+  isWithinAllowedHttpsBase,
   resolvePublicHttpsTarget,
   validateOutboundHttpsUrl,
 } from "@/lib/safe-http";
@@ -65,6 +66,25 @@ describe("public IP classification", () => {
     "2002::1",
   ])("rejects non-public address %s", (address) => {
     expect(isPublicIpAddress(address)).toBe(false);
+  });
+});
+
+describe("HTTP API connection destination boundaries", () => {
+  it("allows paths inside the configured HTTPS origin and base path", () => {
+    expect(isWithinAllowedHttpsBase("https://api.example.com/v1", "https://api.example.com/v1/events")).toBe(true);
+    expect(isWithinAllowedHttpsBase("https://api.example.com/v1/", "https://api.example.com/v1")).toBe(true);
+    expect(isWithinAllowedHttpsBase("https://api.example.com", "https://api.example.com/v2/events")).toBe(true);
+  });
+
+  it.each([
+    "https://attacker.example/v1/events",
+    "http://api.example.com/v1/events",
+    "https://api.example.com:8443/v1/events",
+    "https://api.example.com/v10/events",
+    "https://api.example.com/admin",
+    "https://user:pass@api.example.com/v1/events",
+  ])("rejects destination outside the saved API boundary: %s", (url) => {
+    expect(isWithinAllowedHttpsBase("https://api.example.com/v1", url)).toBe(false);
   });
 });
 
