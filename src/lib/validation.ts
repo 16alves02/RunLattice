@@ -14,6 +14,10 @@ const httpActionConfigSchema = z.object({
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
   url: z.string().trim().min(1).max(2_000),
   body: z.string().max(65_536).optional(),
+}).superRefine((config, context) => {
+  if (config.method === "GET" && config.body?.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "GET requests cannot include a request body." });
+  }
 });
 
 const conditionConfigSchema = z.object({
