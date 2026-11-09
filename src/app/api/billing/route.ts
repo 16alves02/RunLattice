@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { getAppOrigin, getStripe } from "@/lib/stripe";
+import { readBoundedJsonRequest } from "@/lib/read-bounded-body";
 
 export const runtime = "nodejs";
 const requestSchema = z.discriminatedUnion("action", [
@@ -17,8 +18,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Workspace owner or administrator permission required." }, { status: 403 });
   }
 
-  const body = await request.json().catch(() => null);
-  const parsed = requestSchema.safeParse(body);
+  const bodyResult = await readBoundedJsonRequest(request, 8_192);
+  if (!bodyResult.ok) return NextResponse.json({ error: "Invalid or oversized billing request." }, { status: bodyResult.reason === "too_large" ? 413 : 400 });
+  const parsed = requestSchema.safeParse(bodyResult.value);
   if (!parsed.success) return NextResponse.json({ error: "Invalid billing action." }, { status: 400 });
 
   try {
