@@ -22,6 +22,19 @@ describe("workflow input templates", () => {
     expect(() => renderInputTemplate("{{input.__proto__.polluted}}", {})).toThrow(/forbidden/);
   });
 
+  it("JSON-encodes scalar input values for HTTP request bodies", () => {
+    const rendered = renderInputTemplate('{"name": {{input.customer.name}}, "count": {{input.count}}}', {
+      customer: { name: 'A "quoted" value' },
+      count: 3,
+    }, 65_536, true);
+    expect(JSON.parse(rendered)).toEqual({ name: 'A "quoted" value', count: 3 });
+  });
+
+  it("supports a larger explicit limit for bounded HTTP payloads", () => {
+    expect(renderInputTemplate("{{input.payload}}", { payload: "x".repeat(4_000) }, 65_536)).toHaveLength(4_000);
+    expect(() => renderInputTemplate("{{input.payload}}", { payload: "x".repeat(4_000) }, 2_000)).toThrow(/2,000 characters/);
+  });
+
   it("rejects a rendered message longer than Discord's limit", () => {
     expect(() => renderInputTemplate("{{input.message}}", { message: "x".repeat(2_001) })).toThrow(/2,000 characters/);
   });
