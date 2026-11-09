@@ -5,6 +5,34 @@ function getOutgoingEdges(definition: WorkflowDefinition, nodeId: string) {
   return definition.edges.filter((edge) => edge.from === nodeId);
 }
 
+/**
+ * Resolves the next node only after the current node has completed.
+ * This allows conditions to inspect explicitly mapped outputs from earlier steps.
+ */
+export function resolveNextExecutionNode(
+  definition: WorkflowDefinition,
+  currentNode: WorkflowNode,
+  input: unknown = {},
+): WorkflowNode | undefined {
+  const outgoing = getOutgoingEdges(definition, currentNode.id);
+  if (outgoing.length === 0) return undefined;
+
+  let nextEdge = outgoing[0];
+  if (currentNode.kind === "condition") {
+    if (!currentNode.config || !("operator" in currentNode.config)) {
+      throw new Error(`Condition "${currentNode.title}" has no valid rule.`);
+    }
+    const branch = evaluateCondition(currentNode.config, input) ? "true" : "false";
+    const selectedEdge = outgoing.find((edge) => edge.branch === branch);
+    if (!selectedEdge) throw new Error(`Condition "${currentNode.title}" has no ${branch} branch.`);
+    nextEdge = selectedEdge;
+  }
+  if (!nextEdge) return undefined;
+  const nextNode = definition.nodes.find((node) => node.id === nextEdge.to);
+  if (!nextNode) throw new Error("Workflow connection references a missing node.");
+  return nextNode;
+}
+
 export function validateWorkflowGraph(definition: WorkflowDefinition): WorkflowNode[] {
   if (definition.nodes.filter((node) => node.kind === "condition").length > 1) {
     throw new Error("This execution version supports one condition node per workflow.");
