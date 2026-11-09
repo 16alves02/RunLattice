@@ -11,7 +11,7 @@ import { resolveExecutionPath, validateExecutableWorkflow } from "../src/lib/exe
 import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
 import type { DiscordActionConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
-import { requestPublicHttps } from "../src/lib/safe-http";
+import { isWithinAllowedHttpsBase, requestPublicHttps } from "../src/lib/safe-http";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 
 const prisma = new PrismaClient();
@@ -156,21 +156,8 @@ async function executeHttpAction(config: HttpActionConfig, organizationId: strin
   }
 
   const url = renderInputTemplate(config.url, input, 2_000);
-  let allowedOrigin: string;
-  let allowedPath: string;
-  let requestedUrl: URL;
-  try {
-    const base = new URL(credentials.baseUrl);
-    requestedUrl = new URL(url);
-    allowedOrigin = base.origin;
-    allowedPath = base.pathname.endsWith("/") ? base.pathname : `${base.pathname}/`;
-  } catch {
-    throw new Error("The HTTP action destination URL is invalid.");
-  }
-  const basePathWithoutSlash = allowedPath.slice(0, -1) || "/";
-  if (allowedOrigin !== requestedUrl.origin
-    || (requestedUrl.pathname !== basePathWithoutSlash && !requestedUrl.pathname.startsWith(allowedPath))) {
-    throw new Error("The HTTP action destination must remain inside the origin and base path configured for this API connection.");
+  if (!isWithinAllowedHttpsBase(credentials.baseUrl, url)) {
+    throw new Error("The HTTP action destination must remain inside the HTTPS origin and base path configured for this API connection.");
   }
   const body = config.body ? renderInputTemplate(config.body, input, 65_536, true) : "";
   if (body) {
