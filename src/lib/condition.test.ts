@@ -38,6 +38,15 @@ describe("condition evaluation", () => {
     expect(evaluateCondition({ path: "customer.name", operator: "greater_than", value: 1 }, input)).toBe(false);
   });
 
+  it("resolves values from hyphenated workflow step IDs", () => {
+    const context = { steps: { "http-action": { responseValue: 150 } } };
+    expect(evaluateCondition({
+      path: "steps.http-action.responseValue",
+      operator: "greater_than",
+      value: 100,
+    }, context)).toBe(true);
+  });
+
   it("rejects prototype-related and malformed paths", () => {
     expect(() => evaluateCondition({ path: "customer.__proto__.polluted", operator: "exists" }, input)).toThrow(/invalid/);
     expect(() => evaluateCondition({ path: "customer..name", operator: "exists" }, input)).toThrow(/invalid/);
