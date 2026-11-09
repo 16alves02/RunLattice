@@ -18,6 +18,9 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
       REDIS_URL: redis://localhost:6379
       CRON_SECRET: ci-only-placeholder-secret
+      BETTER_AUTH_SECRET: ci-only-secret-that-is-long-enough-for-tests
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
