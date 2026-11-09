@@ -37,6 +37,7 @@ export default function SecurityPage() {
     try {
       const result = await authClient.twoFactor.enable({ password, issuer: "RunLattice" });
       if (result.error || !result.data) throw new Error(result.error?.message || "Could not start authenticator setup.");
+      if (result.data.method !== "totp") throw new Error("The authenticator setup did not return a TOTP credential.");
       const uri = result.data.totpURI;
       setTotpUri(uri);
       setManualKey(new URL(uri).searchParams.get("secret") || "");
