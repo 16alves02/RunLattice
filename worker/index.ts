@@ -12,7 +12,7 @@ import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
 import type { DiscordActionConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
 import { isWithinAllowedHttpsBase, requestPublicHttps } from "../src/lib/safe-http";
-import { extractJsonResponseValue } from "../src/lib/http-response";
+import { extractJsonResponseValue, toPersistableHttpActionResult } from "../src/lib/http-response";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 
 const prisma = new PrismaClient();
@@ -424,9 +424,13 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
         if (result && typeof result === "object" && !Array.isArray(result)) {
           (executionContext.steps as Record<string, unknown>)[node.id] = result;
         }
+        const persistedResult = result && typeof result === "object" && !Array.isArray(result)
+          && "responseValue" in result
+          ? toPersistableHttpActionResult(result as { httpStatus: number; responseValue?: string | number | boolean | null })
+          : result;
         await prisma.workflowRunStep.update({
           where: { id: ledgerStep.id, run: { is: { status: "RUNNING", leaseToken } } },
-          data: { status: "SUCCEEDED", finishedAt: new Date(), result: result ?? {} },
+          data: { status: "SUCCEEDED", finishedAt: new Date(), result: persistedResult ?? {} },
         });
         steps.push({
           nodeId: node.id,
@@ -434,7 +438,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
           status: "SUCCEEDED",
           startedAt,
           finishedAt: new Date().toISOString(),
-          ...(result ? { result } : {}),
+          ...(persistedResult ? { result: persistedResult } : {}),
         });
       } catch (error) {
         const safeMessage = error instanceof Error ? error.message : "The workflow step failed.";
