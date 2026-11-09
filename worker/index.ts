@@ -123,10 +123,6 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
     throw new Error(`Discord rejected the message with HTTP ${response.status}.`);
   }
 
-  if (config.responsePath?.trim()) {
-    const responseValue = extractJsonResponseValue(response.body, config.responsePath.trim());
-    return { httpStatus: response.status, responseValue };
-  }
   return { httpStatus: response.status };
 }
 
@@ -186,6 +182,10 @@ async function executeHttpAction(config: HttpActionConfig, organizationId: strin
 
   if (response.status < 200 || response.status >= 300) {
     throw new Error(`The external API returned HTTP ${response.status}.`);
+  }
+  if (config.responsePath?.trim()) {
+    const responseValue = extractJsonResponseValue(response.body, config.responsePath.trim());
+    return { httpStatus: response.status, responseValue };
   }
   return { httpStatus: response.status };
 }
