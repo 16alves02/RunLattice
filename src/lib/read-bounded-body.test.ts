@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { readBoundedRequestBody } from "@/lib/read-bounded-body";
+import { readBoundedJsonRequest, readBoundedRequestBody } from "@/lib/read-bounded-body";
 
 describe("bounded request body reader", () => {
   it("reads a body within the byte limit", async () => {
@@ -81,4 +81,22 @@ describe("bounded request body reader", () => {
       body: "",
     });
   });
+  it("parses bounded JSON and rejects malformed JSON", async () => {
+    const valid = new Request("http://localhost/test", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "test" }),
+    });
+    await expect(readBoundedJsonRequest(valid, 64)).resolves.toEqual({
+      ok: true,
+      value: { action: "test" },
+    });
+
+    const invalid = new Request("http://localhost/test", { method: "POST", body: "{" });
+    await expect(readBoundedJsonRequest(invalid, 64)).resolves.toEqual({
+      ok: false,
+      reason: "invalid_json",
+    });
+  });
+
 });
