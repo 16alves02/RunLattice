@@ -214,21 +214,42 @@ describe("HTTP API integration connection validation", () => {
     expect(createIntegrationConnectionSchema.safeParse({
       provider: "http",
       name: "Billing API",
+      baseUrl: "https://api.billing.example",
       apiKey: "Bearer test-token",
       apiKeyHeader: "authorization",
     }).success).toBe(true);
     expect(createIntegrationConnectionSchema.safeParse({
       provider: "http",
       name: "Inventory API",
+      baseUrl: "https://inventory.example",
       apiKey: "test-token",
       apiKeyHeader: "x-api-key",
     }).success).toBe(true);
+  });
+
+  it("rejects insecure or credential-bearing API base URLs", () => {
+    for (const baseUrl of [
+      "http://api.example.com",
+      "https://user:pass@api.example.com",
+      "https://api.example.com:8443",
+      "https://api.example.com?token=secret",
+      "https://api.example.com#fragment",
+    ]) {
+      expect(createIntegrationConnectionSchema.safeParse({
+        provider: "http",
+        name: "Invalid API",
+        baseUrl,
+        apiKey: "secret",
+        apiKeyHeader: "authorization",
+      }).success).toBe(false);
+    }
   });
 
   it("rejects empty credentials and arbitrary header names", () => {
     expect(createIntegrationConnectionSchema.safeParse({
       provider: "http",
       name: "Broken API",
+      baseUrl: "https://api.example.com",
       apiKey: "",
       apiKeyHeader: "x-forwarded-for",
     }).success).toBe(false);
