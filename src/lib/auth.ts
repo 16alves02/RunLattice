@@ -88,5 +88,12 @@ export const auth = betterAuth({
       return PLAN_LIMITS[plan].members;
     },
   })],
+  // Railway's public HTTP edge overwrites X-Real-IP with the connecting client IP.
+  // Do not use X-Forwarded-For here: Railway may add proxy hops to that header.
+  advanced: {
+    ipAddress: {
+      ipAddressHeaders: ["x-real-ip"],
+    },
+  },
   trustedOrigins: trustedOrigins.length > 0 ? trustedOrigins : ["http://localhost:3000"],
 });
