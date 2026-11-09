@@ -152,8 +152,12 @@ async function executeHttpAction(config: HttpActionConfig, organizationId: strin
     throw new Error("The stored HTTP API credentials are invalid.");
   }
 
-  const url = renderInputTemplate(config.url, input);
-  const body = config.body ? renderInputTemplate(config.body, input) : "";
+  const url = renderInputTemplate(config.url, input, 2_000);
+  const body = config.body ? renderInputTemplate(config.body, input, 65_536, true) : "";
+  if (body) {
+    try { JSON.parse(body); }
+    catch { throw new Error("The rendered HTTP request body must be valid JSON."); }
+  }
   let response;
   try {
     response = await requestPublicHttps({
