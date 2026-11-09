@@ -9,7 +9,7 @@ import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
 const secret = process.env.BETTER_AUTH_SECRET;
 const production = process.env.NODE_ENV === "production";
 
-if (production && !secret) {
+if (production && !secret?.trim()) {
   throw new Error("BETTER_AUTH_SECRET must be set in production.");
 }
 const emailConfigured = Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
