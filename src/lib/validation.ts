@@ -14,6 +14,7 @@ const httpActionConfigSchema = z.object({
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
   url: z.string().trim().min(1).max(2_000),
   body: z.string().max(65_536).optional(),
+  responsePath: z.string().trim().max(200).regex(/^[A-Za-z_$][A-Za-z0-9_$-]*(\\.[A-Za-z_$][A-Za-z0-9_$-]*)*$/).optional().or(z.literal("")),
 }).superRefine((config, context) => {
   if (config.method === "GET" && config.body?.trim()) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "GET requests cannot include a request body." });
