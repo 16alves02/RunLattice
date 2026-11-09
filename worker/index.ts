@@ -154,16 +154,21 @@ async function executeHttpAction(config: HttpActionConfig, organizationId: strin
   }
 
   const url = renderInputTemplate(config.url, input, 2_000);
-  let allowedHost: string;
-  let requestedHost: string;
+  let allowedOrigin: string;
+  let allowedPath: string;
+  let requestedUrl: URL;
   try {
-    allowedHost = new URL(credentials.baseUrl).hostname.toLowerCase();
-    requestedHost = new URL(url).hostname.toLowerCase();
+    const base = new URL(credentials.baseUrl);
+    requestedUrl = new URL(url);
+    allowedOrigin = base.origin;
+    allowedPath = base.pathname.endsWith("/") ? base.pathname : `${base.pathname}/`;
   } catch {
     throw new Error("The HTTP action destination URL is invalid.");
   }
-  if (allowedHost !== requestedHost) {
-    throw new Error("The HTTP action destination must use the host configured for this API connection.");
+  const basePathWithoutSlash = allowedPath.slice(0, -1) || "/";
+  if (allowedOrigin !== requestedUrl.origin
+    || (requestedUrl.pathname !== basePathWithoutSlash && !requestedUrl.pathname.startsWith(allowedPath))) {
+    throw new Error("The HTTP action destination must remain inside the origin and base path configured for this API connection.");
   }
   const body = config.body ? renderInputTemplate(config.body, input, 65_536, true) : "";
   if (body) {
