@@ -1,6 +1,8 @@
+export type BoundedBodyFailureReason = "too_large" | "invalid_utf8" | "invalid_json" | "read_failed";
+
 export type BoundedBodyResult =
   | { ok: true; body: string }
-  | { ok: false; reason: "too_large" | "invalid_utf8" | "invalid_json" | "read_failed" };
+  | { ok: false; reason: BoundedBodyFailureReason };
 
 /**
  * Reads a request body without buffering untrusted input beyond maxBytes.
@@ -62,7 +64,7 @@ export async function readBoundedRequestBody(
 export async function readBoundedJsonRequest(
   request: Request,
   maxBytes: number,
-): Promise<{ ok: true; value: unknown } | { ok: false; reason: BoundedBodyResult extends { ok: false; reason: infer R } ? R : never }> {
+): Promise<{ ok: true; value: unknown } | { ok: false; reason: BoundedBodyFailureReason }> {
   const result = await readBoundedRequestBody(request, maxBytes);
   if (!result.ok) return result;
   try {
