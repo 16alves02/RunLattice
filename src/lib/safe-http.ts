@@ -104,6 +104,21 @@ export function validateOutboundHttpsUrl(value: string): URL {
   return url;
 }
 
+export function isWithinAllowedHttpsBase(baseUrl: string, requestUrl: string): boolean {
+  try {
+    const base = new URL(baseUrl);
+    const requested = new URL(requestUrl);
+    if (base.protocol !== "https:" || requested.protocol !== "https:"
+      || base.origin !== requested.origin || base.username || base.password
+      || requested.username || requested.password) return false;
+    const allowedPath = base.pathname.endsWith("/") ? base.pathname : `${base.pathname}/`;
+    const basePathWithoutSlash = allowedPath.slice(0, -1) || "/";
+    return requested.pathname === basePathWithoutSlash || requested.pathname.startsWith(allowedPath);
+  } catch {
+    return false;
+  }
+}
+
 export async function resolvePublicHttpsTarget(
   url: URL,
   resolver: typeof lookup = lookup,
