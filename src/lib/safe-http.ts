@@ -22,7 +22,7 @@ function inIpv4Range(address: number, base: string, prefix: number) {
   return (address & mask) === (network & mask);
 }
 
-function ipv6ToBigInt(address: string): bigint | null {
+function ipv6ToGroups(address: string): number[] | null {
   if (address.includes(".")) return null;
   const halves = address.toLowerCase().split("::");
   if (halves.length > 2) return null;
@@ -33,14 +33,20 @@ function ipv6ToBigInt(address: string): bigint | null {
   if ((halves.length === 1 && missing !== 0) || (halves.length === 2 && missing < 1)) return null;
   const groups = [...left, ...Array.from({ length: missing }, () => "0"), ...right];
   if (groups.length !== 8) return null;
-  return groups.reduce((value, part) => (value << 16n) | BigInt(parseInt(part, 16)), 0n);
+  return groups.map((part) => parseInt(part, 16));
 }
 
-function inIpv6Range(address: bigint, base: string, prefix: number) {
-  const network = ipv6ToBigInt(base);
-  if (network === null) return true;
-  const shift = BigInt(128 - prefix);
-  return (address >> shift) === (network >> shift);
+function inIpv6Range(address: number[], base: string, prefix: number) {
+  const network = ipv6ToGroups(base);
+  if (network === null || address.length !== 8) return false;
+  const fullGroups = Math.floor(prefix / 16);
+  for (let index = 0; index < fullGroups; index += 1) {
+    if (address[index] !== network[index]) return false;
+  }
+  const remainingBits = prefix % 16;
+  if (remainingBits === 0) return true;
+  const mask = (0xffff << (16 - remainingBits)) & 0xffff;
+  return ((address[fullGroups] ?? 0) & mask) === ((network[fullGroups] ?? 0) & mask);
 }
 
 export function isPublicIpAddress(address: string): boolean {
@@ -58,7 +64,7 @@ export function isPublicIpAddress(address: string): boolean {
     return !denied.some(([base, prefix]) => inIpv4Range(value, base, prefix));
   }
   if (family === 6) {
-    const value = ipv6ToBigInt(address);
+    const value = ipv6ToGroups(address);
     if (value === null) return false;
     // Only global-unicast 2000::/3 is accepted. Special-use and transition
     // ranges are excluded even when an OS resolver reports them as global.
