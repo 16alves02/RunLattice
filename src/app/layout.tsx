@@ -24,9 +24,13 @@ export const metadata: Metadata = {
     images: ["/opengraph-image"],
   },
   icons: {
-    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, { url: "/icon-192.svg", type: "image/svg+xml", sizes: "192x192" }],
-    shortcut: "/favicon.svg",
-    apple: [{ url: "/apple-touch-icon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+      { url: "/favicon.ico", type: "image/x-icon", sizes: "any" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [{ url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
   },
   manifest: "/manifest.webmanifest",
 };
