@@ -188,6 +188,16 @@ const discordConnectionSchema = z.object({
 const httpConnectionSchema = z.object({
   provider: z.literal("http"),
   name: z.string().trim().min(2).max(60),
+  baseUrl: z.string().url().max(2_000).refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && Boolean(url.hostname)
+        && (!url.port || url.port === "443") && !url.username && !url.password
+        && !url.search && !url.hash;
+    } catch {
+      return false;
+    }
+  }, "Use an HTTPS API base URL on the standard port, without credentials, query strings or fragments."),
   apiKey: z.string().min(1).max(4_096),
   apiKeyHeader: z.enum(["authorization", "x-api-key"]).default("authorization"),
 });
