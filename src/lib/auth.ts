@@ -64,7 +64,7 @@ export const auth = betterAuth({
       "/request-password-reset": { window: 60, max: 3 },
     },
   },
-  plugins: [twoFactor({ issuer: "RunLattice" }), organization({
+  plugins: [twoFactor({ issuer: "RunLattice", backupCodeOptions: { storeBackupCodes: "encrypted" } }), organization({
     requireEmailVerificationOnInvitation: true,
     invitationExpiresIn: 60 * 60 * 24 * 7,
     membershipLimit: async (_user, organizationRecord) => {
