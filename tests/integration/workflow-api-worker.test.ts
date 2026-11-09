@@ -309,7 +309,7 @@ describe("RunLattice PostgreSQL, API and worker integration", () => {
     const completed = await prisma.workflowRun.findUnique({ where: { id: run.id } });
     const persistedSteps = await prisma.workflowRunStep.findMany({
       where: { runId: run.id },
-      orderBy: { createdAt: "asc" },
+      orderBy: { startedAt: "asc" },
     });
     expect(persistedSteps.map((step) => step.nodeId)).toEqual([
       "trigger", "http-action", "condition", "high-action",
