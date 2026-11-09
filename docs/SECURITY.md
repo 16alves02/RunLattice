@@ -107,3 +107,13 @@ The application uses Stripe-hosted Checkout and Customer Portal sessions. Checko
 Stripe webhook signatures are verified against the raw request body. Event IDs are stored in StripeEvent and already-processed events are acknowledged without reapplying changes. Subscription status and price metadata determine workspace plan entitlements. Workflow creation, monthly workflow runs and AI requests are enforced server-side; UI-only limits are not trusted. The initial plans are Free, Pro and Team. Stripe Price IDs, webhook signing secret, Customer Portal settings and test-mode end-to-end verification are still required before billing is enabled.
 
 The new billing migration enables RLS on BillingCustomer, BillingSubscription and StripeEvent and creates explicit deny-all policies for Supabase Data API roles. It also revokes default table/sequence privileges for those roles on future Prisma-owned objects.
+
+## Client IP and authentication rate limits on Railway
+
+Better Auth authentication rate limiting reads the `X-Real-IP` header. The Railway public HTTP edge overwrites this header with the connecting client IP, so the application does not rely on the caller-controlled leftmost value of `X-Forwarded-For`. This is used only as a rate-limit key, not as an identity or authorization factor.
+
+This trust assumption applies to requests arriving through Railway's public HTTP edge. Requests sent over `*.railway.internal` bypass that edge and can supply their own forwarding headers; do not treat `X-Real-IP` from private-network callers as a verified end-user address. If the topology changes (for example, adding another proxy or routing authentication through private networking), revalidate the IP-header trust configuration before release.
+
+References:
+- [Railway public networking request headers](https://docs.railway.com/networking/public-networking/specs-and-limits)
+- [Better Auth IP address configuration](https://better-auth.com/docs/concepts/rate-limit)
