@@ -30,6 +30,13 @@ describe("workflow input templates", () => {
     expect(JSON.parse(rendered)).toEqual({ name: 'A "quoted" value', count: 3 });
   });
 
+  it("makes an explicitly mapped prior HTTP response value available to later actions", () => {
+    const rendered = renderInputTemplate('{"invoiceId": {{input.steps.http_action.responseValue}}}', {
+      steps: { http_action: { httpStatus: 200, responseValue: "inv_123" } },
+    }, 65_536, true);
+    expect(JSON.parse(rendered)).toEqual({ invoiceId: "inv_123" });
+  });
+
   it("supports a larger explicit limit for bounded HTTP payloads", () => {
     expect(renderInputTemplate("{{input.payload}}", { payload: "x".repeat(4_000) }, 65_536)).toHaveLength(4_000);
     expect(() => renderInputTemplate("{{input.payload}}", { payload: "x".repeat(4_000) }, 2_000)).toThrow(/2,000 characters/);
