@@ -45,9 +45,9 @@ export const auth = betterAuth({
     },
   },
   session: {
-    expiresIn: 60 * 60 * 24 * 7,
-    updateAge: 60 * 60 * 24,
-    cookieCache: { enabled: true, maxAge: 5 * 60 },
+    expiresIn: 60 * 60 * 24,
+    updateAge: 60 * 60,
+    cookieCache: { enabled: false },
   },
   rateLimit: {
     enabled: true,
@@ -60,7 +60,7 @@ export const auth = betterAuth({
       "/request-password-reset": { window: 60, max: 3 },
     },
   },
-  plugins: [twoFactor({ issuer: "RunLattice", backupCodeOptions: { storeBackupCodes: "encrypted" } }), organization({
+  plugins: [twoFactor({ issuer: "RunLattice", backupCodeOptions: { storeBackupCodes: "encrypted" }, accountLockout: { enabled: true, maxFailedAttempts: 5, durationSeconds: 1800 } }), organization({
     requireEmailVerificationOnInvitation: true,
     invitationExpiresIn: 60 * 60 * 24 * 7,
     membershipLimit: async (_user, organizationRecord) => {
