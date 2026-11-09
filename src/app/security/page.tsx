@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { FormEvent } from "react";
 import { ShieldCheck, KeyRound, Copy } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
@@ -22,8 +23,7 @@ export default function SecurityPage() {
 
   if (isPending) return <main className="auth-page"><section className="panel auth-card">Loading security settings…</section></main>;
   if (!session) {
-    if (typeof window !== "undefined") router.replace("/sign-in");
-    return <main className="auth-page"><section className="panel auth-card">Redirecting to sign in…</section></main>;
+    return <main className="auth-page"><section className="panel auth-card"><h1>Sign in required</h1><p className="subtitle">Sign in to manage your account security.</p><Link className="btn btn-primary" href="/sign-in">Continue to sign in</Link></section></main>;
   }
 
   const enabled = Boolean(session.user.twoFactorEnabled);
@@ -48,8 +48,7 @@ export default function SecurityPage() {
     }
   }
 
-  async function confirmEnrollment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function confirmEnrollment() {
     setError("");
     setLoading(true);
     try {
@@ -94,6 +93,12 @@ export default function SecurityPage() {
         <p className="panel-subtitle">Two-factor authentication is active. Sign-ins require a current authenticator code unless you use a one-time recovery code.</p>
         <label>Account password to regenerate recovery codes<input className="field-input" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></label>
         <button className="btn" type="button" disabled={loading || !password} onClick={regenerateCodes}>Regenerate recovery codes</button>
+        {backupCodes.length > 0 && <div className="panel" style={{ padding: 14 }}>
+          <div className="panel-title">New recovery codes</div>
+          <p className="panel-subtitle">These replace all previous codes. Save them in a password manager now.</p>
+          <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", padding: 12, background: "var(--surface-2)", borderRadius: 8 }}>{backupCodes.join("\\n")}</pre>
+          <button className="btn" type="button" onClick={copyCodes}><Copy size={13}/>{copied ? "Copied" : "Copy recovery codes"}</button>
+        </div>}
       </div> : !totpUri ? <form className="auth-form" onSubmit={beginEnrollment}>
         <p className="panel-subtitle">MFA setup is required before using the workspace. Enter your password to create an authenticator registration.</p>
         <label>Current account password<input className="field-input" type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} /></label>
