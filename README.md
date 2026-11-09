@@ -132,7 +132,7 @@ docker compose down
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| GET | `/api/health` | Web and PostgreSQL readiness check |
+| GET | `/api/health` | Web, PostgreSQL, Redis and worker readiness check |
 | GET | `/api/integrations` | List the catalog and workspace connections |
 | POST | `/api/integrations` | Save an encrypted Discord webhook |
 | DELETE | `/api/integrations/:id` | Remove a workspace connection |
@@ -149,7 +149,7 @@ docker compose down
 | POST | `/api/billing` | Create a Stripe Checkout or Customer Portal session (owner/admin) |
 | POST | `/api/billing/webhook` | Verify and process Stripe subscription events |
 
-All workflow and integration endpoints require an authenticated session and verified membership in the active organization. Members can read; owners and admins can make changes and queue runs. The AI planning endpoint requires an owner/admin role and remains disabled unless `AI_ASSISTANT_ENABLED=true`. It applies request-size limits, per-user/per-workspace throttling and monthly workspace usage budgets. The dry-run endpoint simulates graph traversal only and never invokes integration adapters. The health endpoint is public and verifies PostgreSQL connectivity. Redis and worker health must be monitored separately.
+All workflow and integration endpoints require an authenticated session and verified membership in the active organization. Members can read; owners and admins can make changes and queue runs. The AI planning endpoint requires an owner/admin role and remains disabled unless `AI_ASSISTANT_ENABLED=true`. It applies request-size limits, per-user/per-workspace throttling and monthly workspace usage budgets. The dry-run endpoint simulates graph traversal only and never invokes integration adapters. The public health endpoint checks PostgreSQL connectivity, Redis availability and the worker heartbeat. It does not verify external integrations or guarantee successful workflow execution.
 
 ## Deployment
 
