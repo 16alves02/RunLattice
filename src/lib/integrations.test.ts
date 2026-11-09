@@ -19,6 +19,7 @@ describe("integration catalog", () => {
   it("looks up a provider by its stable identifier", () => {
     expect(getIntegration("discord")?.name).toBe("Discord");
     expect(getIntegration("discord")?.status).toBe("available");
+    expect(getIntegration("http")?.status).toBe("available");
     expect(getIntegration("unknown")).toBeUndefined();
   });
 });
