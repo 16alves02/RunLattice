@@ -34,7 +34,7 @@ Legacy workflows with no user owner remain unassigned and are not visible to nor
 ## API boundaries
 
 - `/api/auth/*` is handled by Better Auth.
-- `/api/health` is public and verifies PostgreSQL with `SELECT 1`; it does not prove Redis or Worker health.
+- `/api/health` is public and checks PostgreSQL (`SELECT 1`), Redis (`PING`) and the worker's recent Redis heartbeat. It returns only component status values, never connection details. It does not verify external providers or prove that workflow actions succeed.
 - `/api/billing` creates owner/admin-only Stripe Checkout and Customer Portal sessions.
 - `/api/billing/webhook` verifies the raw request signature and deduplicates Stripe event IDs.
 - Workflow, run and integration APIs require a valid session and workspace membership.
