@@ -8,10 +8,14 @@ import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
 
 const secret = process.env.BETTER_AUTH_SECRET;
 const production = process.env.NODE_ENV === "production";
+
+if (production && !secret) {
+  throw new Error("BETTER_AUTH_SECRET must be set in production.");
+}
 const emailConfigured = Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
 
 export const auth = betterAuth({
-  secret: secret || "runlattice-local-development-secret-change-before-deploy",
+  secret: secret ?? "runlattice-local-development-secret-change-before-deploy",
   ...(process.env.BETTER_AUTH_URL ? { baseURL: process.env.BETTER_AUTH_URL } : {}),
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   emailAndPassword: {
