@@ -7,7 +7,7 @@ import { dispatchPendingWorkflowRuns } from "../src/lib/outbox";
 import { createQuotaBoundWorkflowRun } from "../src/lib/run-quota";
 import { PLAN_LIMITS, resolveEntitledPlan } from "../src/lib/billing-core";
 import { renderInputTemplate } from "../src/lib/template";
-import { resolveExecutionPath, validateExecutableWorkflow } from "../src/lib/execution";
+import { resolveNextExecutionNode, validateExecutableWorkflow } from "../src/lib/execution";
 import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
 import type { DiscordActionConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
@@ -400,11 +400,15 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
 
     const definition = parsedDefinition.data as WorkflowDefinition;
     validateExecutableWorkflow(definition);
-    const path = resolveExecutionPath(definition, run.input);
-    for (const node of path) {
+    let currentNode = definition.nodes.find((node) => node.kind === "trigger");
+    const visitedNodes = new Set<string>();
+    while (currentNode) {
+      const node = currentNode;
+      if (visitedNodes.has(node.id)) throw new Error("Workflow connections contain a cycle.");
+      visitedNodes.add(node.id);
       const startedAt = new Date().toISOString();
       if (!(await ownsLease())) throw new Error("Execution lease was lost; this worker stopped.");
-      await job.updateProgress({ currentNode: node.id, completed: steps.length, total: path.length });
+      await job.updateProgress({ currentNode: node.id, completed: steps.length, total: definition.nodes.length });
       const ledgerStep = await prisma.workflowRunStep.create({
         data: { runId, nodeId: node.id, title: node.title, kind: node.kind, status: "RUNNING" },
       });
@@ -415,7 +419,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
           result = {};
         } else if (node.kind === "condition") {
           if (!node.config || !("operator" in node.config)) throw new Error(`Condition "${node.title}" has no valid rule.`);
-          result = { condition: evaluateCondition(node.config, run.input) };
+          result = { condition: evaluateCondition(node.config, executionContext) };
         } else {
           if (!(await ownsLease())) throw new Error("Execution lease was lost before the external action.");
           result = await executeAction(node, workflow.organizationId, executionContext);
@@ -465,6 +469,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
         where: { id: runId, status: "RUNNING", leaseToken },
         data: { output: { executionMode: "LIVE", steps: serializeSteps(steps) } },
       });
+      currentNode = resolveNextExecutionNode(definition, node, executionContext);
     }
 
     const output = {
