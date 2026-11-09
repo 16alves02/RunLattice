@@ -250,7 +250,7 @@ describe("HTTP API integration connection validation", () => {
       provider: "http",
       name: "Invalid API",
       baseUrl: "https://api.example.com",
-      apiKey: "Bearer\\nInjected",
+      apiKey: "Bearer\nInjected",
       apiKeyHeader: "authorization",
     }).success).toBe(false);
   });
