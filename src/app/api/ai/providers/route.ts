@@ -76,8 +76,9 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Workspace owner or administrator permission required." }, { status: 403 });
   }
 
-  const body = await request.json().catch(() => null);
-  const parsed = z.object({ provider: providerSchema }).safeParse(body);
+  const bodyResult = await readBoundedJsonRequest(request, 8_192);
+  if (!bodyResult.ok) return NextResponse.json({ error: "Invalid or oversized request body." }, { status: bodyResult.reason === "too_large" ? 413 : 400 });
+  const parsed = z.object({ provider: providerSchema }).safeParse(bodyResult.value);
   if (!parsed.success) return NextResponse.json({ error: "Select a supported AI provider." }, { status: 400 });
 
   await prisma.aIProviderCredential.deleteMany({
