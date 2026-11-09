@@ -123,8 +123,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   function updateSelectedActionConfig(patch: Partial<DiscordActionConfig>) {
     if (!selectedNode || selectedNode.kind !== "action") return;
     const existingConfig = selectedNode.config && "integrationId" in selectedNode.config
-      ? selectedNode.config
-      : undefined;
+      && selectedNode.config.integrationId === "discord" ? selectedNode.config : undefined;
     const config: DiscordActionConfig = {
       integrationId: "discord",
       actionId: "send_message",
