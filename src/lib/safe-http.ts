@@ -131,7 +131,7 @@ function validateHeaders(headers: Record<string, string> = {}) {
   const result: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
     const normalized = name.toLowerCase();
-    if (!allowedHeaders.has(normalized) || /[\r\n]/.test(value) || value.length > 4_096) {
+    if (!allowedHeaders.has(normalized) || /[\u0000-\u001f\u007f]/.test(value) || value.length > 4_096) {
       throw new Error(`HTTP header "${name}" is not allowed or is invalid.`);
     }
     result[normalized] = value;
@@ -154,8 +154,13 @@ export async function requestPublicHttps(input: SafeHttpRequest): Promise<SafeHt
   if (body && !headers["content-type"]) headers["content-type"] = "application/json";
 
   const target = await resolvePublicHttpsTarget(url);
-  const pinnedLookup = ((_hostname: string, _options: unknown, callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void) => {
-    callback(null, target.address, target.family);
+  const hostname = normalizedHostname(url);
+  const pinnedLookup = ((_hostname: string, options: { all?: boolean }, callback: (...args: unknown[]) => void) => {
+    if (options?.all) {
+      callback(null, [{ address: target.address, family: target.family }]);
+    } else {
+      callback(null, target.address, target.family);
+    }
   }) as unknown as LookupFunction;
 
   return new Promise((resolve, reject) => {
@@ -170,7 +175,7 @@ export async function requestPublicHttps(input: SafeHttpRequest): Promise<SafeHt
       method: input.method,
       headers: { ...headers, ...(body ? { "content-length": String(Buffer.byteLength(body, "utf8")) } : {}) },
       lookup: pinnedLookup,
-      servername: url.hostname,
+      ...(isIP(hostname) ? {} : { servername: hostname }),
       timeout: HTTP_ACTION_TIMEOUT_MS,
     }, (response) => {
       const status = response.statusCode ?? 0;
