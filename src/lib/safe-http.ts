@@ -111,6 +111,11 @@ export function isWithinAllowedHttpsBase(baseUrl: string, requestUrl: string): b
     if (base.protocol !== "https:" || requested.protocol !== "https:"
       || base.origin !== requested.origin || base.username || base.password
       || requested.username || requested.password) return false;
+    // Encoded path separators and dot segments can be interpreted differently
+    // by upstream servers and must not bypass the configured API path boundary.
+    const unsafePathEncoding = /%(?:2e|2f|5c|25)/i;
+    if (unsafePathEncoding.test(base.pathname) || unsafePathEncoding.test(requested.pathname)
+      || base.pathname.includes("\\\\") || requested.pathname.includes("\\\\")) return false;
     const allowedPath = base.pathname.endsWith("/") ? base.pathname : `${base.pathname}/`;
     const basePathWithoutSlash = allowedPath.slice(0, -1) || "/";
     return requested.pathname === basePathWithoutSlash || requested.pathname.startsWith(allowedPath);
