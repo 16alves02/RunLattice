@@ -12,6 +12,7 @@ import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
 import type { DiscordActionConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
 import { isWithinAllowedHttpsBase, requestPublicHttps } from "../src/lib/safe-http";
+import { extractJsonResponseValue } from "../src/lib/http-response";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 
 const prisma = new PrismaClient();
@@ -122,6 +123,10 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
     throw new Error(`Discord rejected the message with HTTP ${response.status}.`);
   }
 
+  if (config.responsePath?.trim()) {
+    const responseValue = extractJsonResponseValue(response.body, config.responsePath.trim());
+    return { httpStatus: response.status, responseValue };
+  }
   return { httpStatus: response.status };
 }
 
@@ -386,6 +391,9 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
   }
 
   const steps: ExecutionStep[] = [];
+  const executionContext: Record<string, unknown> = run.input && typeof run.input === "object" && !Array.isArray(run.input)
+    ? { ...(run.input as Record<string, unknown>), steps: {} }
+    : { value: run.input, steps: {} };
   try {
     const parsedDefinition = workflowDefinitionSchema.safeParse(workflow.definition);
     if (!parsedDefinition.success) throw new Error("The saved workflow definition is invalid.");
@@ -410,9 +418,12 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
           result = { condition: evaluateCondition(node.config, run.input) };
         } else {
           if (!(await ownsLease())) throw new Error("Execution lease was lost before the external action.");
-          result = await executeAction(node, workflow.organizationId, run.input);
+          result = await executeAction(node, workflow.organizationId, executionContext);
         }
 
+        if (result && typeof result === "object" && !Array.isArray(result)) {
+          (executionContext.steps as Record<string, unknown>)[node.id] = result;
+        }
         await prisma.workflowRunStep.update({
           where: { id: ledgerStep.id, run: { is: { status: "RUNNING", leaseToken } } },
           data: { status: "SUCCEEDED", finishedAt: new Date(), result: result ?? {} },
