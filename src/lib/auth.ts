@@ -2,7 +2,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/prisma";
-import { organization } from "better-auth/plugins";
+import { organization, twoFactor } from "better-auth/plugins";
 import { sendTransactionalEmail } from "@/lib/email";
 import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
 
@@ -11,6 +11,7 @@ const production = process.env.NODE_ENV === "production";
 const emailConfigured = Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
 
 export const auth = betterAuth({
+  appName: "RunLattice",
   secret: secret || "runlattice-local-development-secret-change-before-deploy",
   ...(process.env.BETTER_AUTH_URL ? { baseURL: process.env.BETTER_AUTH_URL } : {}),
   database: prismaAdapter(prisma, { provider: "postgresql" }),
@@ -63,7 +64,7 @@ export const auth = betterAuth({
       "/request-password-reset": { window: 60, max: 3 },
     },
   },
-  plugins: [organization({
+  plugins: [twoFactor({ issuer: "RunLattice" }), organization({
     requireEmailVerificationOnInvitation: true,
     invitationExpiresIn: 60 * 60 * 24 * 7,
     membershipLimit: async (_user, organizationRecord) => {
