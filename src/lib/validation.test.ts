@@ -37,6 +37,30 @@ describe("workflow definition validation", () => {
     expect(workflowDefinitionSchema.safeParse(definition).success).toBe(true);
   });
 
+  it("accepts bounded HTTP response paths and rejects unsafe paths", () => {
+    const base = {
+      ...validDefinition.nodes[1],
+      config: {
+        integrationId: "http",
+        actionId: "request",
+        connectionId: "connection-1",
+        method: "GET",
+        url: "https://api.example.com/v1/events",
+        responsePath: "data.invoiceId",
+      },
+    };
+    expect(workflowDefinitionSchema.safeParse({
+      nodes: [validDefinition.nodes[0], base],
+      edges: validDefinition.edges,
+    }).success).toBe(true);
+    for (const responsePath of ["data.__proto__.id", "data.constructor", "x".repeat(201), "data..id"]) {
+      expect(workflowDefinitionSchema.safeParse({
+        nodes: [validDefinition.nodes[0], { ...base, config: { ...base.config, responsePath } }],
+        edges: validDefinition.edges,
+      }).success).toBe(false);
+    }
+  });
+
   it("rejects HTTP actions with a GET body or invalid method", () => {
     const base = {
       ...validDefinition.nodes[1],
