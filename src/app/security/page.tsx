@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
-import { ShieldCheck, KeyRound, Copy, Check } from "lucide-react";
+import { ShieldCheck, KeyRound, Copy } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { AppShell } from "@/components/app-shell";
 
@@ -103,7 +103,7 @@ export default function SecurityPage() {
         <label>Authenticator setup key<input className="field-input" readOnly value={manualKey} onFocus={event => event.currentTarget.select()} /></label>
         <p className="activity-meta">The key is sensitive. Do not share it or send it to anyone. The authenticator URI is available for compatible apps.</p>
         <label>Verification code<input className="field-input" inputMode="numeric" autoComplete="one-time-code" required maxLength={6} value={code} onChange={event => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} /></label>
-        <button className="btn btn-primary" type="button" disabled={loading || code.length !== 6} onClick={() => void confirmEnrollment({ preventDefault() {} } as FormEvent<HTMLFormElement>)}>{loading ? "Verifying…" : "Verify and enable MFA"}</button>
+        <button className="btn btn-primary" type="button" disabled={loading || code.length !== 6} onClick={() => void confirmEnrollment()}>{loading ? "Verifying…" : "Verify and enable MFA"}</button>
         {backupCodes.length > 0 && <div className="panel" style={{ padding: 14 }}>
           <div className="panel-title">Save your recovery codes now</div>
           <p className="panel-subtitle">Each code works once. Store them in a password manager. They will not be shown again after leaving this step.</p>
