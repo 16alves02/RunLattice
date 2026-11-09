@@ -11,7 +11,7 @@ const publicPaths = [
   "/api/health",
 ];
 
-function isPublicPath(pathname: string) {
+export function isPublicPath(pathname: string) {
   return publicPaths.some((path) => pathname === path || pathname.startsWith(path + "/"));
 }
 
