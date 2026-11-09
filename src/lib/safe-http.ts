@@ -69,6 +69,12 @@ export function isPublicIpAddress(address: string): boolean {
   return false;
 }
 
+function normalizedHostname(url: URL) {
+  return url.hostname.startsWith("[") && url.hostname.endsWith("]")
+    ? url.hostname.slice(1, -1)
+    : url.hostname;
+}
+
 export function validateOutboundHttpsUrl(value: string): URL {
   let url: URL;
   try {
@@ -80,11 +86,12 @@ export function validateOutboundHttpsUrl(value: string): URL {
     || (url.port && url.port !== "443") || url.hash) {
     throw new Error("Only HTTPS destinations on the standard port are allowed.");
   }
-  if (url.hostname === "localhost" || url.hostname.endsWith(".localhost")
-    || url.hostname.endsWith(".local") || url.hostname.endsWith(".internal")) {
+  const hostname = normalizedHostname(url);
+  if (hostname === "localhost" || hostname.endsWith(".localhost")
+    || hostname.endsWith(".local") || hostname.endsWith(".internal")) {
     throw new Error("Local and internal network destinations are blocked.");
   }
-  if (isIP(url.hostname) && !isPublicIpAddress(url.hostname)) {
+  if (isIP(hostname) && !isPublicIpAddress(hostname)) {
     throw new Error("Private, reserved and non-public IP destinations are blocked.");
   }
   return url;
@@ -94,7 +101,7 @@ export async function resolvePublicHttpsTarget(
   url: URL,
   resolver: typeof lookup = lookup,
 ): Promise<ResolvedPublicAddress> {
-  const records = await resolver(url.hostname, { all: true, verbatim: true });
+  const records = await resolver(normalizedHostname(url), { all: true, verbatim: true });
   if (records.length === 0 || records.some((record) => !isPublicIpAddress(record.address))) {
     throw new Error("The destination resolves to a private, reserved or non-public IP address.");
   }
