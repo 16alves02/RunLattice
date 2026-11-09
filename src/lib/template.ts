@@ -27,7 +27,7 @@ export function renderInputTemplate(template: string, input: unknown, maxLength 
   });
 
   if (rendered.length > maxLength) {
-    throw new Error(`The rendered template exceeds the ${maxLength.toLocaleString("en-US")} character limit.`);
+    throw new Error(`The rendered template exceeds the ${maxLength.toLocaleString("en-US")} characters.`);
   }
   return rendered;
 }
