@@ -57,7 +57,7 @@ describe("workspace membership authorization", () => {
 
   it("returns a workspace only after membership is verified", async () => {
     getSession.mockResolvedValue({
-      user: { id: "user-1" },
+      user: { id: "user-1", twoFactorEnabled: true },
       session: { activeOrganizationId: "org-1" },
     });
     findFirst.mockResolvedValue({ organizationId: "org-1", role: "owner" });
