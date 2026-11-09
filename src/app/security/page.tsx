@@ -8,6 +8,7 @@ import { ShieldCheck, KeyRound, Copy } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { AppShell } from "@/components/app-shell";
 import { SecuritySessions } from "@/components/security-sessions";
+import { SecurityPassword } from "@/components/security-password";
 
 export default function SecurityPage() {
   const router = useRouter();
@@ -125,6 +126,7 @@ export default function SecurityPage() {
       <div className="panel-title"><KeyRound size={15}/> Passkeys</div>
       <p className="panel-subtitle">Passkey support is not yet enabled on this deployment. It will be added after the WebAuthn package, database migration and browser-based registration tests are validated.</p>
     </section>
+    <SecurityPassword />
     <SecuritySessions />
   </div></AppShell>;
 }
