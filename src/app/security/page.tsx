@@ -58,8 +58,7 @@ export default function SecurityPage() {
       const result = await authClient.twoFactor.verifyTotp({ code: code.trim(), trustDevice: false });
       if (result.error) throw new Error(result.error.message || "The authenticator code is invalid.");
       setNotice("Two-factor authentication is now enabled for this account.");
-      router.refresh();
-      window.location.assign("/");
+      router.replace("/");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not verify the authenticator code.");
       setLoading(false);
