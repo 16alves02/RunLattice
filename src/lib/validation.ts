@@ -198,7 +198,7 @@ const httpConnectionSchema = z.object({
       return false;
     }
   }, "Use an HTTPS API base URL on the standard port, without credentials, query strings or fragments."),
-  apiKey: z.string().min(1).max(4_096).refine((value) => !/[\\u0000-\\u001f\\u007f]/.test(value), "API keys cannot contain control characters."),
+  apiKey: z.string().min(1).max(4_096).refine((value) => !/[\x00-\x1f\x7f]/.test(value), "API keys cannot contain control characters."),
   apiKeyHeader: z.enum(["authorization", "x-api-key"]).default("authorization"),
 });
 
