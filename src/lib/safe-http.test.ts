@@ -82,6 +82,9 @@ describe("HTTP API connection destination boundaries", () => {
     "https://api.example.com:8443/v1/events",
     "https://api.example.com/v10/events",
     "https://api.example.com/admin",
+    "https://api.example.com/v1%2f..%2fadmin",
+    "https://api.example.com/v1/%2e%2e/admin",
+    "https://api.example.com/v1/%255cadmin",
     "https://user:pass@api.example.com/v1/events",
   ])("rejects destination outside the saved API boundary: %s", (url) => {
     expect(isWithinAllowedHttpsBase("https://api.example.com/v1", url)).toBe(false);
