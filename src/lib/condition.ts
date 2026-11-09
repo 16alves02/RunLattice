@@ -8,7 +8,7 @@ function resolveInputPath(input: unknown, path: string): unknown {
   const segments = path.split(".");
   if (
     segments.length === 0
-    || segments.some((segment) => !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(segment) || blockedPathSegments.has(segment))
+    || segments.some((segment) => !/^[A-Za-z_$][A-Za-z0-9_$-]*$/.test(segment) || blockedPathSegments.has(segment))
   ) {
     throw new Error("Condition input path is invalid.");
   }
