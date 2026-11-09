@@ -25,7 +25,7 @@ const httpActionConfigSchema = z.object({
 });
 
 const conditionConfigSchema = z.object({
-  path: z.string().trim().min(1).max(200).regex(/^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$/),
+  path: z.string().trim().min(1).max(200).regex(/^[A-Za-z_$][A-Za-z0-9_$-]*(\.[A-Za-z_$][A-Za-z0-9_$-]*)*$/),
   operator: z.enum(["equals", "not_equals", "contains", "greater_than", "less_than", "exists"]),
   value: z.union([z.string().max(1000), z.number().finite(), z.boolean(), z.null()]).optional(),
 }).superRefine((config, context) => {
