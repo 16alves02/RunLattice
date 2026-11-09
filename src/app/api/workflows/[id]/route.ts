@@ -9,6 +9,7 @@ import type { WorkflowDefinition } from "@/lib/types";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
 import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
 import { getWorkspaceEntitlements } from "@/lib/billing";
+import { readBoundedJsonRequest } from "@/lib/read-bounded-body";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -47,7 +48,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const body: unknown = await request.json().catch(() => null);
+  const bodyResult = await readBoundedJsonRequest(request, 262_144);
+  if (!bodyResult.ok) return NextResponse.json({ error: "Invalid or oversized workflow request." }, { status: bodyResult.reason === "too_large" ? 413 : 400 });
+  const body = bodyResult.value;
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "A JSON object is required." }, { status: 400 });
   }
