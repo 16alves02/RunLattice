@@ -19,6 +19,9 @@ const httpActionConfigSchema = z.object({
   if (config.method === "GET" && config.body?.trim()) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "GET requests cannot include a request body." });
   }
+  if (config.responsePath?.split(".").some((segment) => ["__proto__", "prototype", "constructor"].includes(segment))) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["responsePath"], message: "Response paths cannot access prototype properties." });
+  }
 });
 
 const conditionConfigSchema = z.object({
