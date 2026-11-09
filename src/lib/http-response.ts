@@ -37,3 +37,11 @@ export function extractJsonResponseValue(body: string, path: string): JsonScalar
   if (typeof value === "string" && value.length <= 2_000) return value;
   throw new Error("The selected response value must be a scalar of at most 2,000 characters.");
 }
+
+/**
+ * Runtime-mapped values are passed only in memory to later steps.
+ * Run history stores the HTTP status, never the selected response value.
+ */
+export function toPersistableHttpActionResult(result: { httpStatus: number }): { httpStatus: number } {
+  return { httpStatus: result.httpStatus };
+}
