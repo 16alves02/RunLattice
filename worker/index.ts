@@ -10,7 +10,8 @@ import { renderInputTemplate } from "../src/lib/template";
 import { resolveExecutionPath, validateExecutableWorkflow } from "../src/lib/execution";
 import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
-import type { DiscordActionConfig, WorkflowDefinition } from "../src/lib/types";
+import type { DiscordActionConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
+import { requestPublicHttps } from "../src/lib/safe-http";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 
 const prisma = new PrismaClient();
@@ -122,10 +123,68 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
   return { httpStatus: response.status };
 }
 
+async function executeHttpAction(config: HttpActionConfig, organizationId: string, input: unknown) {
+  if (!config.connectionId || !config.url.trim()) {
+    throw new Error("The HTTP action is missing its connection or destination URL.");
+  }
+
+  const integrationConnection = await prisma.integrationConnection.findFirst({
+    where: {
+      id: config.connectionId,
+      organizationId,
+      provider: "http",
+    },
+    select: { credentialsCiphertext: true },
+  });
+  if (!integrationConnection) throw new Error("The HTTP API connection is unavailable in this workspace.");
+
+  let credentials: unknown;
+  try {
+    credentials = JSON.parse(decryptSecret(integrationConnection.credentialsCiphertext, `${organizationId}:http`));
+  } catch {
+    throw new Error("The stored HTTP API credentials could not be decrypted.");
+  }
+
+  if (!credentials || typeof credentials !== "object" || !("apiKey" in credentials)
+    || typeof credentials.apiKey !== "string" || !credentials.apiKey
+    || !("apiKeyHeader" in credentials)
+    || (credentials.apiKeyHeader !== "authorization" && credentials.apiKeyHeader !== "x-api-key")) {
+    throw new Error("The stored HTTP API credentials are invalid.");
+  }
+
+  const url = renderInputTemplate(config.url, input);
+  const body = config.body ? renderInputTemplate(config.body, input) : "";
+  let response;
+  try {
+    response = await requestPublicHttps({
+      url,
+      method: config.method,
+      headers: {
+        [credentials.apiKeyHeader]: credentials.apiKey,
+        ...(body ? { "content-type": "application/json" } : {}),
+      },
+      ...(body ? { body } : {}),
+    });
+  } catch {
+    throw new Error("The external HTTPS request failed or was blocked by RunLattice security controls.");
+  }
+
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`The external API returned HTTP ${response.status}.`);
+  }
+  return { httpStatus: response.status };
+}
+
 async function executeAction(node: WorkflowDefinition["nodes"][number], organizationId: string, input: unknown) {
-  if (!node.config || !("integrationId" in node.config) || !node.config.connectionId || !node.config.message?.trim()) throw new Error(`Action "${node.title}" has not been configured.`);
+  if (!node.config || !("integrationId" in node.config) || !node.config.connectionId) {
+    throw new Error(`Action "${node.title}" has not been configured.`);
+  }
   if (node.config.integrationId === "discord" && node.config.actionId === "send_message") {
+    if (!node.config.message?.trim()) throw new Error("The Discord action is missing its message.");
     return executeDiscordAction(node.config, organizationId, input);
+  }
+  if (node.config.integrationId === "http" && node.config.actionId === "request") {
+    return executeHttpAction(node.config, organizationId, input);
   }
   throw new Error(`Action "${node.title}" is not supported by this worker version.`);
 }
