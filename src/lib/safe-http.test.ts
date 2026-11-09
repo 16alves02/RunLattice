@@ -88,4 +88,13 @@ describe("DNS rebinding protection", () => {
     await expect(resolvePublicHttpsTarget(new URL("https://api.example.com"), resolver))
       .resolves.toEqual({ address: "93.184.216.34", family: 4 });
   });
+  it("strips IPv6 URL brackets before resolving the hostname", async () => {
+    const resolver = vi.fn(async () => [{ address: "2606:4700:4700::1111", family: 6 }])
+      as unknown as typeof import("node:dns/promises").lookup;
+
+    await expect(resolvePublicHttpsTarget(new URL("https://[2606:4700:4700::1111]"), resolver))
+      .resolves.toEqual({ address: "2606:4700:4700::1111", family: 6 });
+    expect(resolver).toHaveBeenCalledWith("2606:4700:4700::1111", { all: true, verbatim: true });
+  });
+
 });
