@@ -80,9 +80,11 @@ function getSafeWebhookUrl(ciphertext: string, connectionName: string, organizat
     name: connectionName,
     webhookUrl,
   });
-  if (!validated.success) throw new Error("The stored Discord webhook URL is invalid.");
+  if (!validated.success || typeof webhookUrl !== "string") {
+    throw new Error("The stored Discord webhook URL is invalid.");
+  }
 
-  return validated.data.webhookUrl;
+  return webhookUrl;
 }
 
 async function executeDiscordAction(config: DiscordActionConfig, organizationId: string, input: unknown) {
