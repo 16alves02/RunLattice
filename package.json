@@ -17,7 +17,9 @@
     "db:deploy": "prisma migrate deploy",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:baseline": "node scripts/baseline-existing-prisma-migrations.mjs",
-    "worker:start": "npm run db:baseline && npm run db:deploy && npm run worker"
+    "worker:start": "npm run db:baseline && npm run db:deploy && npm run worker",
+    "predev": "node scripts/generate-brand-icons.mjs",
+    "prebuild": "node scripts/generate-brand-icons.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.7.0",
@@ -30,7 +32,8 @@
     "react-dom": "^19.0.0",
     "stripe": "^23.1.0",
     "zod": "^4.6.7",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
