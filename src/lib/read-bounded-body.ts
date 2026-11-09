@@ -1,6 +1,6 @@
 export type BoundedBodyResult =
   | { ok: true; body: string }
-  | { ok: false; reason: "too_large" | "invalid_utf8" | "read_failed" };
+  | { ok: false; reason: "too_large" | "invalid_utf8" | "invalid_json" | "read_failed" };
 
 /**
  * Reads a request body without buffering untrusted input beyond maxBytes.
@@ -36,18 +36,38 @@ export async function readBoundedRequestBody(
         await reader.cancel().catch(() => undefined);
         return { ok: false, reason: "too_large" };
       }
-      body += decoder.decode(value, { stream: true });
+      try {
+        body += decoder.decode(value, { stream: true });
+      } catch {
+        await reader.cancel().catch(() => undefined);
+        return { ok: false, reason: "invalid_utf8" };
+      }
     }
-    body += decoder.decode();
+    try {
+      body += decoder.decode();
+    } catch {
+      return { ok: false, reason: "invalid_utf8" };
+    }
     return { ok: true, body };
-  } catch (error) {
-    if (error instanceof TypeError) return { ok: false, reason: "invalid_utf8" };
-    return { ok: false, reason: "read_failed" };
+  } catch { return { ok: false, reason: "read_failed" };
   } finally {
     try {
       reader.releaseLock();
     } catch {
       // The stream may already have been cancelled or errored.
     }
+  }
+}
+
+export async function readBoundedJsonRequest(
+  request: Request,
+  maxBytes: number,
+): Promise<{ ok: true; value: unknown } | { ok: false; reason: BoundedBodyResult extends { ok: false; reason: infer R } ? R : never }> {
+  const result = await readBoundedRequestBody(request, maxBytes);
+  if (!result.ok) return result;
+  try {
+    return { ok: true, value: JSON.parse(result.body) as unknown };
+  } catch {
+    return { ok: false, reason: "invalid_json" };
   }
 }
