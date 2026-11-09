@@ -245,6 +245,16 @@ describe("HTTP API integration connection validation", () => {
     }
   });
 
+  it("rejects API keys containing control characters", () => {
+    expect(createIntegrationConnectionSchema.safeParse({
+      provider: "http",
+      name: "Invalid API",
+      baseUrl: "https://api.example.com",
+      apiKey: "Bearer\\nInjected",
+      apiKeyHeader: "authorization",
+    }).success).toBe(false);
+  });
+
   it("rejects empty credentials and arbitrary header names", () => {
     expect(createIntegrationConnectionSchema.safeParse({
       provider: "http",
