@@ -100,9 +100,17 @@ export function validateExecutableWorkflow(definition: WorkflowDefinition): Work
     if (node.kind === "condition" && (!node.config || !("operator" in node.config))) {
       throw new Error(`Condition "${node.title}" requires a valid condition rule.`);
     }
-    if (node.kind === "action" && (!node.config || !("integrationId" in node.config)
-      || !node.config.connectionId || !node.config.message?.trim())) {
-      throw new Error(`Action "${node.title}" requires a connected integration and a message before activation.`);
+    if (node.kind === "action") {
+      const config = node.config;
+      if (!config || !("integrationId" in config) || !config.connectionId) {
+        throw new Error(`Action "${node.title}" requires a connected integration before activation.`);
+      }
+      if (config.integrationId === "discord" && !config.message?.trim()) {
+        throw new Error(`Action "${node.title}" requires a Discord message before activation.`);
+      }
+      if (config.integrationId === "http" && !config.url.trim()) {
+        throw new Error(`Action "${node.title}" requires a destination URL before activation.`);
+      }
     }
   }
   return nodes;
