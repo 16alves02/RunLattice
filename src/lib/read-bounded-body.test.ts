@@ -34,7 +34,7 @@ describe("bounded request body reader", () => {
       ok: false,
       reason: "too_large",
     });
-    expect(cancel).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalled();
   });
 
   it("stops reading and cancels a stream that exceeds the limit", async () => {
