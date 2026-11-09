@@ -12,6 +12,7 @@ type SessionItem = {
 };
 
 export function SecuritySessions() {
+  const { data: currentSession } = authClient.useSession();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -67,7 +68,7 @@ export function SecuritySessions() {
       {sessions.map((item, index) => <div className="activity-item" key={item.token}>
         <span className="activity-dot" style={{ background: "#83d3a1" }}/>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="activity-title">{item.userAgent || "Unknown device"}{index === 0 ? " · Session" : ""}</div>
+          <div className="activity-title">{item.userAgent || "Unknown device"}{item.token === currentSession?.session.token ? " · This device" : ""}</div>
           <div className="activity-meta">Started {new Date(item.createdAt).toLocaleString("en-GB")} · Expires {new Date(item.expiresAt).toLocaleString("en-GB")}{item.ipAddress ? " · " + item.ipAddress : ""}</div>
         </div>
         <button className="btn" type="button" disabled={busy} onClick={() => void revoke(item.token)}>Revoke</button>
