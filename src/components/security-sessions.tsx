@@ -31,7 +31,7 @@ export function SecuritySessions() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   async function revoke(token: string) {
     setBusy(true);
