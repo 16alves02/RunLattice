@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createWorkflowSchema } from "@/lib/validation";
 import { inferTriggerType } from "@/lib/trigger-type";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
+import { readBoundedJsonRequest } from "@/lib/read-bounded-body";
 
 export async function GET(request: Request) {
   const access = await getRequestWorkspace(request);
@@ -30,8 +31,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Workspace administrator permission required." }, { status: 403 });
   }
 
-  const body: unknown = await request.json().catch(() => null);
-  const parsed = createWorkflowSchema.safeParse(body);
+  const bodyResult = await readBoundedJsonRequest(request, 262_144);
+  if (!bodyResult.ok) return NextResponse.json({ error: "Invalid or oversized workflow request." }, { status: bodyResult.reason === "too_large" ? 413 : 400 });
+  const parsed = createWorkflowSchema.safeParse(bodyResult.value);
   if (!parsed.success) {
     return NextResponse.json({
       error: "Invalid workflow data.",
