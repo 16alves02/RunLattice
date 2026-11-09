@@ -10,6 +10,22 @@ const secret = process.env.BETTER_AUTH_SECRET;
 const production = process.env.NODE_ENV === "production";
 const emailConfigured = Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
 
+// Never allow production authentication to fall back to a public development secret
+// or a localhost-only origin configuration.
+const trustedOrigins = process.env.BETTER_AUTH_TRUSTED_ORIGINS
+  ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean)
+  : [];
+
+if (production && (!secret || secret.length < 32)) {
+  throw new Error("BETTER_AUTH_SECRET must be configured with at least 32 characters in production.");
+}
+if (production && !process.env.BETTER_AUTH_URL) {
+  throw new Error("BETTER_AUTH_URL must be configured in production.");
+}
+if (production && trustedOrigins.length === 0) {
+  throw new Error("BETTER_AUTH_TRUSTED_ORIGINS must contain at least one trusted origin in production.");
+}
+
 export const auth = betterAuth({
   appName: "RunLattice",
   secret: secret || "runlattice-local-development-secret-change-before-deploy",
@@ -72,7 +88,5 @@ export const auth = betterAuth({
       return PLAN_LIMITS[plan].members;
     },
   })],
-  trustedOrigins: process.env.BETTER_AUTH_TRUSTED_ORIGINS
-    ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean)
-    : ["http://localhost:3000"],
+  trustedOrigins: trustedOrigins.length > 0 ? trustedOrigins : ["http://localhost:3000"],
 });
