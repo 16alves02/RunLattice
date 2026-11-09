@@ -1,30 +1,38 @@
 import type { Metadata, Viewport } from "next";
+import { CookieConsent } from "@/components/cookie-consent";
 import "./globals.css";
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://runlattice-web-production.up.railway.app";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(appUrl),
   title: { default: "RunLattice | Workflow automation", template: "%s | RunLattice" },
-  description: "Design workflow definitions, validate automation logic and monitor background execution from one workspace.",
+  description: "Design, validate and manage workflow automations from one workspace.",
   applicationName: "RunLattice",
   openGraph: {
     type: "website",
     siteName: "RunLattice",
     title: "RunLattice | Workflow automation",
     description: "Design, validate and monitor workflow automations from one workspace.",
+    url: appUrl,
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "RunLattice workflow automation workspace" }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "RunLattice | Workflow automation",
     description: "Design, validate and monitor workflow automations from one workspace.",
+    images: ["/opengraph-image"],
   },
-  icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, { url: "/icon-192.svg", type: "image/svg+xml", sizes: "192x192" }],
+    shortcut: "/favicon.svg",
+    apple: [{ url: "/apple-touch-icon.svg", type: "image/svg+xml" }],
+  },
+  manifest: "/manifest.webmanifest",
 };
 
-export const viewport: Viewport = {
-  themeColor: "#0c0d0f",
-  colorScheme: "dark",
-};
+export const viewport: Viewport = { themeColor: "#0c0d0f", colorScheme: "dark" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body>{children}<CookieConsent /></body></html>;
 }

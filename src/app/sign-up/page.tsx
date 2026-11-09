@@ -13,20 +13,17 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setNotice("");
     setLoading(true);
     try {
       const result = await authClient.signUp.email({ name, email, password, callbackURL: "/onboarding" });
       if (result.error) throw new Error(result.error.message || "Unable to create your account.");
       if (!result.data?.token) {
-        setNotice("Check your inbox to verify your email address before signing in.");
-        setLoading(false);
+        router.push("/thank-you");
         return;
       }
       await ensureActiveWorkspace(`${name.trim()}'s workspace`);
@@ -45,7 +42,6 @@ export default function SignUpPage() {
       <label>Email address<input className="field-input" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
       <label>Password<input className="field-input" type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} /><span className="activity-meta">Use at least 12 characters.</span></label>
       {error && <p className="auth-error" role="alert">{error}</p>}
-      {notice && <p className="panel-subtitle" role="status">{notice}</p>}
       <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? "Creating account…" : "Create account"}</button>
     </form>
     <p className="auth-footer">Already registered? <Link href="/sign-in">Sign in</Link></p>
