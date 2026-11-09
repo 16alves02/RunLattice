@@ -121,3 +121,9 @@ References:
 ## Bounded request body handling
 
 Application API routes that accept JSON or raw payloads use a streaming reader with endpoint-specific byte limits. The reader checks a declared Content-Length as an early rejection hint, enforces the limit against bytes actually received, cancels oversized streams and rejects invalid UTF-8/JSON. The current limits are 8 KiB for billing, integration and AI-provider credential requests; 10 KB for AI planning; 32 KiB for workflow run inputs and signed workflow webhooks; 64 KiB for AI dry-run simulations; 256 KiB for workflow definitions; and 1 MiB for Stripe webhook events. Authentication routes are handled by Better Auth and remain subject to its own request handling and upstream platform limits.
+
+## Outbound HTTP transport safeguards
+
+The shared outbound HTTPS transport is being introduced as the foundation for generic HTTP actions. It currently enforces HTTPS on port 443, rejects local hostnames and non-public IP literals, resolves DNS before connecting, rejects the entire hostname if any returned address is non-public, and pins the selected validated address into the TLS connection to prevent a second DNS lookup from reaching a different destination. Redirects are rejected rather than followed. Request bodies are limited to 64 KB, responses to 1 MB, and requests time out after 10 seconds. Only a small allow-list of request headers is accepted.
+
+This transport is not yet exposed as a workflow action or a user-configurable integration. Generic HTTP actions must not be enabled until the action schema, credential storage, editor controls, response mapping, and end-to-end tests are complete.
