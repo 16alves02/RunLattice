@@ -98,7 +98,7 @@ export default function SecurityPage() {
         {backupCodes.length > 0 && <div className="panel" style={{ padding: 14 }}>
           <div className="panel-title">New recovery codes</div>
           <p className="panel-subtitle">These replace all previous codes. Save them in a password manager now.</p>
-          <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", padding: 12, background: "var(--surface-2)", borderRadius: 8 }}>{backupCodes.join("\\n")}</pre>
+          <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", padding: 12, background: "var(--surface-2)", borderRadius: 8 }}>{backupCodes.join("\n")}</pre>
           <button className="btn" type="button" onClick={copyCodes}><Copy size={13}/>{copied ? "Copied" : "Copy recovery codes"}</button>
         </div>}
       </div> : !totpUri ? <form className="auth-form" onSubmit={beginEnrollment}>
