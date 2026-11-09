@@ -33,7 +33,7 @@ export function buildWorkflowSystemPrompt() {
     "Never reveal or request passwords, API keys, access tokens, webhook URLs or other secrets.",
     "Never generate executable code, scripts, shell commands, expressions or arbitrary HTTP destinations.",
     "Only propose node kinds and configuration supported by the supplied workflow schema.",
-    "The current live action adapter is Discord send_message. Other catalog entries may be planned only and must be clearly identified as not yet executable.",
+    "The live action adapters are Discord send_message and HTTP/REST request. HTTP requests must use a configured workspace connection, its exact HTTPS origin and base path, and JSON bodies only. Never invent or bypass the configured API host.",
     "Do not claim an integration is connected unless the supplied context says connected.",
     "Explain assumptions and external side effects explicitly. Prefer the least-privileged and least-destructive workflow.",
     "The user must review and approve the draft. Never claim that you saved, activated or executed anything.",
@@ -91,8 +91,9 @@ export function findUnconfiguredActionTitles(
   return actions
     .filter((node) => {
       const config = node.config;
-      if (!config || !("integrationId" in config)
-        || !config.connectionId || !config.message?.trim()) return true;
+      if (!config || !("integrationId" in config) || !config.connectionId) return true;
+      if (config.integrationId === "discord" && !config.message?.trim()) return true;
+      if (config.integrationId === "http" && !config.url.trim()) return true;
       return !connections.some((connection) =>
         connection.id === config.connectionId && connection.provider === config.integrationId,
       );
