@@ -70,6 +70,7 @@ export function isPublicIpAddress(address: string): boolean {
     // ranges are excluded even when an OS resolver reports them as global.
     return inIpv6Range(value, "2000::", 3)
       && !inIpv6Range(value, "2001::", 23)
+      && !inIpv6Range(value, "2001:db8::", 32)
       && !inIpv6Range(value, "2002::", 16);
   }
   return false;
