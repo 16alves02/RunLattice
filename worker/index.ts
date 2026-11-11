@@ -11,7 +11,7 @@ import { resolveNextExecutionNode, validateExecutableWorkflow } from "../src/lib
 import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
 import type { DiscordActionConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
-import { isWithinAllowedHttpsBase, requestPublicHttps } from "../src/lib/safe-http";
+import { ActionOutcomeUnknownError, isWithinAllowedHttpsBase, requestPublicHttps } from "../src/lib/safe-http";
 import { extractJsonResponseValue, toPersistableHttpActionResult } from "../src/lib/http-response";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 
@@ -113,7 +113,7 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
-    throw new Error("Discord did not respond within the 10-second action timeout.");
+    throw new ActionOutcomeUnknownError("Discord did not respond within the 10-second action timeout; delivery outcome may be unknown.");
   }
 
   if (response.status >= 300 && response.status < 400) {
@@ -176,7 +176,8 @@ async function executeHttpAction(config: HttpActionConfig, organizationId: strin
       },
       ...(body ? { body } : {}),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ActionOutcomeUnknownError) throw error;
     throw new Error("The external HTTPS request failed or was blocked by RunLattice security controls.");
   }
 
@@ -449,7 +450,7 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
         await prisma.workflowRunStep.update({
           where: { id: ledgerStep.id, run: { is: { status: "RUNNING", leaseToken } } },
           data: {
-            status: node.kind === "action" ? "OUTCOME_UNKNOWN" : "FAILED",
+            status: node.kind === "action" && error instanceof ActionOutcomeUnknownError ? "OUTCOME_UNKNOWN" : "FAILED",
             finishedAt: new Date(),
             error: safeMessage,
           },
