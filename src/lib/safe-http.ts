@@ -7,6 +7,13 @@ export const MAX_HTTP_REQUEST_BYTES = 64 * 1024;
 export const MAX_HTTP_RESPONSE_BYTES = 1024 * 1024;
 export const HTTP_ACTION_TIMEOUT_MS = 10_000;
 
+export class ActionOutcomeUnknownError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ActionOutcomeUnknownError";
+  }
+}
+
 export type ResolvedPublicAddress = { address: string; family: 4 | 6 };
 
 function ipv4ToNumber(address: string): number | null {
@@ -222,7 +229,7 @@ export async function requestPublicHttps(input: SafeHttpRequest): Promise<SafeHt
         }
         chunks.push(buffer);
       });
-      response.on("error", (error) => finishReject(error));
+      response.on("error", () => finishReject(new ActionOutcomeUnknownError("The HTTP response was interrupted; the external action outcome may be unknown.")));
       response.on("end", () => {
         if (settled) return;
         settled = true;
@@ -235,7 +242,7 @@ export async function requestPublicHttps(input: SafeHttpRequest): Promise<SafeHt
       });
     });
 
-    request.on("error", (error) => finishReject(error));
+    request.on("error", () => finishReject(new ActionOutcomeUnknownError("The HTTPS request was interrupted; the external action outcome may be unknown.")));
     request.setTimeout(HTTP_ACTION_TIMEOUT_MS, () => request.destroy(new Error("HTTP action timed out after 10 seconds.")));
     if (body) request.write(body);
     request.end();
