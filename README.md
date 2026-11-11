@@ -153,7 +153,7 @@ All workflow and integration endpoints require an authenticated session and veri
 
 ## Deployment
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the required web/worker topology, environment variables and production release checklist. The guide does not indicate that a production deployment has been completed.
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the required web/worker topology and production release checklist. [docs/backup-and-recovery.md](docs/backup-and-recovery.md) defines the backup, secret-protection and restore-drill requirements. It is a runbook to implement and validate, not proof that backups or recovery are currently operational.
 
 ## Project status
 
