@@ -11,6 +11,7 @@ import type { WorkflowDefinition } from "@/lib/types";
 const organizationId = `integration-org-${randomBytes(8).toString("hex")}`;
 const webhookWorkflowId = `integration-webhook-${randomBytes(8).toString("hex")}`;
 const workerWorkflowId = `integration-worker-${randomBytes(8).toString("hex")}`;
+const failedActionWorkflowId = `integration-action-failure-${randomBytes(8).toString("hex")}`;
 const successfulWorkflowId = `integration-success-${randomBytes(8).toString("hex")}`;
 const successfulConnectionId = `integration-connection-${randomBytes(8).toString("hex")}`;
 const httpWorkflowId = `integration-http-${randomBytes(8).toString("hex")}`;
@@ -318,6 +319,57 @@ describe("RunLattice PostgreSQL, API and worker integration", () => {
     expect(persistedSteps.find((step) => step.nodeId === "http-action")?.result).toEqual({ httpStatus: 200 });
     expect(JSON.stringify(completed?.output)).not.toContain("inv_mock_123");
     expect(JSON.stringify(completed?.output)).not.toContain("integration-test-secret");
+  });
+
+  it("marks a known integration configuration failure as FAILED, not OUTCOME_UNKNOWN", async () => {
+    await prisma.workflow.create({
+      data: {
+        id: failedActionWorkflowId,
+        name: "Known action failure classification",
+        description: "",
+        status: "ACTIVE",
+        triggerType: "MANUAL",
+        organizationId,
+        definition: {
+          nodes: [
+            {
+              id: "trigger",
+              kind: "trigger",
+              title: "Manual trigger",
+              detail: "Trigger · MANUAL",
+              config: { triggerType: "MANUAL" },
+              x: 0,
+              y: 0,
+            },
+            {
+              id: "discord-action",
+              kind: "action",
+              title: "Missing Discord connection",
+              detail: "Discord · Send message",
+              config: {
+                integrationId: "discord",
+                actionId: "send_message",
+                connectionId: "missing-connection",
+                message: "This action must not be sent",
+              },
+              x: 320,
+              y: 0,
+            },
+          ],
+          edges: [{ id: "trigger-to-action", from: "trigger", to: "discord-action" }],
+        },
+      },
+    });
+    const run = await prisma.workflowRun.create({
+      data: { workflowId: failedActionWorkflowId, outboxEvent: { create: {} } },
+    });
+
+    startWorkerProcess();
+    expect(await waitForRunStatus(run.id, "FAILED")).toBe("FAILED");
+    const actionStep = await prisma.workflowRunStep.findFirst({
+      where: { runId: run.id, nodeId: "discord-action" },
+    });
+    expect(actionStep?.status).toBe("FAILED");
   });
 
   it("records an invalid workflow failure safely in the real BullMQ worker", async () => {
