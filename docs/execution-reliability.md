@@ -27,6 +27,8 @@ Each node attempt is persisted in `WorkflowRunStep` with its node identity, kind
 
 If recovery finds an action step still running, it records `OUTCOME_UNKNOWN`; it does not assume the external request failed. Interrupted non-action steps are marked failed. There is no automatic resume or replay in this phase.
 
+During a live worker execution, a received provider/API rejection or a preflight/configuration error is recorded as `FAILED`. A network interruption or timeout after an external request has started is recorded as `OUTCOME_UNKNOWN`, because the provider may have processed it without returning a response.
+
 ## Retry and idempotency policy
 
 - BullMQ delivery uses one attempt; Discord actions are not automatically retried.
