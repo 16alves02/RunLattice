@@ -39,6 +39,44 @@ describe("stale workflow run recovery", () => {
         error: "The worker stopped during an external action; delivery may have occurred.",
       },
     });
+    expect(stepUpdateMany).toHaveBeenNthCalledWith(2, {
+      where: { runId: { in: ["run-1", "run-2"] }, status: "RUNNING", kind: { not: "action" } },
+      data: {
+        status: "FAILED",
+        finishedAt: now,
+        error: "The worker stopped before this step completed.",
+      },
+    });
+  });
+
+  it("does not query or update steps when no stale run is found", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const updateMany = vi.fn();
+    const stepUpdateMany = vi.fn();
+    const database = {
+      workflowRun: { findMany, updateMany },
+      workflowRunStep: { updateMany: stepUpdateMany },
+    };
+
+    await expect(recoverStaleWorkflowRuns(database as never)).resolves.toBe(0);
+
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(stepUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("does not update steps when another worker has already claimed the stale runs", async () => {
+    const findMany = vi.fn().mockResolvedValue([{ id: "run-1" }]);
+    const updateMany = vi.fn().mockResolvedValue({ count: 0 });
+    const stepUpdateMany = vi.fn();
+    const database = {
+      workflowRun: { findMany, updateMany },
+      workflowRunStep: { updateMany: stepUpdateMany },
+    };
+
+    await expect(recoverStaleWorkflowRuns(database as never)).resolves.toBe(0);
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(stepUpdateMany).not.toHaveBeenCalled();
   });
 
   it("does not replay interrupted runs", async () => {
