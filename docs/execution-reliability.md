@@ -42,4 +42,4 @@ If recovery finds an action step still running, it records `OUTCOME_UNKNOWN`; it
 
 ## Scope
 
-Phase 2 supports manual triggers, Discord webhook send-message actions, bounded JSON input, safe scalar templates and one declarative condition node with true/false branches. It does not include scheduled triggers, inbound webhooks, OAuth providers, arbitrary code execution, safe automatic retries or exactly-once delivery.
+Phase 2 supports manual, scheduled and signed inbound webhook triggers; Discord webhook message actions and bounded HTTPS API request actions; bounded JSON input; safe scalar templates; and one declarative condition node with true/false branches. It does not include OAuth providers, arbitrary code execution, automatic retries for external actions or exactly-once delivery.
