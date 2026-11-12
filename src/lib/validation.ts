@@ -32,7 +32,7 @@ function isBoundedGoogleSheetsReadRange(value: string) {
 }
 
 function isValidGoogleSheetsAppendRange(value: string) {
-  return /^(?:'(?:[^']|'')+'|[A-Za-z0-9_]+)!\$?[A-Z]{1,3}(?:\$?[1-9]\d*)?:\$?[A-Z]{1,3}(?:\$?[1-9]\d*)?$/i.test(value);
+  return /^(?:'(?:[^']|'')+'|[A-Za-z0-9_]+)!(?:\$?[A-Z]{1,3}:\$?[A-Z]{1,3}|\$?[A-Z]{1,3}\$?[1-9]\d*:\$?[A-Z]{1,3}\$?[1-9]\d*)$/i.test(value);
 }
 
 const googleSheetsReadActionConfigSchema = z.object({
