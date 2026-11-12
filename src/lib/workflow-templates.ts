@@ -6,7 +6,7 @@ export interface WorkflowTemplate {
   description: string;
   category: "Communication" | "Development";
   integrations: string[];
-  icon: "discord" | "http" | "gmail";
+  icon: "discord" | "http" | "gmail" | "sheets";
   setupInstructions: string;
   definition: WorkflowDefinition;
 }
@@ -63,6 +63,22 @@ export const workflowTemplates: WorkflowTemplate[] = [
         { id: "action-gmail", kind: "action", title: "Send Gmail email", detail: "Action · Gmail", config: { integrationId: "gmail", actionId: "send_email", to: "{{input.email}}", subject: "A message from RunLattice", body: "Hello {{input.name}},\n\nThis message was sent by an automated workflow." }, x: 360, y: 90 },
       ],
       edges: [{ id: "edge-manual-gmail", from: "trigger-manual", to: "action-gmail" }],
+    },
+  },
+  {
+    id: "manual-google-sheets-append",
+    name: "Append workflow data to Google Sheets",
+    description: "Append a row of input data to a connected spreadsheet.",
+    category: "Development",
+    integrations: ["Manual trigger", "Google Sheets"],
+    icon: "sheets",
+    setupInstructions: "Connect or reconnect a Google account after granting the Google Sheets permission. Enter the spreadsheet ID and A1 range, then adjust the JSON row mapping to match your columns.",
+    definition: {
+      nodes: [
+        { id: "trigger-manual", kind: "trigger", title: "Manual start", detail: "Trigger · Run on demand", config: { triggerType: "MANUAL" }, x: 70, y: 90 },
+        { id: "action-sheets", kind: "action", title: "Append spreadsheet row", detail: "Action · Google Sheets", config: { integrationId: "google-sheets", actionId: "append_rows", spreadsheetId: "REPLACE_WITH_SPREADSHEET_ID", range: "Sheet1!A:D", valuesJson: '[["{{input.name}}","{{input.email}}","{{input.status}}","{{input.createdAt}}"]]' }, x: 360, y: 90 },
+      ],
+      edges: [{ id: "edge-manual-sheets", from: "trigger-manual", to: "action-sheets" }],
     },
   },
   {
