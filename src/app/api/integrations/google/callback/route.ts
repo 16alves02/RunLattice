@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret } from "@/lib/secrets";
 import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
+import { canManageWorkspace } from "@/lib/workspace";
 
 export const runtime = "nodejs";
 
@@ -41,6 +42,14 @@ export async function GET(request: Request) {
     });
     if (consumed.count !== 1) return redirectToIntegrations("error", "reused_state");
     if (providerError || !code || code.length > 4_096) return redirectToIntegrations("error", "authorization_denied");
+
+    const currentMembership = await prisma.member.findFirst({
+      where: { userId: oauthState.userId, organizationId: oauthState.organizationId },
+      select: { role: true },
+    });
+    if (!currentMembership || !canManageWorkspace(currentMembership.role)) {
+      return redirectToIntegrations("error", "workspace_permission_changed");
+    }
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
