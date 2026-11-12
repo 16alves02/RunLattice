@@ -71,7 +71,7 @@ export async function GET(request: Request) {
       client_id: config.clientId,
       redirect_uri: config.redirectUri,
       response_type: "code",
-      scope: "openid email https://www.googleapis.com/auth/gmail.send",
+      scope: "openid email https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/spreadsheets",
       access_type: "offline",
       prompt: "consent select_account",
       include_granted_scopes: "true",
