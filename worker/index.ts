@@ -237,7 +237,7 @@ async function executeGoogleSheetsRead(config: GoogleSheetsReadConfig, organizat
   try {
     response = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` }, redirect: "error", signal: AbortSignal.timeout(15_000) });
   } catch {
-    throw new ActionOutcomeUnknownError("Google Sheets did not respond within the 15-second read timeout.");
+    throw new Error("Google Sheets read request timed out or could not be completed.");
   }
   if (!response.ok) throw new Error(`Google Sheets rejected the read request with HTTP ${response.status}.`);
   const payload: unknown = await response.json();
