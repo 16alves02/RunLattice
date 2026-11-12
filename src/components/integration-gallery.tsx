@@ -159,7 +159,7 @@ export function IntegrationGallery() {
       <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>{categories.map((item) => <button key={item} className={category === item ? "btn btn-primary" : "btn btn-quiet"} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}</div>
     </div>
     <div className="integration-grid">{visible.map((item) => {
-      const connected = connections.filter((connection) => connection.provider === (item.id === "gmail" ? "google" : item.id));
+      const connected = connections.filter((connection) => connection.provider === (item.id === "gmail" || item.id === "google-sheets" ? "google" : item.id));
       return <article className="panel integration-card" key={item.id}>
         <div className="integration-card-head"><div className="quick-icon">{item.name.slice(0, 1)}</div><span className="tag">{item.status === "available" ? "Available" : "Planned"}</span></div>
         <h2>{item.name}</h2><p>{item.description}</p>
@@ -173,6 +173,10 @@ export function IntegrationGallery() {
           <div className="activity-meta">{connected.length} Slack workspace(s) connected</div>
           {canManage && <form action="/api/integrations/slack/connect" method="get"><button className="btn btn-primary" type="submit">Connect Slack workspace</button></form>}
           <p className="editor-help">Uses a Slack bot installation with the minimum <code>chat:write</code> permission. Invite the RunLattice app to each channel before posting, including private channels.</p>
+        </> : item.id === "google-sheets" ? <>
+          <div className="activity-meta">{connected.length} Google account(s) available for Sheets</div>
+          {canManage && <form action="/api/integrations/google/connect" method="get"><button className="btn btn-primary" type="submit">Connect Google account</button></form>}
+          <p className="editor-help">Uses the same Google OAuth connection as Gmail. Grants spreadsheet read/write access; reconnect accounts that were authorized before this permission was added.</p>
         </> : item.id === "gmail" ? <>
           <div className="activity-meta">{connected.length} Google account(s) connected to this workspace</div>
           {canManage && <form action="/api/integrations/google/connect" method="get"><button className="btn btn-primary" type="submit">Connect Google account</button></form>}
