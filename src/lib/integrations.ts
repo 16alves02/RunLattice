@@ -23,7 +23,7 @@ export interface IntegrationActionDefinition {
   id: string;
   name: string;
   status: IntegrationStatus;
-  connectionProvider?: "discord" | "http" | "google";
+  connectionProvider?: "discord" | "http" | "google" | "slack";
   description: string;
   configuration: IntegrationFieldDefinition[];
   outputs: IntegrationOutputDefinition[];
@@ -48,7 +48,7 @@ export interface IntegrationDefinition {
 
 export interface RequiredIntegrationConnection {
   id: string;
-  provider: "discord" | "http" | "google";
+  provider: "discord" | "http" | "google" | "slack";
 }
 
 /**
@@ -93,11 +93,18 @@ export const integrationCatalog: IntegrationDefinition[] = [
   },
   {
     id: "slack", name: "Slack", category: "Communication",
-    description: "Connect team notifications and message events.",
-    auth: "OAuth 2.0", triggers: [], actions: [],
-    plannedTriggers: ["New message"],
-    plannedActions: ["Send message"],
-    operations: [], status: "planned",
+    description: "Send messages to channels in a connected Slack workspace.",
+    auth: "OAuth 2.0", triggers: [], actions: ["Send message"],
+    plannedTriggers: ["New message"], plannedActions: [],
+    operations: [{
+      id: "send_message", name: "Send message", status: "available", connectionProvider: "slack",
+      description: "Post a plain-text message to a Slack channel where the RunLattice app is a member.",
+      configuration: [
+        { id: "channel", label: "Channel ID", type: "text", required: true, description: "Slack channel ID. Invite the RunLattice app to private channels before sending." },
+        { id: "message", label: "Message", type: "text", required: true, description: "Plain-text Slack message; supports workflow input and previous-step mappings." },
+      ],
+      outputs: [{ path: "channel", label: "Channel ID", type: "string", availability: "always" }, { path: "ts", label: "Message timestamp", type: "string", availability: "always" }],
+    }], status: "available",
   },
   {
     id: "google-sheets", name: "Google Sheets", category: "Productivity",
@@ -204,7 +211,7 @@ export function isIntegrationActionAvailable(integrationId: string, actionId: st
 export function getRequiredIntegrationConnections(
   nodes: readonly WorkflowNode[],
 ): RequiredIntegrationConnection[] {
-  const requirements = new Map<string, "discord" | "http" | "google">();
+  const requirements = new Map<string, "discord" | "http" | "google" | "slack">();
 
   for (const node of nodes) {
     if (node.kind !== "action" || !node.config || !("integrationId" in node.config) || !node.config.connectionId) {
