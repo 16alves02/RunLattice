@@ -18,6 +18,7 @@ import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 import { isIntegrationActionAvailable } from "../src/lib/integrations";
 import { buildGmailRawMessage } from "../src/lib/gmail-message";
 import { parseGoogleSheetsAppendResponse, parseGoogleSheetsAppendValues, parseGoogleSheetsReadResponse, readGoogleSheetsJsonResponse } from "../src/lib/google-sheets";
+import { buildSlackMessagePayload, parseSlackMessageResponse } from "../src/lib/slack-message";
 
 const prisma = new PrismaClient();
 const databaseUrl = process.env.DATABASE_URL;
@@ -291,9 +292,8 @@ async function getSlackAccessToken(connectionId: string, organizationId: string)
 async function executeSlackAction(config: SlackActionConfig, organizationId: string, input: unknown) {
   if (!config.connectionId) throw new Error("The Slack action is missing its workspace connection.");
   const channel = renderInputTemplate(config.channel, input, 40);
-  if (!/^[CDG][A-Z0-9]{8,39}$/.test(channel)) throw new Error("Enter a valid Slack channel ID, such as C0123456789.");
   const message = renderInputTemplate(config.message, input, 40_000);
-  if (!message.trim()) throw new Error("The Slack message cannot be empty.");
+  const payload = buildSlackMessagePayload(channel, message);
   const accessToken = await getSlackAccessToken(config.connectionId, organizationId);
 
   let response: Response;
@@ -301,7 +301,7 @@ async function executeSlackAction(config: SlackActionConfig, organizationId: str
     response = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json; charset=utf-8" },
-      body: JSON.stringify({ channel, text: message, unfurl_links: false, unfurl_media: false }),
+      body: JSON.stringify(payload),
       redirect: "error",
       signal: AbortSignal.timeout(15_000),
     });
@@ -309,15 +309,8 @@ async function executeSlackAction(config: SlackActionConfig, organizationId: str
     throw new ActionOutcomeUnknownError("Slack did not respond within the 15-second send timeout; message delivery may be unknown. RunLattice will not automatically resend it.");
   }
   if (!response.ok) throw new Error(`Slack rejected the message with HTTP ${response.status}.`);
-  const payload: unknown = await response.json();
-  if (!payload || typeof payload !== "object" || !("ok" in payload) || payload.ok !== true
-    || !("channel" in payload) || typeof payload.channel !== "string"
-    || !("ts" in payload) || typeof payload.ts !== "string") {
-    const reason = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
-      ? payload.error : "invalid_response";
-    throw new Error(`Slack could not post the message (${reason}). Check that the app is a member of the selected channel.`);
-  }
-  return { channel: payload.channel, ts: payload.ts };
+  const result: unknown = await response.json();
+  return parseSlackMessageResponse(result);
 }
 
 async function executeGmailAction(config: GmailActionConfig, organizationId: string, input: unknown) {
