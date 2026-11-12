@@ -23,7 +23,7 @@ export interface IntegrationActionDefinition {
   id: string;
   name: string;
   status: IntegrationStatus;
-  connectionProvider?: "discord" | "http";
+  connectionProvider?: "discord" | "http" | "google";
   description: string;
   configuration: IntegrationFieldDefinition[];
   outputs: IntegrationOutputDefinition[];
@@ -48,7 +48,7 @@ export interface IntegrationDefinition {
 
 export interface RequiredIntegrationConnection {
   id: string;
-  provider: "discord" | "http";
+  provider: "discord" | "http" | "google";
 }
 
 /**
@@ -59,11 +59,20 @@ export interface RequiredIntegrationConnection {
 export const integrationCatalog: IntegrationDefinition[] = [
   {
     id: "gmail", name: "Gmail", category: "Communication",
-    description: "Connect email events and automate message handling.",
-    auth: "OAuth 2.0", triggers: [], actions: [],
+    description: "Send email from a connected Google account.",
+    auth: "OAuth 2.0", triggers: [], actions: ["Send email"],
     plannedTriggers: ["New email", "New attachment"],
-    plannedActions: ["Send email", "Add label"],
-    operations: [], status: "planned",
+    plannedActions: ["Add label"],
+    operations: [{
+      id: "send_email", name: "Send email", status: "available", connectionProvider: "google",
+      description: "Send a plain-text email using a workspace-authorized Google account.",
+      configuration: [
+        { id: "to", label: "To", type: "text", required: true, description: "Comma-separated recipient email addresses; supports workflow mappings." },
+        { id: "subject", label: "Subject", type: "text", required: true, description: "Email subject; supports workflow mappings." },
+        { id: "body", label: "Message", type: "text", required: true, description: "Plain-text email body; supports workflow mappings." },
+      ],
+      outputs: [{ path: "httpStatus", label: "HTTP status", type: "number", availability: "always" }],
+    }], status: "available",
   },
   {
     id: "discord", name: "Discord", category: "Communication",
@@ -175,7 +184,7 @@ export function isIntegrationActionAvailable(integrationId: string, actionId: st
 export function getRequiredIntegrationConnections(
   nodes: readonly WorkflowNode[],
 ): RequiredIntegrationConnection[] {
-  const requirements = new Map<string, "discord" | "http">();
+  const requirements = new Map<string, "discord" | "http" | "google">();
 
   for (const node of nodes) {
     if (node.kind !== "action" || !node.config || !("integrationId" in node.config) || !node.config.connectionId) {
