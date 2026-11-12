@@ -39,8 +39,14 @@ export function IntegrationGallery() {
       : googleStatus === "error"
         ? "Google authorization could not be completed (" + (params.get("reason") ?? "unknown_error") + "). Check the Google OAuth configuration and try again."
         : "";
-    if (googleNotice) queueMicrotask(() => setNotice(googleNotice));
-    if (googleStatus) window.history.replaceState({}, "", window.location.pathname);
+    const slackStatus = params.get("slack");
+    const slackNotice = slackStatus === "connected"
+      ? "Slack workspace connected. You can now send messages to channels where the RunLattice app is a member."
+      : slackStatus === "error"
+        ? "Slack authorization could not be completed (" + (params.get("reason") ?? "unknown_error") + "). Check the Slack app configuration and try again."
+        : "";
+    if (googleNotice || slackNotice) queueMicrotask(() => setNotice(googleNotice || slackNotice));
+    if (googleStatus || slackStatus) window.history.replaceState({}, "", window.location.pathname);
   }, []);
 
   useEffect(() => {
@@ -163,7 +169,11 @@ export function IntegrationGallery() {
           <strong>Planned capabilities</strong>
           <span>{[...item.plannedTriggers, ...item.plannedActions].join(" · ")}</span>
         </div>}
-        {item.id === "gmail" ? <>
+        {item.id === "slack" && item.status === "available" ? <>
+          <div className="activity-meta">{connected.length} Slack workspace(s) connected</div>
+          {canManage && <form action="/api/integrations/slack/connect" method="get"><button className="btn btn-primary" type="submit">Connect Slack workspace</button></form>}
+          <p className="editor-help">Uses a Slack bot installation with the minimum <code>chat:write</code> permission. Invite the RunLattice app to each channel before posting, including private channels.</p>
+        </> : item.id === "gmail" ? <>
           <div className="activity-meta">{connected.length} Google account(s) connected to this workspace</div>
           {canManage && <form action="/api/integrations/google/connect" method="get"><button className="btn btn-primary" type="submit">Connect Google account</button></form>}
           <p className="editor-help">Authorization uses Google OAuth 2.0 with PKCE. Gmail Send email and Google Sheets Read rows / Append rows are available in the workflow builder.</p>
