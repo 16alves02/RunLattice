@@ -9,8 +9,20 @@ export function buildGmailRawMessage(toValue: string, subject: string, body: str
   }
   if (!body.trim() || body.length > 100_000) throw new Error("The Gmail message body is empty or too long.");
 
-  const encodedSubject = (Buffer.from(subject, "utf8").toString("base64").match(/.{1,60}/g) ?? [])
-    .map((chunk) => `=?UTF-8?B?${chunk}?=`)
+  const subjectChunks: string[] = [];
+  let subjectChunk = "";
+  for (const character of subject) {
+    const candidate = subjectChunk + character;
+    if (subjectChunk && Buffer.from(candidate, "utf8").toString("base64").length > 60) {
+      subjectChunks.push(subjectChunk);
+      subjectChunk = character;
+    } else {
+      subjectChunk = candidate;
+    }
+  }
+  if (subjectChunk) subjectChunks.push(subjectChunk);
+  const encodedSubject = subjectChunks
+    .map((chunk) => `=?UTF-8?B?${Buffer.from(chunk, "utf8").toString("base64")}?=`)
     .join(" ");
   const encodedBody = (Buffer.from(body, "utf8").toString("base64").match(/.{1,76}/g) ?? []).join("\r\n");
   const mimeMessage = [
