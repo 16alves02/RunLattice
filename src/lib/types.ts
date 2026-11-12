@@ -16,6 +16,23 @@ export interface GmailActionConfig {
   body: string;
 }
 
+export interface GoogleSheetsReadConfig {
+  integrationId: "google-sheets";
+  actionId: "read_rows";
+  connectionId?: string;
+  spreadsheetId: string;
+  range: string;
+}
+
+export interface GoogleSheetsAppendConfig {
+  integrationId: "google-sheets";
+  actionId: "append_rows";
+  connectionId?: string;
+  spreadsheetId: string;
+  range: string;
+  valuesJson: string;
+}
+
 export interface HttpActionConfig {
   integrationId: "http";
   actionId: "request";
@@ -45,7 +62,7 @@ export interface WorkflowNode {
   kind: NodeKind;
   title: string;
   detail: string;
-  config?: DiscordActionConfig | GmailActionConfig | HttpActionConfig | ConditionConfig | TriggerConfig;
+  config?: DiscordActionConfig | GmailActionConfig | GoogleSheetsReadConfig | GoogleSheetsAppendConfig | HttpActionConfig | ConditionConfig | TriggerConfig;
   x: number;
   y: number;
 }
