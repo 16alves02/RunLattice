@@ -35,7 +35,7 @@ export function IntegrationGallery() {
     const params = new URLSearchParams(window.location.search);
     const googleStatus = params.get("google");
     const googleNotice = googleStatus === "connected"
-      ? "Google account connected securely. You can now use Gmail's Send email action in workflows."
+      ? "Google account connected securely. You can now use Gmail Send email and Google Sheets Read rows / Append rows actions in workflows."
       : googleStatus === "error"
         ? "Google authorization could not be completed (" + (params.get("reason") ?? "unknown_error") + "). Check the Google OAuth configuration and try again."
         : "";
@@ -166,7 +166,7 @@ export function IntegrationGallery() {
         {item.id === "gmail" ? <>
           <div className="activity-meta">{connected.length} Google account(s) connected to this workspace</div>
           {canManage && <form action="/api/integrations/google/connect" method="get"><button className="btn btn-primary" type="submit">Connect Google account</button></form>}
-          <p className="editor-help">Authorization uses Google OAuth 2.0 with PKCE. The Gmail Send email action is available in the workflow builder.</p>
+          <p className="editor-help">Authorization uses Google OAuth 2.0 with PKCE. Gmail Send email and Google Sheets Read rows / Append rows are available in the workflow builder.</p>
         </> : item.id === "http" && item.status === "available" ? <>
           <div className="activity-meta">{connected.length} connection(s) in this workspace</div>
           {canManage && <button className="btn btn-primary" onClick={() => setShowHttpForm((value) => !value)}>{showHttpForm ? "Close form" : "Connect API key"}</button>}
