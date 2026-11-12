@@ -65,4 +65,4 @@ Official references:
 - [Installing with OAuth](https://docs.slack.dev/authentication/installing-with-oauth/)
 - [Using token rotation](https://docs.slack.dev/authentication/using-token-rotation/)
 - [chat.postMessage](https://docs.slack.dev/reference/methods/chat.postMessage/)
-- [apps.uninstall](https://docs.slack.dev/reference/methods/apps.uninstall/)
+- [auth.revoke](https://docs.slack.dev/reference/methods/auth.revoke/)
