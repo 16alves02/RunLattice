@@ -1,11 +1,22 @@
--- Keep the TwoFactor table inaccessible through Supabase Data API roles.
--- The application connects through the dedicated Prisma role (BYPASSRLS).
-REVOKE ALL PRIVILEGES ON TABLE public."TwoFactor" FROM anon, authenticated;
 ALTER TABLE public."TwoFactor" ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "deny_all_api_roles" ON public."TwoFactor";
-CREATE POLICY "deny_all_api_roles"
-  ON public."TwoFactor"
-  FOR ALL
-  TO anon, authenticated
-  USING (false)
-  WITH CHECK (false);
+
+DO $$
+DECLARE
+  api_role text;
+  policy_name text;
+BEGIN
+  DROP POLICY IF EXISTS "deny_all_api_roles" ON public."TwoFactor";
+
+  FOREACH api_role IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = api_role) THEN
+      policy_name := 'deny_all_api_roles_' || api_role;
+      EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE public."TwoFactor" FROM %I', api_role);
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public."TwoFactor"', policy_name);
+      EXECUTE format(
+        'CREATE POLICY %I ON public."TwoFactor" FOR ALL TO %I USING (false) WITH CHECK (false)',
+        policy_name, api_role
+      );
+    END IF;
+  END LOOP;
+END
+$$;
