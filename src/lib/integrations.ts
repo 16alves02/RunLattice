@@ -3,12 +3,30 @@ import type { WorkflowNode } from "@/lib/types";
 export type IntegrationCategory = "Communication" | "Productivity" | "E-commerce" | "Payments" | "Development";
 export type IntegrationStatus = "available" | "planned";
 
+export interface IntegrationFieldDefinition {
+  id: string;
+  label: string;
+  type: "text" | "url" | "select" | "json";
+  required: boolean;
+  description: string;
+  options?: string[];
+}
+
+export interface IntegrationOutputDefinition {
+  path: string;
+  label: string;
+  type: "string" | "number" | "boolean" | "json";
+  availability: "always" | "when_configured";
+}
+
 export interface IntegrationActionDefinition {
   id: string;
   name: string;
   status: IntegrationStatus;
   connectionProvider?: "discord" | "http";
   description: string;
+  configuration: IntegrationFieldDefinition[];
+  outputs: IntegrationOutputDefinition[];
 }
 
 export interface IntegrationDefinition {
@@ -56,6 +74,11 @@ export const integrationCatalog: IntegrationDefinition[] = [
       id: "send_message", name: "Send message", status: "available",
       connectionProvider: "discord",
       description: "Post a message through a workspace-scoped Discord webhook.",
+      configuration: [{
+        id: "message", label: "Message", type: "text", required: true,
+        description: "Message content; supports workflow input and previous-step mappings.",
+      }],
+      outputs: [{ path: "httpStatus", label: "HTTP status", type: "number", availability: "always" }],
     }],
     status: "available",
   },
@@ -116,6 +139,16 @@ export const integrationCatalog: IntegrationDefinition[] = [
       id: "request", name: "Send HTTP request", status: "available",
       connectionProvider: "http",
       description: "Send a secured HTTPS request to the configured API origin.",
+      configuration: [
+        { id: "method", label: "HTTP method", type: "select", required: true, options: ["GET", "POST", "PUT", "PATCH", "DELETE"], description: "Request method." },
+        { id: "url", label: "Request URL", type: "url", required: true, description: "Must remain within the connected HTTPS API origin and base path." },
+        { id: "body", label: "JSON body", type: "json", required: false, description: "Optional JSON request body with dynamic input mappings." },
+        { id: "responsePath", label: "Response JSON path", type: "text", required: false, description: "Optional scalar path to expose as responseValue." },
+      ],
+      outputs: [
+        { path: "httpStatus", label: "HTTP status", type: "number", availability: "always" },
+        { path: "responseValue", label: "Selected response value", type: "json", availability: "when_configured" },
+      ],
     }],
     status: "available",
   },
