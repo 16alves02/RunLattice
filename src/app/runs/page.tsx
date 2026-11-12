@@ -68,7 +68,7 @@ export default async function RunsPage() {
     <section className="panel"><div className="panel-heading"><div><div className="panel-title">Latest runs</div><div className="panel-subtitle">Most recent 100 records from your workspace</div></div><span className="tag">{runs.length} shown</span></div>
       <div style={{ overflowX: "auto" }}><table className="workflow-table"><thead><tr><th>Run ID</th><th>Workflow</th><th>Status</th><th>Duration</th><th>Created</th></tr></thead><tbody>
         {runs.map((run) => <tr key={run.id}>
-          <td style={{ fontFamily: "'DM Mono', monospace", color: "#a8adb4" }}>{run.id.slice(0, 12)}</td>
+          <td style={{ fontFamily: "'DM Mono', monospace", color: "#a8adb4" }}><Link href={`/runs/${encodeURIComponent(run.id)}`} aria-label={`Inspect run ${run.id}`}>{run.id.slice(0, 12)}</Link></td>
           <td style={{ color: "#f2f3f4", fontWeight: 700 }}><Link href={`/workflows/new?workflow=${encodeURIComponent(run.workflowId)}`}>{run.workflowName}</Link></td>
           <td><span className={`status ${run.status === "SUCCEEDED" ? "status-active" : run.status === "FAILED" ? "status-paused" : "status-draft"}`}>{run.status.toLowerCase()}</span>{run.executionMode === "SIMULATED" && <span className="tag" style={{ marginLeft: 6 }}>simulation</span>}{run.error && <div style={{ color: "var(--muted)", fontSize: 10, marginTop: 4 }}>{run.error}</div>}</td>
           <td>{formatDuration(run.startedAt, run.finishedAt)}</td>
