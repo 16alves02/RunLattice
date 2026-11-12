@@ -72,6 +72,7 @@ export async function DELETE(request: Request, context: RouteContext) {
           || !("accessToken" in credentials) || typeof credentials.accessToken !== "string" || !credentials.accessToken) {
           return { ok: false as const, status: 503, error: "The stored Slack credentials are invalid. The connection was not removed." };
         }
+        const accessToken = credentials.accessToken;
 
         async function revokeSlackToken(token: string) {
           const response = await fetch("https://slack.com/api/auth.revoke", {
@@ -106,7 +107,7 @@ export async function DELETE(request: Request, context: RouteContext) {
           && Number.isFinite(Date.parse(credentials.expiresAt)) && Date.parse(credentials.expiresAt) <= Date.now();
         if (!accessTokenExpired) {
           let accessRevoked = false;
-          try { accessRevoked = await revokeSlackToken(credentials.accessToken); } catch { accessRevoked = false; }
+          try { accessRevoked = await revokeSlackToken(accessToken); } catch { accessRevoked = false; }
           if (!accessRevoked) {
             return { ok: false as const, status: 503, error: "Slack access-token revocation could not be confirmed. The connection remains saved." };
           }
