@@ -46,10 +46,17 @@ describe("integration registry", () => {
     const gmail = getIntegrationAction("gmail", "send_email");
     expect(gmail?.configuration.map((field) => field.id)).toEqual(["to", "subject", "body"]);
     expect(gmail?.connectionProvider).toBe("google");
+
+    const sheetsRead = getIntegrationAction("google-sheets", "read_rows");
+    expect(sheetsRead?.configuration.map((field) => field.id)).toEqual(["spreadsheetId", "range"]);
+    expect(sheetsRead?.connectionProvider).toBe("google");
+    const sheetsAppend = getIntegrationAction("google-sheets", "append_rows");
+    expect(sheetsAppend?.configuration.map((field) => field.id)).toEqual(["spreadsheetId", "range", "valuesJson"]);
+    expect(sheetsAppend?.connectionProvider).toBe("google");
   });
 
   it("does not advertise roadmap capabilities as executable actions or triggers", () => {
-    for (const id of ["slack", "google-sheets", "google-drive", "shopify", "stripe", "github"]) {
+    for (const id of ["slack", "google-drive", "shopify", "stripe", "github"]) {
       const integration = getIntegration(id);
       expect(integration?.status).toBe("planned");
       expect(integration?.actions).toEqual([]);
@@ -63,6 +70,8 @@ describe("integration registry", () => {
     expect(getIntegrationAction("discord", "send_message")?.status).toBe("available");
     expect(isIntegrationActionAvailable("http", "request")).toBe(true);
     expect(isIntegrationActionAvailable("gmail", "send_email")).toBe(true);
+    expect(isIntegrationActionAvailable("google-sheets", "read_rows")).toBe(true);
+    expect(isIntegrationActionAvailable("google-sheets", "append_rows")).toBe(true);
     expect(isIntegrationActionAvailable("discord", "unknown")).toBe(false);
     expect(getIntegration("unknown")).toBeUndefined();
   });
@@ -73,6 +82,7 @@ describe("integration registry", () => {
       { id: "discord", kind: "action", title: "Notify", detail: "", config: { integrationId: "discord", actionId: "send_message", connectionId: "conn-discord", message: "hello" }, x: 100, y: 0 },
       { id: "http", kind: "action", title: "Request", detail: "", config: { integrationId: "http", actionId: "request", connectionId: "conn-http", method: "GET", url: "https://api.example.com" }, x: 200, y: 0 },
       { id: "gmail", kind: "action", title: "Email", detail: "", config: { integrationId: "gmail", actionId: "send_email", connectionId: "conn-google", to: "a@example.com", subject: "Hello", body: "Message" }, x: 300, y: 0 },
+      { id: "sheets", kind: "action", title: "Append rows", detail: "", config: { integrationId: "google-sheets", actionId: "append_rows", connectionId: "conn-google", spreadsheetId: "abcdefghijklmnopqrstuv", range: "Sheet1!A:D", valuesJson: '[["a"]]' }, x: 400, y: 0 },
     ];
     expect(getRequiredIntegrationConnections(nodes)).toEqual([
       { id: "conn-discord", provider: "discord" },
