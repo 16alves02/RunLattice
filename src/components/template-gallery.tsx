@@ -17,7 +17,7 @@ export function TemplateGallery() {
   const [notice, setNotice] = useState("");
   const visibleTemplates = useMemo(() => workflowTemplates.filter((template) => {
     const matchesCategory = category === "All templates" || template.category === category;
-    const searchable = [template.name, template.description, ...template.apps].join(" ").toLowerCase();
+    const searchable = [template.name, template.description, ...template.integrations].join(" ").toLowerCase();
     return matchesCategory && searchable.includes(query.toLowerCase());
   }), [category, query]);
 
