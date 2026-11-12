@@ -149,7 +149,7 @@ export function IntegrationGallery() {
       <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>{categories.map((item) => <button key={item} className={category === item ? "btn btn-primary" : "btn btn-quiet"} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}</div>
     </div>
     <div className="integration-grid">{visible.map((item) => {
-      const connected = connections.filter((connection) => connection.provider === item.id);
+      const connected = connections.filter((connection) => connection.provider === (item.id === "gmail" ? "google" : item.id));
       return <article className="panel integration-card" key={item.id}>
         <div className="integration-card-head"><div className="quick-icon">{item.name.slice(0, 1)}</div><span className="tag">{item.status === "available" ? "Available" : "Planned"}</span></div>
         <h2>{item.name}</h2><p>{item.description}</p>
