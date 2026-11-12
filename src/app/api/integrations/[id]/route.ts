@@ -53,6 +53,87 @@ export async function DELETE(request: Request, context: RouteContext) {
       }
     }
 
+    if (connection.provider === "slack") {
+      const clientId = process.env.SLACK_CLIENT_ID;
+      const clientSecret = process.env.SLACK_CLIENT_SECRET;
+      if (!clientId || !clientSecret) {
+        return NextResponse.json({ error: "Slack app credentials are missing. The connection was not removed." }, { status: 503 });
+      }
+      let credentials: unknown;
+      try {
+        credentials = JSON.parse(decryptSecret(connection.credentialsCiphertext, `${access.context.organizationId}:slack`));
+      } catch {
+        return NextResponse.json({ error: "The Slack connection could not be decrypted. It was not removed." }, { status: 503 });
+      }
+      if (!credentials || typeof credentials !== "object"
+        || !("accessToken" in credentials) || typeof credentials.accessToken !== "string" || !credentials.accessToken) {
+        return NextResponse.json({ error: "The stored Slack credentials are invalid. The connection was not removed." }, { status: 503 });
+      }
+
+      let accessToken = credentials.accessToken;
+      const expiresAt = "expiresAt" in credentials && typeof credentials.expiresAt === "string"
+        ? Date.parse(credentials.expiresAt) : Number.POSITIVE_INFINITY;
+      if (!Number.isFinite(expiresAt) && expiresAt !== Number.POSITIVE_INFINITY) {
+        return NextResponse.json({ error: "The stored Slack token expiry is invalid. The connection was not removed." }, { status: 503 });
+      }
+      if (expiresAt <= Date.now() + 60_000) {
+        if (!("refreshToken" in credentials) || typeof credentials.refreshToken !== "string" || !credentials.refreshToken) {
+          return NextResponse.json({ error: "The Slack token has expired. Reconnect the workspace or uninstall RunLattice from Slack before removing this connection." }, { status: 503 });
+        }
+        let refreshedResponse: Response;
+        try {
+          refreshedResponse = await fetch("https://slack.com/api/oauth.v2.access", {
+            method: "POST",
+            headers: {
+              authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64")}`,
+              "content-type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: credentials.refreshToken }),
+            redirect: "error",
+            signal: AbortSignal.timeout(10_000),
+          });
+        } catch {
+          return NextResponse.json({ error: "Slack token refresh could not be confirmed. The connection remains saved." }, { status: 503 });
+        }
+        const refreshed: unknown = refreshedResponse.ok ? await refreshedResponse.json() : null;
+        if (!refreshed || typeof refreshed !== "object" || !("ok" in refreshed) || refreshed.ok !== true
+          || !("access_token" in refreshed) || typeof refreshed.access_token !== "string" || !refreshed.access_token
+          || !("expires_in" in refreshed) || typeof refreshed.expires_in !== "number"
+          || refreshed.expires_in < 60 || refreshed.expires_in > 86_400
+          || !("refresh_token" in refreshed) || typeof refreshed.refresh_token !== "string" || !refreshed.refresh_token) {
+          return NextResponse.json({ error: "Slack token refresh failed. The connection remains saved; reconnect the workspace or remove the app in Slack." }, { status: 503 });
+        }
+        accessToken = refreshed.access_token;
+        const refreshedCredentials = {
+          ...credentials,
+          accessToken,
+          refreshToken: refreshed.refresh_token,
+          expiresAt: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+        };
+        await prisma.integrationConnection.updateMany({
+          where: { id: connection.id, organizationId: access.context.organizationId, provider: "slack", credentialsCiphertext: connection.credentialsCiphertext },
+          data: { credentialsCiphertext: encryptSecret(JSON.stringify(refreshedCredentials), `${access.context.organizationId}:slack`) },
+        });
+      }
+
+      let uninstallResponse: Response;
+      try {
+        uninstallResponse = await fetch("https://slack.com/api/apps.uninstall", {
+          method: "POST",
+          headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret }),
+          redirect: "error",
+          signal: AbortSignal.timeout(10_000),
+        });
+      } catch {
+        return NextResponse.json({ error: "Slack app removal could not be confirmed. The connection remains saved." }, { status: 503 });
+      }
+      const uninstallResult: unknown = uninstallResponse.ok ? await uninstallResponse.json() : null;
+      if (!uninstallResult || typeof uninstallResult !== "object" || !("ok" in uninstallResult) || uninstallResult.ok !== true) {
+        return NextResponse.json({ error: "Slack did not confirm app removal. The connection remains saved; remove RunLattice from your Slack workspace settings if necessary." }, { status: 503 });
+      }
+    }
+
     const result = await prisma.integrationConnection.deleteMany({
       where: { id, organizationId: access.context.organizationId },
     });
