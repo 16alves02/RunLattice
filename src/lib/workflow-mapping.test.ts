@@ -25,10 +25,18 @@ describe("workflow data mapping options", () => {
   it("does not offer values from downstream or disconnected steps", () => {
     const options = getWorkflowMappingOptions(nodes, edges.slice(0, 1), "http-one");
     expect(options.map((option) => option.path)).not.toContain("steps.http-two.responseValue");
+    expect(options.map((option) => option.path)).toContain("steps.http-one.httpStatus");
     expect(options.map((option) => option.path)).not.toContain("steps.http-one.responseValue");
   });
 
-  it("does not offer an HTTP output unless a response path is configured", () => {
+  it("skips response mappings for node IDs that cannot be represented as a safe path segment", () => {
+    const dotted = nodes.map((node) => node.id === "http-one" ? { ...node, id: "http.one" } : node);
+    const dottedEdges = edges.map((edge) => ({ ...edge, from: edge.from === "http-one" ? "http.one" : edge.from, to: edge.to === "http-one" ? "http.one" : edge.to }));
+    const options = getWorkflowMappingOptions(dotted, dottedEdges, "discord");
+    expect(options.map((option) => option.path)).not.toContain("steps.http.one.httpStatus");
+  });
+
+  it("always offers HTTP status but only offers response values when configured", () => {
     const withoutResponse = nodes.map((node) => node.id === "http-one"
       ? { ...node, config: { integrationId: "http" as const, actionId: "request" as const, method: "GET" as const, url: "https://api.example.com/customer" } }
       : node);
