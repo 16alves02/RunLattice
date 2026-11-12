@@ -43,6 +43,7 @@ model User {
   workflows     Workflow[]
   members       Member[]
   invitations   Invitation[]  @relation("InvitationInviter")
+  googleOAuthStates GoogleOAuthState[]
 }
 
 model Session {
@@ -125,6 +126,7 @@ model Organization {
   billingCustomer    BillingCustomer?
   billingSubscription BillingSubscription?
   stripeEvents        StripeEvent[]
+  googleOAuthStates   GoogleOAuthState[]
 }
 
 model Member {
@@ -207,6 +209,22 @@ model WorkflowRunOutbox {
   run          WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([dispatchedAt, createdAt])
+}
+
+model GoogleOAuthState {
+  id                       String       @id @default(cuid())
+  stateHash                String       @unique
+  userId                   String
+  organizationId           String
+  codeVerifierCiphertext   String
+  expiresAt                DateTime
+  consumedAt               DateTime?
+  createdAt                DateTime     @default(now())
+  user                     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([organizationId, createdAt])
 }
 
 model IntegrationConnection {
