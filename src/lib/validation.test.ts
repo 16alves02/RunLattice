@@ -16,6 +16,27 @@ describe("workflow definition validation", () => {
 
 
 
+  it("accepts Slack channel messages with a valid channel ID", () => {
+    const valid = {
+      nodes: [validDefinition.nodes[0], { ...validDefinition.nodes[1], config: {
+        integrationId: "slack", actionId: "send_message", connectionId: "slack-connection",
+        channel: "C0123456789", message: "Order received.",
+      } }],
+      edges: validDefinition.edges,
+    };
+    expect(workflowDefinitionSchema.safeParse(valid).success).toBe(true);
+    for (const channel of ["general", "C123", "C0123456789?x=1"]) {
+      expect(workflowDefinitionSchema.safeParse({
+        ...valid,
+        nodes: [valid.nodes[0], { ...valid.nodes[1], config: { ...valid.nodes[1].config, channel } }],
+      }).success).toBe(false);
+    }
+    expect(workflowDefinitionSchema.safeParse({
+      ...valid,
+      nodes: [valid.nodes[0], { ...valid.nodes[1], config: { ...valid.nodes[1].config, message: "x".repeat(40_001) } }],
+    }).success).toBe(false);
+  });
+
   it("accepts a configured Gmail send email action", () => {
     const definition = {
       nodes: [
