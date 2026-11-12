@@ -83,7 +83,7 @@ describe("integration registry", () => {
 
   it("rejects unknown or planned operations when resolving connections", () => {
     const nodes: WorkflowNode[] = [
-      { id: "gmail", kind: "action", title: "Email", detail: "", config: { integrationId: "gmail", actionId: "send_email", connectionId: "conn" } as never, x: 0, y: 0 },
+      { id: "slack", kind: "action", title: "Message", detail: "", config: { integrationId: "slack", actionId: "send_message", connectionId: "conn" } as never, x: 0, y: 0 },
     ];
     expect(() => getRequiredIntegrationConnections(nodes)).toThrow(/not available/);
   });
