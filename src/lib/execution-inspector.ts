@@ -1,3 +1,5 @@
+import type { WorkflowDefinition } from "@/lib/types";
+
 const SENSITIVE_KEY = /(authorization|api[-_]?key|access[-_]?token|refresh[-_]?token|password|secret|cookie|credential)/i;
 const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi;
 
@@ -28,8 +30,6 @@ export function formatExecutionData(value: unknown, maximumLength = 12_000): str
   return `${serialized.slice(0, maximumLength)}\n… Output truncated for display.`;
 }
 
-
-import type { WorkflowDefinition } from "@/lib/types";
 
 export interface ExecutionTraceRecord {
   id: string;
