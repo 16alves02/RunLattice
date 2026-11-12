@@ -43,7 +43,7 @@ export function getWorkflowMappingOptions(
     : [];
 
   for (const node of nodes) {
-    if (!ancestors.has(node.id) || node.kind !== "action" || !node.config
+    if (!ancestors.has(node.id) || node.id === targetNodeId || node.kind !== "action" || !node.config
       || !("integrationId" in node.config) || node.config.integrationId !== "http"
       || !/^[A-Za-z0-9_-]+$/.test(node.id)) continue;
     options.push({
