@@ -71,6 +71,12 @@ describe("workflow definition validation", () => {
     };
     expect(workflowDefinitionSchema.safeParse(read).success).toBe(true);
     expect(workflowDefinitionSchema.safeParse(append).success).toBe(true);
+    for (const range of ["Sheet1!A:D", "Sheet1!A1:ZZ100", "Sheet1!A1:D1001", "Sheet1!A100:D1", "Sheet1!A1:D100;DROP"]) {
+      expect(workflowDefinitionSchema.safeParse({ ...read, nodes: [read.nodes[0], { ...read.nodes[1], config: { ...read.nodes[1].config, range } }] }).success).toBe(false);
+    }
+    for (const range of ["Sheet1!A1:D", "Sheet1!A:D100", "Sheet1!A:D;DROP"]) {
+      expect(workflowDefinitionSchema.safeParse({ ...append, nodes: [append.nodes[0], { ...append.nodes[1], config: { ...append.nodes[1].config, range } }] }).success).toBe(false);
+    }
     for (const spreadsheetId of ["short", "bad/id", "x".repeat(201)]) {
       expect(workflowDefinitionSchema.safeParse({ ...read, nodes: [read.nodes[0], { ...read.nodes[1], config: { ...read.nodes[1].config, spreadsheetId } }] }).success).toBe(false);
     }
