@@ -18,7 +18,7 @@ describe("Gmail message encoding", () => {
 
   it("rejects invalid recipients and header injection", () => {
     expect(() => buildGmailRawMessage("not-an-email", "Update", "Body")).toThrow(/valid comma-separated/);
-    expect(() => buildGmailRawMessage("person@example.com", "Hello\\r\\nBcc: attacker@example.com", "Body")).toThrow(/line breaks/);
+    expect(() => buildGmailRawMessage("person@example.com", "Hello\r\nBcc: attacker@example.com", "Body")).toThrow(/line breaks/);
   });
 
   it("rejects empty or oversized message content", () => {
