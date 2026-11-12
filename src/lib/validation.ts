@@ -7,6 +7,15 @@ const discordActionConfigSchema = z.object({
   message: z.string().max(2000).optional(),
 });
 
+const gmailActionConfigSchema = z.object({
+  integrationId: z.literal("gmail"),
+  actionId: z.literal("send_email"),
+  connectionId: z.string().max(80).optional(),
+  to: z.string().trim().min(3).max(1000),
+  subject: z.string().max(500),
+  body: z.string().max(100_000),
+});
+
 const httpActionConfigSchema = z.object({
   integrationId: z.literal("http"),
   actionId: z.literal("request"),
@@ -85,7 +94,7 @@ const nodeSchema = z.object({
   kind: z.enum(["trigger", "condition", "action"]),
   title: z.string().trim().min(1).max(100),
   detail: z.string().max(500).default(""),
-  config: z.union([discordActionConfigSchema, httpActionConfigSchema, conditionConfigSchema, triggerConfigSchema]).optional(),
+  config: z.union([discordActionConfigSchema, gmailActionConfigSchema, httpActionConfigSchema, conditionConfigSchema, triggerConfigSchema]).optional(),
   x: z.number().finite().min(0).max(5000),
   y: z.number().finite().min(0).max(5000),
 }).superRefine((node, context) => {
