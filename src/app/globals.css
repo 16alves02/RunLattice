@@ -315,3 +315,13 @@ h1 { font-size:27px; line-height:1.2; letter-spacing:-1px; margin:0 0 8px; }
   .connection-editor { grid-template-columns:1fr; }
   .connection-row { grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:6px;font-size:9px; }
 }
+
+
+/* Data mapping controls inside action configuration panels. */
+.mapping-insert-row { display:flex;align-items:center;gap:8px;margin-top:7px;margin-bottom:12px; }
+.mapping-insert-row select { min-width:0;flex:1;font-size:10px; }
+.mapping-insert-row .btn { flex:0 0 auto;white-space:nowrap; }
+@media(max-width:520px) {
+  .mapping-insert-row { align-items:stretch;flex-direction:column; }
+  .mapping-insert-row .btn { justify-content:center; }
+}
