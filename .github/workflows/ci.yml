@@ -120,6 +120,9 @@ jobs:
           DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice
       - name: Apply migrations
         run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
       - name: Verify TwoFactor row-level security
         run: |
           psql "$DIRECT_URL" -v ON_ERROR_STOP=1 <<'SQL'
@@ -159,9 +162,6 @@ jobs:
           $block$;
           SQL
         env:
-          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice
           DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice
       - name: Run API and worker integration tests
         run: npm run test:integration
