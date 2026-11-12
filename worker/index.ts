@@ -204,89 +204,77 @@ async function getGoogleAccessToken(connectionId: string, organizationId: string
 }
 
 async function getSlackAccessToken(connectionId: string, organizationId: string) {
-  const connection = await prisma.integrationConnection.findFirst({
-    where: { id: connectionId, organizationId, provider: "slack" },
-    select: { id: true, credentialsCiphertext: true },
-  });
-  if (!connection) throw new Error("The Slack workspace connection is unavailable in this workspace.");
-
-  let credentials: unknown;
-  try { credentials = JSON.parse(decryptSecret(connection.credentialsCiphertext, `${organizationId}:slack`)); }
-  catch { throw new Error("The stored Slack workspace credentials could not be decrypted."); }
-  if (!credentials || typeof credentials !== "object"
-    || !("accessToken" in credentials) || typeof credentials.accessToken !== "string" || !credentials.accessToken
-    || !("scope" in credentials) || typeof credentials.scope !== "string"
-    || !("teamId" in credentials) || typeof credentials.teamId !== "string") {
-    throw new Error("The stored Slack workspace credentials are invalid.");
-  }
-  if (!credentials.scope.split(",").map((scope) => scope.trim()).includes("chat:write")) {
-    throw new Error("The Slack app has not granted chat:write. Reconnect the Slack workspace.");
-  }
-
-  const expiresAt = "expiresAt" in credentials && typeof credentials.expiresAt === "string"
-    ? Date.parse(credentials.expiresAt) : Number.POSITIVE_INFINITY;
-  if (!Number.isFinite(expiresAt) && expiresAt !== Number.POSITIVE_INFINITY) {
-    throw new Error("The stored Slack token expiry is invalid.");
-  }
-  if (expiresAt > Date.now() + 60_000) return credentials.accessToken;
-  if (!("refreshToken" in credentials) || typeof credentials.refreshToken !== "string" || !credentials.refreshToken) {
-    throw new Error("The Slack bot token has expired. Reconnect the Slack workspace.");
-  }
-
-  const clientId = process.env.SLACK_CLIENT_ID;
-  const clientSecret = process.env.SLACK_CLIENT_SECRET;
-  if (!clientId || !clientSecret) throw new Error("Slack OAuth client credentials are not configured on the worker.");
-  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
-  let response: Response;
-  try {
-    response = await fetch("https://slack.com/api/oauth.v2.access", {
-      method: "POST",
-      headers: { authorization: `Basic ${basicAuth}`, "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: credentials.refreshToken }),
-      redirect: "error",
-      signal: AbortSignal.timeout(10_000),
+  return prisma.$transaction(async (transaction) => {
+    // Slack refresh tokens are single-use. Serialize refreshes across all worker processes.
+    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${connectionId}, 0))`;
+    const connection = await transaction.integrationConnection.findFirst({
+      where: { id: connectionId, organizationId, provider: "slack" },
+      select: { id: true, credentialsCiphertext: true },
     });
-  } catch {
-    throw new Error("Slack could not refresh the workspace access token.");
-  }
-  if (!response.ok) throw new Error("Slack rejected the workspace token refresh. Reconnect the Slack workspace.");
-  const refreshed: unknown = await response.json();
-  if (!refreshed || typeof refreshed !== "object" || !("ok" in refreshed) || refreshed.ok !== true
-    || !("access_token" in refreshed) || typeof refreshed.access_token !== "string" || !refreshed.access_token
-    || !("expires_in" in refreshed) || typeof refreshed.expires_in !== "number"
-    || refreshed.expires_in < 60 || refreshed.expires_in > 86_400
-    || !("refresh_token" in refreshed) || typeof refreshed.refresh_token !== "string" || !refreshed.refresh_token) {
-    throw new Error("Slack returned an invalid rotated access token.");
-  }
+    if (!connection) throw new Error("The Slack workspace connection is unavailable in this workspace.");
 
-  const updatedCredentials = {
-    ...credentials,
-    accessToken: refreshed.access_token,
-    refreshToken: refreshed.refresh_token,
-    expiresAt: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
-  };
-  const updatedCiphertext = encryptSecret(JSON.stringify(updatedCredentials), `${organizationId}:slack`);
-  const updated = await prisma.integrationConnection.updateMany({
-    where: { id: connection.id, organizationId, provider: "slack", credentialsCiphertext: connection.credentialsCiphertext },
-    data: { credentialsCiphertext: updatedCiphertext },
-  });
-  if (updated.count === 1) return refreshed.access_token;
+    let credentials: unknown;
+    try { credentials = JSON.parse(decryptSecret(connection.credentialsCiphertext, `${organizationId}:slack`)); }
+    catch { throw new Error("The stored Slack workspace credentials could not be decrypted."); }
+    if (!credentials || typeof credentials !== "object"
+      || !("accessToken" in credentials) || typeof credentials.accessToken !== "string" || !credentials.accessToken
+      || !("scope" in credentials) || typeof credentials.scope !== "string"
+      || !("teamId" in credentials) || typeof credentials.teamId !== "string") {
+      throw new Error("The stored Slack workspace credentials are invalid.");
+    }
+    if (!credentials.scope.split(",").map((scope) => scope.trim()).includes("chat:write")) {
+      throw new Error("The Slack app has not granted chat:write. Reconnect the Slack workspace.");
+    }
 
-  const latest = await prisma.integrationConnection.findFirst({
-    where: { id: connection.id, organizationId, provider: "slack" },
-    select: { credentialsCiphertext: true },
-  });
-  if (!latest) throw new Error("The Slack workspace connection was removed during token refresh.");
-  try {
-    const latestCredentials: unknown = JSON.parse(decryptSecret(latest.credentialsCiphertext, `${organizationId}:slack`));
-    if (latestCredentials && typeof latestCredentials === "object"
-      && "accessToken" in latestCredentials && typeof latestCredentials.accessToken === "string"
-      && "expiresAt" in latestCredentials && typeof latestCredentials.expiresAt === "string"
-      && Date.parse(latestCredentials.expiresAt) > Date.now() + 60_000) return latestCredentials.accessToken;
-  } catch {
-    throw new Error("The refreshed Slack workspace credentials could not be read.");
-  }
-  throw new Error("Slack token refresh conflicted with another worker. Retry the workflow.");
+    const expiresAt = "expiresAt" in credentials && typeof credentials.expiresAt === "string"
+      ? Date.parse(credentials.expiresAt) : Number.POSITIVE_INFINITY;
+    if (!Number.isFinite(expiresAt) && expiresAt !== Number.POSITIVE_INFINITY) {
+      throw new Error("The stored Slack token expiry is invalid.");
+    }
+    if (expiresAt > Date.now() + 60_000) return credentials.accessToken;
+    if (!("refreshToken" in credentials) || typeof credentials.refreshToken !== "string" || !credentials.refreshToken) {
+      throw new Error("The Slack bot token has expired. Reconnect the Slack workspace.");
+    }
+
+    const clientId = process.env.SLACK_CLIENT_ID;
+    const clientSecret = process.env.SLACK_CLIENT_SECRET;
+    if (!clientId || !clientSecret) throw new Error("Slack OAuth client credentials are not configured on the worker.");
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+    let response: Response;
+    try {
+      response = await fetch("https://slack.com/api/oauth.v2.access", {
+        method: "POST",
+        headers: { authorization: `Basic ${basicAuth}`, "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: credentials.refreshToken }),
+        redirect: "error",
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch {
+      throw new Error("Slack could not refresh the workspace access token. Reconnect if the refresh outcome is unknown.");
+    }
+    if (!response.ok) throw new Error("Slack rejected the workspace token refresh. Reconnect the Slack workspace.");
+    const refreshed: unknown = await response.json();
+    if (!refreshed || typeof refreshed !== "object" || !("ok" in refreshed) || refreshed.ok !== true
+      || !("access_token" in refreshed) || typeof refreshed.access_token !== "string" || !refreshed.access_token
+      || !("expires_in" in refreshed) || typeof refreshed.expires_in !== "number"
+      || refreshed.expires_in < 60 || refreshed.expires_in > 86_400
+      || !("refresh_token" in refreshed) || typeof refreshed.refresh_token !== "string" || !refreshed.refresh_token) {
+      throw new Error("Slack returned an invalid rotated access token.");
+    }
+
+    const updatedCredentials = {
+      ...credentials,
+      accessToken: refreshed.access_token,
+      refreshToken: refreshed.refresh_token,
+      expiresAt: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+    };
+    const updated = await transaction.integrationConnection.updateMany({
+      where: { id: connection.id, organizationId, provider: "slack" },
+      data: { credentialsCiphertext: encryptSecret(JSON.stringify(updatedCredentials), `${organizationId}:slack`) },
+    });
+    if (updated.count !== 1) throw new Error("The Slack workspace connection changed during token refresh. Retry the workflow.");
+    return refreshed.access_token;
+  }, { maxWait: 10_000, timeout: 20_000 });
 }
 
 async function executeSlackAction(config: SlackActionConfig, organizationId: string, input: unknown) {
