@@ -1,7 +1,7 @@
 import { Queue, Worker, type Job } from "bullmq";
 import { randomUUID } from "node:crypto";
 import { PrismaClient, type Prisma } from "@prisma/client";
-import { decryptSecret } from "../src/lib/secrets";
+import { decryptSecret, encryptSecret } from "../src/lib/secrets";
 import { recoverStaleWorkflowRuns } from "../src/lib/run-recovery";
 import { createRunStepIfLeaseOwned } from "../src/lib/run-lease";
 import { dispatchPendingWorkflowRuns } from "../src/lib/outbox";
@@ -11,7 +11,7 @@ import { renderInputTemplate } from "../src/lib/template";
 import { resolveNextExecutionNode, validateExecutableWorkflow } from "../src/lib/execution";
 import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
-import type { DiscordActionConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
+import type { DiscordActionConfig, GmailActionConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
 import { ActionOutcomeUnknownError, isWithinAllowedHttpsBase, requestPublicHttps } from "../src/lib/safe-http";
 import { extractJsonResponseValue, toPersistableHttpActionResult } from "../src/lib/http-response";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
@@ -128,6 +128,119 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
   return { httpStatus: response.status };
 }
 
+async function getGoogleAccessToken(connectionId: string, organizationId: string) {
+  const connection = await prisma.integrationConnection.findFirst({
+    where: { id: connectionId, organizationId, provider: "google" },
+    select: { id: true, credentialsCiphertext: true },
+  });
+  if (!connection) throw new Error("The Google account connection is unavailable in this workspace.");
+
+  let credentials: unknown;
+  try {
+    credentials = JSON.parse(decryptSecret(connection.credentialsCiphertext, `${organizationId}:google`));
+  } catch {
+    throw new Error("The stored Google account credentials could not be decrypted.");
+  }
+  if (!credentials || typeof credentials !== "object"
+    || !("accessToken" in credentials) || typeof credentials.accessToken !== "string"
+    || !("refreshToken" in credentials) || typeof credentials.refreshToken !== "string"
+    || !("expiresAt" in credentials) || typeof credentials.expiresAt !== "string"
+    || !credentials.refreshToken) {
+    throw new Error("The stored Google account credentials are invalid.");
+  }
+
+  const expiresAt = Date.parse(credentials.expiresAt);
+  if (!Number.isFinite(expiresAt)) throw new Error("The stored Google token expiry is invalid.");
+  if (expiresAt > Date.now() + 60_000) return credentials.accessToken;
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("Google OAuth client credentials are not configured on the worker.");
+
+  let response: Response;
+  try {
+    response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: credentials.refreshToken,
+        grant_type: "refresh_token",
+      }),
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new Error("Google could not refresh the account access token.");
+  }
+  if (!response.ok) throw new Error("Google rejected the account refresh token. Reconnect this Google account.");
+  const refreshed: unknown = await response.json();
+  if (!refreshed || typeof refreshed !== "object" || !("access_token" in refreshed)
+    || typeof refreshed.access_token !== "string" || !refreshed.access_token
+    || !("expires_in" in refreshed) || typeof refreshed.expires_in !== "number"
+    || refreshed.expires_in < 60 || refreshed.expires_in > 86_400) {
+    throw new Error("Google returned an invalid refreshed access token.");
+  }
+
+  const updatedCredentials = {
+    ...credentials,
+    accessToken: refreshed.access_token,
+    expiresAt: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+  };
+  const updatedCiphertext = encryptSecret(JSON.stringify(updatedCredentials), `${organizationId}:google`);
+  await prisma.integrationConnection.updateMany({
+    where: { id: connection.id, organizationId, provider: "google", credentialsCiphertext: connection.credentialsCiphertext },
+    data: { credentialsCiphertext: updatedCiphertext },
+  });
+  return refreshed.access_token;
+}
+
+async function executeGmailAction(config: GmailActionConfig, organizationId: string, input: unknown) {
+  if (!config.connectionId) throw new Error("The Gmail action is missing its Google account connection.");
+  const toValue = renderInputTemplate(config.to, input, 1_000);
+  const recipients = toValue.split(",").map((recipient) => recipient.trim()).filter(Boolean);
+  if (recipients.length === 0 || recipients.length > 20
+    || recipients.some((recipient) => !/^[^\\s@,<>]+@[^\\s@,<>]+\\.[^\\s@,<>]+$/.test(recipient))) {
+    throw new Error("Gmail recipients must contain between 1 and 20 valid comma-separated email addresses.");
+  }
+  const subject = renderInputTemplate(config.subject, input, 500);
+  const body = renderInputTemplate(config.body, input, 100_000);
+  if (!subject.trim() || /[\\r\\n]/.test(subject)) throw new Error("The Gmail subject is empty or contains invalid line breaks.");
+  if (!body.trim()) throw new Error("The Gmail message body cannot be empty.");
+
+  const accessToken = await getGoogleAccessToken(config.connectionId, organizationId);
+  const encodedSubject = Buffer.from(subject, "utf8").toString("base64");
+  const mimeMessage = [
+    `To: ${recipients.join(", ")}`,
+    `Subject: =?UTF-8?B?${encodedSubject}?=`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    Buffer.from(body, "utf8").toString("base64"),
+  ].join("\\r\\n");
+  const raw = Buffer.from(mimeMessage, "utf8").toString("base64url");
+
+  let response: Response;
+  try {
+    response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ raw }),
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new ActionOutcomeUnknownError("Gmail did not respond within the 15-second send timeout; the email delivery outcome may be unknown.");
+  }
+  if (!response.ok) throw new Error(`Gmail rejected the email with HTTP ${response.status}. Reconnect the account if Google reports an authorization error.`);
+  return { httpStatus: response.status };
+}
+
 async function executeHttpAction(config: HttpActionConfig, organizationId: string, input: unknown) {
   if (!config.connectionId || !config.url.trim()) {
     throw new Error("The HTTP action is missing its connection or destination URL.");
@@ -203,6 +316,9 @@ async function executeAction(node: WorkflowDefinition["nodes"][number], organiza
   if (node.config.integrationId === "discord" && node.config.actionId === "send_message") {
     if (!node.config.message?.trim()) throw new Error("The Discord action is missing its message.");
     return executeDiscordAction(node.config, organizationId, input);
+  }
+  if (node.config.integrationId === "gmail" && node.config.actionId === "send_email") {
+    return executeGmailAction(node.config, organizationId, input);
   }
   if (node.config.integrationId === "http" && node.config.actionId === "request") {
     return executeHttpAction(node.config, organizationId, input);
