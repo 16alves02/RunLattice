@@ -55,7 +55,6 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const [connectionTo, setConnectionTo] = useState("");
   const [connectionBranch, setConnectionBranch] = useState<"true" | "false">("true");
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selected), [nodes, selected]);
-  const selectedActionIntegrationId = selectedNode?.config && "integrationId" in selectedNode.config ? selectedNode.config.integrationId : "discord";
   const selectedActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "discord" ? selectedNode.config : undefined;
   const selectedHttpActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "http" ? selectedNode.config : undefined;
   const selectedGmailActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "gmail" ? selectedNode.config : undefined;
