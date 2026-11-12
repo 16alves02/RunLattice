@@ -15,8 +15,6 @@ export function connectWorkflowNodes(
   const target = nodes.find((node) => node.id === toId);
   if (!source || !target) return { ok: false, error: "Choose two existing workflow nodes." };
   if (fromId === toId) return { ok: false, error: "A node cannot connect to itself." };
-  if (target.kind === "trigger") return { ok: false, error: "The trigger node cannot have an incoming connection." };
-  if (edges.some((edge) => edge.to === toId)) return { ok: false, error: "A node can only have one incoming connection." };
 
   const outgoing = edges.filter((edge) => edge.from === fromId);
   if (source.kind === "condition") {
@@ -49,6 +47,9 @@ export function connectWorkflowNodes(
     visited.add(current);
     pending.push(...(adjacency.get(current) ?? []));
   }
+
+  if (target.kind === "trigger") return { ok: false, error: "The trigger node cannot have an incoming connection." };
+  if (edges.some((edge) => edge.to === toId)) return { ok: false, error: "A node can only have one incoming connection." };
 
   const edge: WorkflowEdge = {
     id: `edge-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`,
