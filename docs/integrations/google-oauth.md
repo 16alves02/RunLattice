@@ -69,6 +69,6 @@ The worker refreshes expired access tokens using the encrypted refresh token. Di
 - OAuth callbacks re-check the initiating user's current workspace administrator membership.
 - Workspace integration quotas apply to new Google connections.
 - Access tokens and refresh tokens are never returned to the browser or written to application logs.
-- Sheets reads are limited to 1,000 rows and 100 columns per run; appends are limited to 1,000 rows and 10,000 cells.
+- Sheets reads and appends are limited to 10,000 cells per run (with a maximum of 1,000 rows and 100 columns). Google Sheets JSON responses are capped at 2 MB.
 - Sheets append uses RAW input values to prevent spreadsheet formulas from being executed. A timeout after the request begins is treated as an unknown outcome and is not automatically retried.
 - Gmail sends are treated as outcome-unknown if the network times out after the request starts; RunLattice does not automatically resend that email.
