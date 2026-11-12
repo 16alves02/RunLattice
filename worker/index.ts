@@ -16,6 +16,7 @@ import { ActionOutcomeUnknownError, isWithinAllowedHttpsBase, requestPublicHttps
 import { extractJsonResponseValue, toPersistableHttpActionResult } from "../src/lib/http-response";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 import { isIntegrationActionAvailable } from "../src/lib/integrations";
+import { buildGmailRawMessage } from "../src/lib/gmail-message";
 
 const prisma = new PrismaClient();
 const databaseUrl = process.env.DATABASE_URL;
@@ -199,28 +200,10 @@ async function getGoogleAccessToken(connectionId: string, organizationId: string
 async function executeGmailAction(config: GmailActionConfig, organizationId: string, input: unknown) {
   if (!config.connectionId) throw new Error("The Gmail action is missing its Google account connection.");
   const toValue = renderInputTemplate(config.to, input, 1_000);
-  const recipients = toValue.split(",").map((recipient) => recipient.trim()).filter(Boolean);
-  if (recipients.length === 0 || recipients.length > 20
-    || recipients.some((recipient) => !/^[^\\s@,<>]+@[^\\s@,<>]+\\.[^\\s@,<>]+$/.test(recipient))) {
-    throw new Error("Gmail recipients must contain between 1 and 20 valid comma-separated email addresses.");
-  }
   const subject = renderInputTemplate(config.subject, input, 500);
   const body = renderInputTemplate(config.body, input, 100_000);
-  if (!subject.trim() || /[\\r\\n]/.test(subject)) throw new Error("The Gmail subject is empty or contains invalid line breaks.");
-  if (!body.trim()) throw new Error("The Gmail message body cannot be empty.");
-
+  const raw = buildGmailRawMessage(toValue, subject, body);
   const accessToken = await getGoogleAccessToken(config.connectionId, organizationId);
-  const encodedSubject = Buffer.from(subject, "utf8").toString("base64");
-  const mimeMessage = [
-    `To: ${recipients.join(", ")}`,
-    `Subject: =?UTF-8?B?${encodedSubject}?=`,
-    "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
-    "",
-    Buffer.from(body, "utf8").toString("base64"),
-  ].join("\\r\\n");
-  const raw = Buffer.from(mimeMessage, "utf8").toString("base64url");
 
   let response: Response;
   try {
