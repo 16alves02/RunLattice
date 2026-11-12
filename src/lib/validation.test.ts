@@ -36,8 +36,21 @@ describe("workflow definition validation", () => {
     };
     expect(workflowDefinitionSchema.safeParse(definition).success).toBe(true);
     expect(workflowDefinitionSchema.safeParse({
-      ...definition,
-      nodes: [validDefinition.nodes[0], { ...definition.nodes[1], config: { ...definition.nodes[1].config, to: "x".repeat(1001) } }],
+      nodes: [
+        validDefinition.nodes[0],
+        {
+          ...validDefinition.nodes[1],
+          config: {
+            integrationId: "gmail",
+            actionId: "send_email",
+            connectionId: "google-connection",
+            to: "x".repeat(1001),
+            subject: "Order update",
+            body: "Your order is ready.",
+          },
+        },
+      ],
+      edges: validDefinition.edges,
     }).success).toBe(false);
   });
 
