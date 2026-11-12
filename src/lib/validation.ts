@@ -21,7 +21,7 @@ function googleSheetsColumnNumber(value: string) {
 }
 
 function isBoundedGoogleSheetsReadRange(value: string) {
-  const match = /^(?:'((?:[^']|'')+)'|([A-Za-z0-9_]+))!\\$?([A-Z]{1,3})\\$?([1-9]\\d*):\\$?([A-Z]{1,3})\\$?([1-9]\\d*)$/i.exec(value);
+  const match = /^(?:'((?:[^']|'')+)'|([A-Za-z0-9_]+))!\$?([A-Z]{1,3})\$?([1-9]\d*):\$?([A-Z]{1,3})\$?([1-9]\d*)$/i.exec(value);
   if (!match) return false;
   const startColumn = googleSheetsColumnNumber(match[3]);
   const endColumn = googleSheetsColumnNumber(match[5]);
@@ -32,7 +32,7 @@ function isBoundedGoogleSheetsReadRange(value: string) {
 }
 
 function isValidGoogleSheetsAppendRange(value: string) {
-  return /^(?:'(?:[^']|'')+'|[A-Za-z0-9_]+)!\\$?[A-Z]{1,3}(?:\\$?[1-9]\\d*)?:\\$?[A-Z]{1,3}(?:\\$?[1-9]\\d*)?$/i.test(value);
+  return /^(?:'(?:[^']|'')+'|[A-Za-z0-9_]+)!\$?[A-Z]{1,3}(?:\$?[1-9]\d*)?:\$?[A-Z]{1,3}(?:\$?[1-9]\d*)?$/i.test(value);
 }
 
 const googleSheetsReadActionConfigSchema = z.object({
