@@ -36,6 +36,20 @@ export async function GET(request: Request) {
   }
 
   try {
+    const now = new Date();
+    await prisma.googleOAuthState.deleteMany({ where: { expiresAt: { lt: now } } });
+    const pendingStates = await prisma.googleOAuthState.count({
+      where: {
+        userId: access.context.userId,
+        organizationId: access.context.organizationId,
+        consumedAt: null,
+        expiresAt: { gt: now },
+      },
+    });
+    if (pendingStates >= 5) {
+      return NextResponse.json({ error: "Too many Google authorization attempts are already pending. Finish or wait for an existing attempt to expire." }, { status: 429 });
+    }
+
     const { state, stateHash, verifier, challenge } = createGoogleOAuthProof();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
