@@ -20,8 +20,9 @@ function MappingInsert({ value, onChange, options }: {
   options: WorkflowMappingOption[];
 }) {
   const [selectedPath, setSelectedPath] = useState(options[0]?.path ?? "");
+  useEffect(() => setSelectedPath(options[0]?.path ?? ""), [options]);
   function insertMapping() {
-    if (!selectedPath) return;
+    if (!options.some((option) => option.path === selectedPath)) return;
     onChange(value + (value && !value.endsWith(" ") ? " " : "") + "{{input." + selectedPath + "}}");
   }
   return <div className="mapping-insert-row">
@@ -361,7 +362,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
             <textarea id="http-body" className="field-input" rows={5} maxLength={65536}
               value={selectedHttpActionConfig.body ?? ""} onChange={(event) => updateSelectedHttpActionConfig({ body: event.target.value })}
               placeholder={'{"event": {{input.event.name}}}'} />
-            <MappingInsert value={selectedHttpActionConfig.body ?? ""} onChange={(value) => updateSelectedHttpActionConfig({ body: value })} options={mappingOptions}/>
+            <MappingInsert value={selectedHttpActionConfig.body ?? ""} onChange={(value) => updateSelectedHttpActionConfig({ body: value })} options={mappingOptions}/><div className="editor-help">Inserted paths must exist in the run input. HTTP response values are available only when the earlier action has a response path configured.</div>
             <label className="field-label" htmlFor="http-response-path">Response JSON path (optional)</label>
             <input id="http-response-path" className="field-input" type="text" maxLength={200}
               value={selectedHttpActionConfig.responsePath ?? ""} onChange={(event) => updateSelectedHttpActionConfig({ responsePath: event.target.value })}
@@ -379,7 +380,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
             <textarea id="action-message" className="field-input" rows={4} maxLength={2000}
               value={selectedActionConfig?.message ?? ""} onChange={(event) => updateSelectedActionConfig({ message: event.target.value })}
               placeholder="Write the message to send to Discord…"/>
-            <MappingInsert value={selectedActionConfig?.message ?? ""} onChange={(value) => updateSelectedActionConfig({ message: value })} options={mappingOptions}/>
+            <MappingInsert value={selectedActionConfig?.message ?? ""} onChange={(value) => updateSelectedActionConfig({ message: value })} options={mappingOptions}/><div className="editor-help">Inserted paths must exist in the run input. HTTP response values are available only when the earlier action has a response path configured.</div>
             <div className="editor-help">This action sends a real Discord message when the workflow runs. Keep the message under 2,000 characters.</div>
             {connections.filter((connection) => connection.provider === "discord").length === 0 && <Link href="/integrations" className="editor-help">Connect a Discord webhook in Integrations first.</Link>}
           </>}
