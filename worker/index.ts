@@ -15,6 +15,7 @@ import type { DiscordActionConfig, HttpActionConfig, WorkflowDefinition } from "
 import { ActionOutcomeUnknownError, isWithinAllowedHttpsBase, requestPublicHttps } from "../src/lib/safe-http";
 import { extractJsonResponseValue, toPersistableHttpActionResult } from "../src/lib/http-response";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
+import { isIntegrationActionAvailable } from "../src/lib/integrations";
 
 const prisma = new PrismaClient();
 const databaseUrl = process.env.DATABASE_URL;
@@ -195,6 +196,9 @@ async function executeHttpAction(config: HttpActionConfig, organizationId: strin
 async function executeAction(node: WorkflowDefinition["nodes"][number], organizationId: string, input: unknown) {
   if (!node.config || !("integrationId" in node.config) || !node.config.connectionId) {
     throw new Error(`Action "${node.title}" has not been configured.`);
+  }
+  if (!isIntegrationActionAvailable(node.config.integrationId, node.config.actionId)) {
+    throw new Error(`Action "${node.title}" uses an integration operation that is not available.`);
   }
   if (node.config.integrationId === "discord" && node.config.actionId === "send_message") {
     if (!node.config.message?.trim()) throw new Error("The Discord action is missing its message.");
