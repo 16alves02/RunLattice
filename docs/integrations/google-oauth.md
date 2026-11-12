@@ -5,14 +5,14 @@ RunLattice supports Gmail **Send email** and Google Sheets **Read rows** and **A
 ## 1. Configure Google Cloud
 
 1. Create or select a Google Cloud project.
-2. Enable the **Gmail API**.
+2. Enable both the **Gmail API** and **Google Sheets API**.
 3. Configure the OAuth consent screen and add the Google accounts that will test the integration.
 4. Create an OAuth client with application type **Web application**.
 5. Add the exact RunLattice callback URL to **Authorized redirect URIs**:
    `https://YOUR-RUNLATTICE-HOST/api/integrations/google/callback`
-6. Request only the Gmail send scope used by the app:
-   `https://www.googleapis.com/auth/gmail.send
-   `https://www.googleapis.com/auth/spreadsheets``
+6. Request the minimum scopes used by the current operations:
+   - `https://www.googleapis.com/auth/gmail.send`
+   - `https://www.googleapis.com/auth/spreadsheets`
 
 The `gmail.send` scope is classified by Google as **sensitive**, so an external public app must complete Google's OAuth verification before broad production use. Because this implementation requests only a sensitive scope (not a restricted Gmail scope), Google's current guidance does not require the restricted-scope third-party security assessment. A testing consent screen is suitable only for configured test users; refresh tokens issued while an external app remains in testing can expire after seven days.
 
