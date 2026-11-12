@@ -16,6 +16,23 @@ const gmailActionConfigSchema = z.object({
   body: z.string().max(100_000),
 });
 
+const googleSheetsReadActionConfigSchema = z.object({
+  integrationId: z.literal("google-sheets"),
+  actionId: z.literal("read_rows"),
+  connectionId: z.string().max(80).optional(),
+  spreadsheetId: z.string().trim().min(20).max(200).regex(/^[A-Za-z0-9_-]+$/),
+  range: z.string().trim().min(1).max(200).refine((value) => !/[\\x00-\\x1f\\x7f]/.test(value), "Range cannot contain control characters."),
+});
+
+const googleSheetsAppendActionConfigSchema = z.object({
+  integrationId: z.literal("google-sheets"),
+  actionId: z.literal("append_rows"),
+  connectionId: z.string().max(80).optional(),
+  spreadsheetId: z.string().trim().min(20).max(200).regex(/^[A-Za-z0-9_-]+$/),
+  range: z.string().trim().min(1).max(200).refine((value) => !/[\\x00-\\x1f\\x7f]/.test(value), "Range cannot contain control characters."),
+  valuesJson: z.string().trim().min(2).max(65_536),
+});
+
 const httpActionConfigSchema = z.object({
   integrationId: z.literal("http"),
   actionId: z.literal("request"),
@@ -94,7 +111,7 @@ const nodeSchema = z.object({
   kind: z.enum(["trigger", "condition", "action"]),
   title: z.string().trim().min(1).max(100),
   detail: z.string().max(500).default(""),
-  config: z.union([discordActionConfigSchema, gmailActionConfigSchema, httpActionConfigSchema, conditionConfigSchema, triggerConfigSchema]).optional(),
+  config: z.union([discordActionConfigSchema, gmailActionConfigSchema, googleSheetsReadActionConfigSchema, googleSheetsAppendActionConfigSchema, httpActionConfigSchema, conditionConfigSchema, triggerConfigSchema]).optional(),
   x: z.number().finite().min(0).max(5000),
   y: z.number().finite().min(0).max(5000),
 }).superRefine((node, context) => {
