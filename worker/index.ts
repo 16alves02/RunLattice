@@ -17,6 +17,7 @@ import { extractJsonResponseValue, toPersistableHttpActionResult } from "../src/
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
 import { isIntegrationActionAvailable } from "../src/lib/integrations";
 import { buildGmailRawMessage } from "../src/lib/gmail-message";
+import { parseGoogleSheetsAppendResponse, parseGoogleSheetsAppendValues, parseGoogleSheetsReadResponse, readGoogleSheetsJsonResponse } from "../src/lib/google-sheets";
 
 const prisma = new PrismaClient();
 const databaseUrl = process.env.DATABASE_URL;
@@ -240,29 +241,14 @@ async function executeGoogleSheetsRead(config: GoogleSheetsReadConfig, organizat
     throw new Error("Google Sheets read request timed out or could not be completed.");
   }
   if (!response.ok) throw new Error(`Google Sheets rejected the read request with HTTP ${response.status}.`);
-  const payload: unknown = await response.json();
-  if (!payload || typeof payload !== "object" || !("values" in payload)) return { rowCount: 0, values: [] };
-  if (!Array.isArray(payload.values) || payload.values.length > 1_000
-    || payload.values.some((row) => !Array.isArray(row) || row.length > 100
-      || row.some((cell) => !["string", "number", "boolean"].includes(typeof cell)))) {
-    throw new Error("Google Sheets returned an unsupported or oversized cell range. Limit reads to 1,000 rows and 100 columns.");
-  }
-  return { rowCount: payload.values.length, values: payload.values };
+  const payload = await readGoogleSheetsJsonResponse(response);
+  return parseGoogleSheetsReadResponse(payload);
 }
 
 async function executeGoogleSheetsAppend(config: GoogleSheetsAppendConfig, organizationId: string, input: unknown) {
   if (!config.connectionId) throw new Error("The Google Sheets action is missing its Google account connection.");
   const rendered = renderInputTemplate(config.valuesJson, input, 65_536, true);
-  let values: unknown;
-  try { values = JSON.parse(rendered); }
-  catch { throw new Error("Google Sheets rows must be valid JSON after workflow mappings are resolved."); }
-  if (!Array.isArray(values) || values.length < 1 || values.length > 1_000
-    || values.some((row) => !Array.isArray(row) || row.length < 1 || row.length > 100
-      || row.some((cell) => !["string", "number", "boolean"].includes(typeof cell) || (typeof cell === "string" && cell.length > 10_000)))) {
-    throw new Error("Google Sheets rows must be a two-dimensional array containing 1-1,000 rows and 1-100 scalar cells per row.");
-  }
-  const cellCount = values.reduce((total, row) => total + row.length, 0);
-  if (cellCount > 10_000) throw new Error("Google Sheets append is limited to 10,000 cells per execution.");
+  const values = parseGoogleSheetsAppendValues(rendered);
   const accessToken = await getGoogleAccessToken(config.connectionId, organizationId, "https://www.googleapis.com/auth/spreadsheets");
   const url = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(config.spreadsheetId)}/values/${encodeURIComponent(config.range)}:append`);
   url.searchParams.set("valueInputOption", "RAW");
@@ -281,14 +267,8 @@ async function executeGoogleSheetsAppend(config: GoogleSheetsAppendConfig, organ
     throw new ActionOutcomeUnknownError("Google Sheets did not respond within the 15-second append timeout; rows may have been added. RunLattice will not automatically retry this operation.");
   }
   if (!response.ok) throw new Error(`Google Sheets rejected the append request with HTTP ${response.status}.`);
-  const payload: unknown = await response.json();
-  const updates = payload && typeof payload === "object" && "updates" in payload ? payload.updates : undefined;
-  if (!updates || typeof updates !== "object" || !("updatedRange" in updates)
-    || typeof updates.updatedRange !== "string" || !("updatedRows" in updates)
-    || typeof updates.updatedRows !== "number") {
-    throw new Error("Google Sheets returned an invalid append confirmation.");
-  }
-  return { updatedRange: updates.updatedRange, updatedRows: updates.updatedRows };
+  const payload = await readGoogleSheetsJsonResponse(response);
+  return parseGoogleSheetsAppendResponse(payload);
 }
 
 async function executeHttpAction(config: HttpActionConfig, organizationId: string, input: unknown) {
