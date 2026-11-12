@@ -9,9 +9,30 @@ import { ManualRunInput } from "@/components/manual-run-input";
 import { demoDefinition } from "@/lib/demo-data";
 import type { ConditionConfig, DiscordActionConfig, HttpActionConfig, TriggerConfig, WorkflowDefinition, WorkflowNode } from "@/lib/types";
 import { connectWorkflowNodes, getWorkflowCanvasSize, moveWorkflowNode } from "@/lib/workflow-graph";
+import { getWorkflowMappingOptions, type WorkflowMappingOption } from "@/lib/workflow-mapping";
 
 type WorkflowBuilderProps = { workflowId?: string };
 type IntegrationConnection = { id: string; provider: string; name: string };
+
+function MappingInsert({ value, onChange, options }: {
+  value: string;
+  onChange: (value: string) => void;
+  options: WorkflowMappingOption[];
+}) {
+  const [selectedPath, setSelectedPath] = useState(options[0]?.path ?? "");
+  function insertMapping() {
+    if (!selectedPath) return;
+    onChange(value + (value && !value.endsWith(" ") ? " " : "") + "{{input." + selectedPath + "}}");
+  }
+  return <div className="mapping-insert-row">
+    <select className="field-input" aria-label="Choose workflow data" value={selectedPath}
+      onChange={(event) => setSelectedPath(event.target.value)} disabled={options.length === 0}>
+      {options.length === 0 && <option value="">No upstream data available</option>}
+      {options.map((option) => <option key={option.path} value={option.path}>{option.label}</option>)}
+    </select>
+    <button type="button" className="btn btn-quiet" onClick={insertMapping} disabled={options.length === 0 || !selectedPath}><Plus size={12}/> Insert data</button>
+  </div>;
+}
 
 export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const router = useRouter();
@@ -40,6 +61,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const hasTrigger = nodes.some((node) => node.kind === "trigger");
   const canvasSize = useMemo(() => getWorkflowCanvasSize(nodes), [nodes]);
   const connectionSource = nodes.find((node) => node.id === connectionFrom);
+  const mappingOptions = useMemo(() => selectedNode ? getWorkflowMappingOptions(nodes, edges, selectedNode.id) : [], [nodes, edges, selectedNode]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -339,6 +361,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
             <textarea id="http-body" className="field-input" rows={5} maxLength={65536}
               value={selectedHttpActionConfig.body ?? ""} onChange={(event) => updateSelectedHttpActionConfig({ body: event.target.value })}
               placeholder={'{"event": {{input.event.name}}}'} />
+            <MappingInsert value={selectedHttpActionConfig.body ?? ""} onChange={(value) => updateSelectedHttpActionConfig({ body: value })} options={mappingOptions}/>
             <label className="field-label" htmlFor="http-response-path">Response JSON path (optional)</label>
             <input id="http-response-path" className="field-input" type="text" maxLength={200}
               value={selectedHttpActionConfig.responsePath ?? ""} onChange={(event) => updateSelectedHttpActionConfig({ responsePath: event.target.value })}
@@ -356,6 +379,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
             <textarea id="action-message" className="field-input" rows={4} maxLength={2000}
               value={selectedActionConfig?.message ?? ""} onChange={(event) => updateSelectedActionConfig({ message: event.target.value })}
               placeholder="Write the message to send to Discord…"/>
+            <MappingInsert value={selectedActionConfig?.message ?? ""} onChange={(value) => updateSelectedActionConfig({ message: value })} options={mappingOptions}/>
             <div className="editor-help">This action sends a real Discord message when the workflow runs. Keep the message under 2,000 characters.</div>
             {connections.filter((connection) => connection.provider === "discord").length === 0 && <Link href="/integrations" className="editor-help">Connect a Discord webhook in Integrations first.</Link>}
           </>}
