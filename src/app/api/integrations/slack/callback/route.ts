@@ -98,6 +98,9 @@ export async function GET(request: Request) {
         where: { organizationId: oauthState.organizationId, provider: "slack", name: connectionName },
         select: { id: true, credentialsCiphertext: true },
       });
+      if (existing) {
+        await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${existing.id}, 0))`;
+      }
 
       let refreshToken = typeof refreshTokenValue === "string" && refreshTokenValue ? refreshTokenValue : undefined;
       if (!refreshToken && existing) {
