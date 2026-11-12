@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, MessageCircle, Search, Sparkles, Workflow } from "lucide-react";
+import { ArrowRight, Mail, MessageCircle, Search, Sparkles, Workflow } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { workflowTemplates, type WorkflowTemplate } from "@/lib/workflow-templates";
 
@@ -60,7 +60,7 @@ export function TemplateGallery() {
     </div>
     <div className="template-grid">
       {visibleTemplates.map((template) => {
-        const Icon = template.icon === "http" ? Workflow : MessageCircle;
+        const Icon = template.icon === "http" ? Workflow : template.icon === "gmail" ? Mail : MessageCircle;
         return <article className="panel template-card" key={template.id}>
           <div className="template-card-top"><span className="quick-icon"><Icon size={18}/></span><span className="tag">{template.category}</span></div>
           <h2>{template.name}</h2>
