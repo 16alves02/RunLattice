@@ -7,6 +7,15 @@ export interface DiscordActionConfig {
   message?: string;
 }
 
+export interface GmailActionConfig {
+  integrationId: "gmail";
+  actionId: "send_email";
+  connectionId?: string;
+  to: string;
+  subject: string;
+  body: string;
+}
+
 export interface HttpActionConfig {
   integrationId: "http";
   actionId: "request";
@@ -36,7 +45,7 @@ export interface WorkflowNode {
   kind: NodeKind;
   title: string;
   detail: string;
-  config?: DiscordActionConfig | HttpActionConfig | ConditionConfig | TriggerConfig;
+  config?: DiscordActionConfig | GmailActionConfig | HttpActionConfig | ConditionConfig | TriggerConfig;
   x: number;
   y: number;
 }
