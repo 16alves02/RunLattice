@@ -86,7 +86,9 @@ export async function GET(request: Request) {
     if (tokenData.expires_in < 60 || tokenData.expires_in > 86_400 || tokenData.token_type !== "Bearer") {
       return redirectToIntegrations("error", "invalid_token_response");
     }
-    if (!tokenData.scope.split(" ").includes("https://www.googleapis.com/auth/gmail.send")) {
+    const grantedScopes = new Set(tokenData.scope.split(" "));
+    if (!grantedScopes.has("https://www.googleapis.com/auth/gmail.send")
+      || !grantedScopes.has("https://www.googleapis.com/auth/spreadsheets")) {
       return redirectToIntegrations("error", "required_scope_missing");
     }
 
