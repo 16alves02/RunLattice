@@ -394,8 +394,8 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
               const [integrationId, actionId] = event.target.value.split(":");
               if (integrationId === "google-sheets" && actionId === "read_rows") updateSelected({ config: { integrationId, actionId, connectionId: "", spreadsheetId: "", range: "Sheet1!A1:D100" } });
               else if (integrationId === "google-sheets" && actionId === "append_rows") updateSelected({ config: { integrationId, actionId, connectionId: "", spreadsheetId: "", range: "Sheet1!A:D", valuesJson: '[["{{input.name}}","{{input.email}}"]]' } });
-              else if (integrationId === "http") updateSelected({ config: { integrationId, actionId, method: "POST", url: "", connectionId: "", body: "" } });
-              else if (integrationId === "gmail") updateSelected({ config: { integrationId, actionId, connectionId: "", to: "", subject: "", body: "" } });
+              else if (integrationId === "http") updateSelected({ config: { integrationId, actionId: "request", method: "POST", url: "", connectionId: "", body: "" } });
+              else if (integrationId === "gmail") updateSelected({ config: { integrationId, actionId: "send_email", connectionId: "", to: "", subject: "", body: "" } });
               else updateSelected({ config: { integrationId: "discord", actionId: "send_message", connectionId: "", message: "" } });
             }}>
             {integrationCatalog.filter((integration) => integration.status === "available").flatMap((integration) => integration.operations.filter((operation) => operation.status === "available").map((operation) => <option key={`${integration.id}:${operation.id}`} value={`${integration.id}:${operation.id}`}>{integration.name} · {operation.name}</option>))}
