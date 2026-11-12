@@ -6,7 +6,7 @@ export interface WorkflowTemplate {
   description: string;
   category: "Communication" | "Development";
   integrations: string[];
-  icon: "discord" | "http" | "gmail" | "sheets";
+  icon: "discord" | "http" | "gmail" | "sheets" | "slack";
   setupInstructions: string;
   definition: WorkflowDefinition;
 }
@@ -47,6 +47,22 @@ export const workflowTemplates: WorkflowTemplate[] = [
         { id: "action-discord", kind: "action", title: "Send Discord message", detail: "Action · Discord", config: { integrationId: "discord", actionId: "send_message", message: "This workflow was started manually." }, x: 360, y: 90 },
       ],
       edges: [{ id: "edge-manual-discord", from: "trigger-manual", to: "action-discord" }],
+    },
+  },
+  {
+    id: "manual-slack-message",
+    name: "Send a Slack channel message",
+    description: "Post a prepared message to a Slack channel when the workflow is run.",
+    category: "Communication",
+    integrations: ["Manual trigger", "Slack"],
+    icon: "slack",
+    setupInstructions: "Install RunLattice in your Slack workspace, invite the app to the target channel, and enter that channel's ID in the action.",
+    definition: {
+      nodes: [
+        { id: "trigger-manual", kind: "trigger", title: "Manual start", detail: "Trigger · Run on demand", config: { triggerType: "MANUAL" }, x: 70, y: 90 },
+        { id: "action-slack", kind: "action", title: "Send Slack message", detail: "Action · Slack", config: { integrationId: "slack", actionId: "send_message", channel: "C0123456789", message: "A new workflow event was received." }, x: 360, y: 90 },
+      ],
+      edges: [{ id: "edge-manual-slack", from: "trigger-manual", to: "action-slack" }],
     },
   },
   {
