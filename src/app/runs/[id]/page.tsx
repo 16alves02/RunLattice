@@ -76,7 +76,7 @@ export default async function ExecutionInspectorPage({ params }: PageProps) {
         <h1>Execution inspector</h1>
         <p className="subtitle">{run.workflow.name} · {run.id}</p>
       </div>
-      <span className={`status ${run.status === "SUCCEEDED" ? "status-active" : run.status === "FAILED" || run.status === "OUTCOME_UNKNOWN" ? "status-paused" : "status-draft"}`}>
+      <span className={`status ${run.status === "SUCCEEDED" ? "status-active" : run.status === "FAILED" ? "status-paused" : "status-draft"}`}>
         {run.status.toLowerCase().replaceAll("_", " ")}
       </span>
     </div>
