@@ -58,8 +58,14 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
      AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
     REVOKE ALL PRIVILEGES ON TABLE "BillingCustomer", "BillingSubscription", "StripeEvent" FROM anon, authenticated;
-    ALTER DEFAULT PRIVILEGES FOR ROLE prisma IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
-    ALTER DEFAULT PRIVILEGES FOR ROLE prisma IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
+
+    -- Supabase uses the prisma role for application migrations. Plain PostgreSQL
+    -- CI databases may not have it, so default-privilege hardening is conditional.
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'prisma') THEN
+      ALTER DEFAULT PRIVILEGES FOR ROLE prisma IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+      ALTER DEFAULT PRIVILEGES FOR ROLE prisma IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
+    END IF;
+
     CREATE POLICY deny_supabase_data_api_roles ON "BillingCustomer" FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
     CREATE POLICY deny_supabase_data_api_roles ON "BillingSubscription" FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
     CREATE POLICY deny_supabase_data_api_roles ON "StripeEvent" FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);

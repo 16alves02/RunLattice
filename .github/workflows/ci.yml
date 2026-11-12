@@ -102,11 +102,67 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
           DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+      - name: Prepare Supabase API roles for PostgreSQL integration tests
+        run: |
+          psql "$DIRECT_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $block$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+              CREATE ROLE anon NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+              CREATE ROLE authenticated NOLOGIN;
+            END IF;
+          END
+          $block$;
+          SQL
+        env:
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice
       - name: Apply migrations
         run: npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
           DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice?schema=public
+      - name: Verify TwoFactor row-level security
+        run: |
+          psql "$DIRECT_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $block$
+          DECLARE
+            rls_enabled boolean;
+            policy_count integer;
+          BEGIN
+            SELECT relrowsecurity INTO rls_enabled
+            FROM pg_class
+            WHERE oid = 'public."TwoFactor"'::regclass;
+
+            IF rls_enabled IS DISTINCT FROM true THEN
+              RAISE EXCEPTION 'TwoFactor RLS is not enabled';
+            END IF;
+
+            SELECT count(*) INTO policy_count
+            FROM pg_policies
+            WHERE schemaname = 'public'
+              AND tablename = 'TwoFactor'
+              AND policyname IN ('deny_all_api_roles_anon', 'deny_all_api_roles_authenticated');
+
+            IF policy_count <> 2 THEN
+              RAISE EXCEPTION 'Expected two deny-all API policies, found %', policy_count;
+            END IF;
+
+            IF EXISTS (
+              SELECT 1
+              FROM information_schema.role_table_grants
+              WHERE table_schema = 'public'
+                AND table_name = 'TwoFactor'
+                AND grantee IN ('anon', 'authenticated')
+            ) THEN
+              RAISE EXCEPTION 'Supabase API roles still have TwoFactor table grants';
+            END IF;
+          END
+          $block$;
+          SQL
+        env:
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/runlattice
       - name: Run API and worker integration tests
         run: npm run test:integration
         env:
