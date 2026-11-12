@@ -34,6 +34,16 @@ describe("integration registry", () => {
     }
   });
 
+  it("defines real action configuration fields and output contracts", () => {
+    const discord = getIntegrationAction("discord", "send_message");
+    expect(discord?.configuration.find((field) => field.id === "message")?.required).toBe(true);
+    expect(discord?.outputs.map((output) => output.path)).toContain("httpStatus");
+
+    const http = getIntegrationAction("http", "request");
+    expect(http?.configuration.map((field) => field.id)).toEqual(["method", "url", "body", "responsePath"]);
+    expect(http?.outputs.find((output) => output.path === "responseValue")?.availability).toBe("when_configured");
+  });
+
   it("does not advertise roadmap capabilities as executable actions or triggers", () => {
     for (const id of ["gmail", "slack", "google-sheets", "google-drive", "shopify", "stripe", "github"]) {
       const integration = getIntegration(id);
