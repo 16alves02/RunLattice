@@ -38,8 +38,8 @@ export interface ExecutionTraceRecord {
   kind: string;
   attempt: number;
   status: string;
-  startedAt: Date | string | null;
-  finishedAt: Date | string | null;
+  startedAt: Date | null;
+  finishedAt: Date | null;
   result: unknown;
   error: string | null;
 }
