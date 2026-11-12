@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canManageWorkspace, getRequestWorkspace } from "@/lib/workspace";
-import { decryptSecret } from "@/lib/secrets";
+import { decryptSecret, encryptSecret } from "@/lib/secrets";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
