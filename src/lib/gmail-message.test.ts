@@ -13,12 +13,14 @@ describe("Gmail message encoding", () => {
 
   it("wraps long subjects and base64 bodies within MIME line limits", () => {
     const messageBody = "Long message content ".repeat(100);
-    const raw = buildGmailRawMessage("person@example.com", "Update ".repeat(40), messageBody);
+    const subject = "Olá 世界🙂 ".repeat(40);
+    const raw = buildGmailRawMessage("person@example.com", subject, messageBody);
     const decoded = Buffer.from(raw, "base64url").toString("utf8");
     const [headers, encodedBody] = decoded.split("\r\n\r\n");
     const encodedWords = headers.match(/=\?UTF-8\?B\?.*?\?=/g) ?? [];
     expect(encodedWords.length).toBeGreaterThan(1);
     expect(encodedWords.every((word) => word.length <= 75)).toBe(true);
+    expect(encodedWords.map((word) => Buffer.from(word.slice(10, -2), "base64").toString("utf8")).join("")).toBe(subject);
     expect(encodedBody.split("\r\n").every((line) => line.length <= 76)).toBe(true);
     expect(Buffer.from(encodedBody.replaceAll("\r\n", ""), "base64").toString("utf8")).toBe(messageBody);
   });
