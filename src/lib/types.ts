@@ -7,6 +7,14 @@ export interface DiscordActionConfig {
   message?: string;
 }
 
+export interface SlackActionConfig {
+  integrationId: "slack";
+  actionId: "send_message";
+  connectionId?: string;
+  channel: string;
+  message: string;
+}
+
 export interface GmailActionConfig {
   integrationId: "gmail";
   actionId: "send_email";
@@ -62,7 +70,7 @@ export interface WorkflowNode {
   kind: NodeKind;
   title: string;
   detail: string;
-  config?: DiscordActionConfig | GmailActionConfig | GoogleSheetsReadConfig | GoogleSheetsAppendConfig | HttpActionConfig | ConditionConfig | TriggerConfig;
+  config?: DiscordActionConfig | SlackActionConfig | GmailActionConfig | GoogleSheetsReadConfig | GoogleSheetsAppendConfig | HttpActionConfig | ConditionConfig | TriggerConfig;
   x: number;
   y: number;
 }
