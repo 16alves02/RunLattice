@@ -100,7 +100,6 @@ export async function DELETE(request: Request, context: RouteContext) {
             where: { id: current.id, organizationId: access.context.organizationId, provider: "slack" },
             data: { credentialsCiphertext: encryptSecret(JSON.stringify(remainingCredentials), `${access.context.organizationId}:slack`) },
           });
-          credentials = remainingCredentials;
         }
 
         const accessTokenExpired = "expiresAt" in credentials && typeof credentials.expiresAt === "string"
