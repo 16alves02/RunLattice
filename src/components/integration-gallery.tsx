@@ -32,6 +32,14 @@ export function IntegrationGallery() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const googleStatus = params.get("google");
+    if (googleStatus === "connected") setNotice("Google account connected securely. Gmail actions are being prepared and are not executable yet.");
+    if (googleStatus === "error") setNotice("Google authorization could not be completed (" + (params.get("reason") ?? "unknown_error") + "). Check the Google OAuth configuration and try again.");
+    if (googleStatus) window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
+  useEffect(() => {
     const controller = new AbortController();
 
     async function loadConnections() {
@@ -151,7 +159,11 @@ export function IntegrationGallery() {
           <strong>Planned capabilities</strong>
           <span>{[...item.plannedTriggers, ...item.plannedActions].join(" · ")}</span>
         </div>}
-        {item.id === "http" && item.status === "available" ? <>
+        {item.id === "gmail" ? <>
+          <div className="activity-meta">{connected.length} Google account(s) connected to this workspace</div>
+          {canManage && <button className="btn btn-primary" onClick={() => window.location.assign("/api/integrations/google/connect")}>Connect Google account</button>}
+          <p className="editor-help">Authorization uses Google OAuth 2.0 with PKCE. The Gmail send action remains unavailable until its worker executor is completed.</p>
+        </> : item.id === "http" && item.status === "available" ? <>
           <div className="activity-meta">{connected.length} connection(s) in this workspace</div>
           {canManage && <button className="btn btn-primary" onClick={() => setShowHttpForm((value) => !value)}>{showHttpForm ? "Close form" : "Connect API key"}</button>}
           {showHttpForm && <form className="editor-panel" onSubmit={(event) => { event.preventDefault(); void connectHttp(); }}>
