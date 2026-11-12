@@ -427,7 +427,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
                 value={selectedSheetsAppendConfig.valuesJson}
                 onChange={(event) => updateSelectedGoogleSheetsAppendConfig({ valuesJson: event.target.value })}
                 placeholder={'[["{{input.name}}","{{input.email}}"]]'} />
-              <div className="editor-help">Use a two-dimensional JSON array. For dynamic cells, place mappings without surrounding quotes, for example: [["{{input.name}}","{{input.email}}"]]. Values are written as RAW data, so formulas are not executed.</div>
+              <div className="editor-help">Use a two-dimensional JSON array. For dynamic cells, place mappings without surrounding quotes, for example: <code>{"{{input.name}}"}</code>. Values are written as RAW data, so formulas are not executed.</div>
             </>}
             <div className="editor-help">{selectedSheetsReadConfig ? "Reads up to 1,000 rows and 100 columns from the selected range." : "Appends up to 1,000 rows and 10,000 cells per execution. A network timeout may leave the result unknown; the action is not automatically retried."} Reconnect the Google account if it was authorized before the Sheets permission was added.</div>
             {connections.filter((connection) => connection.provider === "google").length === 0 && <Link href="/integrations" className="editor-help">Connect a Google account in Integrations first.</Link>}
