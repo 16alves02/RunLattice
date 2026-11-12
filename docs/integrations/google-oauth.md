@@ -13,7 +13,12 @@ RunLattice currently supports one Google Workspace operation: **Gmail → Send e
 6. Request only the Gmail send scope used by the app:
    `https://www.googleapis.com/auth/gmail.send`
 
-For external production users, complete Google's consent-screen publishing and verification requirements for the requested Gmail scope. A testing consent screen is suitable only for configured test users; refresh tokens issued while an external app remains in testing can expire after seven days.
+The `gmail.send` scope is classified by Google as **sensitive**, so an external public app must complete Google's OAuth verification before broad production use. Because this implementation requests only a sensitive scope (not a restricted Gmail scope), Google's current guidance does not require the restricted-scope third-party security assessment. A testing consent screen is suitable only for configured test users; refresh tokens issued while an external app remains in testing can expire after seven days.
+
+Official references:
+- [Gmail API scope classifications](https://developers.google.com/workspace/gmail/api/auth/scopes)
+- [Google OAuth token lifetime and testing-mode behavior](https://developers.google.com/identity/protocols/oauth2)
+- [Google OAuth verification requirements](https://support.google.com/cloud/answer/13463817)
 
 ## 2. Configure environment variables
 
