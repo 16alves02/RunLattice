@@ -7,6 +7,14 @@ const discordActionConfigSchema = z.object({
   message: z.string().max(2000).optional(),
 });
 
+const slackActionConfigSchema = z.object({
+  integrationId: z.literal("slack"),
+  actionId: z.literal("send_message"),
+  connectionId: z.string().max(80).optional(),
+  channel: z.string().trim().min(9).max(40).regex(/^[CDG][A-Z0-9]{8,39}$/),
+  message: z.string().min(1).max(40_000),
+});
+
 const gmailActionConfigSchema = z.object({
   integrationId: z.literal("gmail"),
   actionId: z.literal("send_email"),
@@ -130,7 +138,7 @@ const nodeSchema = z.object({
   kind: z.enum(["trigger", "condition", "action"]),
   title: z.string().trim().min(1).max(100),
   detail: z.string().max(500).default(""),
-  config: z.union([discordActionConfigSchema, gmailActionConfigSchema, googleSheetsReadActionConfigSchema, googleSheetsAppendActionConfigSchema, httpActionConfigSchema, conditionConfigSchema, triggerConfigSchema]).optional(),
+  config: z.union([discordActionConfigSchema, slackActionConfigSchema, gmailActionConfigSchema, googleSheetsReadActionConfigSchema, googleSheetsAppendActionConfigSchema, httpActionConfigSchema, conditionConfigSchema, triggerConfigSchema]).optional(),
   x: z.number().finite().min(0).max(5000),
   y: z.number().finite().min(0).max(5000),
 }).superRefine((node, context) => {
