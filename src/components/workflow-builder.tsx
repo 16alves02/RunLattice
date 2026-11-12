@@ -20,13 +20,13 @@ function MappingInsert({ value, onChange, options }: {
   options: WorkflowMappingOption[];
 }) {
   const [selectedPath, setSelectedPath] = useState(options[0]?.path ?? "");
-  useEffect(() => setSelectedPath(options[0]?.path ?? ""), [options]);
+  const activePath = options.some((option) => option.path === selectedPath) ? selectedPath : options[0]?.path ?? "";
   function insertMapping() {
-    if (!options.some((option) => option.path === selectedPath)) return;
-    onChange(value + (value && !value.endsWith(" ") ? " " : "") + "{{input." + selectedPath + "}}");
+    if (!activePath) return;
+    onChange(value + (value && !value.endsWith(" ") ? " " : "") + "{{input." + activePath + "}}");
   }
   return <div className="mapping-insert-row">
-    <select className="field-input" aria-label="Choose workflow data" value={selectedPath}
+    <select className="field-input" aria-label="Choose workflow data" value={activePath}
       onChange={(event) => setSelectedPath(event.target.value)} disabled={options.length === 0}>
       {options.length === 0 && <option value="">No upstream data available</option>}
       {options.map((option) => <option key={option.path} value={option.path}>{option.label}</option>)}
