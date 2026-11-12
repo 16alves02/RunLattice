@@ -101,11 +101,31 @@ export const integrationCatalog: IntegrationDefinition[] = [
   },
   {
     id: "google-sheets", name: "Google Sheets", category: "Productivity",
-    description: "Read and write rows in spreadsheets.",
-    auth: "OAuth 2.0", triggers: [], actions: [],
+    description: "Read spreadsheet ranges and append rows using a connected Google account.",
+    auth: "OAuth 2.0", triggers: [], actions: ["Read rows", "Append rows"],
     plannedTriggers: ["New row"],
-    plannedActions: ["Append row", "Update row", "Read rows"],
-    operations: [], status: "planned",
+    plannedActions: ["Update row"],
+    operations: [
+      {
+        id: "read_rows", name: "Read rows", status: "available", connectionProvider: "google",
+        description: "Read values from a spreadsheet range.",
+        configuration: [
+          { id: "spreadsheetId", label: "Spreadsheet ID", type: "text", required: true, description: "ID from the Google Sheets URL." },
+          { id: "range", label: "Range", type: "text", required: true, description: "A1 notation, for example Sheet1!A1:D100." },
+        ],
+        outputs: [{ path: "values", label: "Rows", type: "json", availability: "always" }, { path: "rowCount", label: "Rows returned", type: "number", availability: "always" }],
+      },
+      {
+        id: "append_rows", name: "Append rows", status: "available", connectionProvider: "google",
+        description: "Append validated row values to the end of a spreadsheet range.",
+        configuration: [
+          { id: "spreadsheetId", label: "Spreadsheet ID", type: "text", required: true, description: "ID from the Google Sheets URL." },
+          { id: "range", label: "Range", type: "text", required: true, description: "A1 notation, for example Sheet1!A:D." },
+          { id: "valuesJson", label: "Rows (JSON)", type: "json", required: true, description: "Two-dimensional JSON array. Use {{input.field}} without quotes for mapped scalar values." },
+        ],
+        outputs: [{ path: "updatedRange", label: "Updated range", type: "string", availability: "always" }, { path: "updatedRows", label: "Rows appended", type: "number", availability: "always" }],
+      },
+    ], status: "available",
   },
   {
     id: "google-drive", name: "Google Drive", category: "Productivity",
