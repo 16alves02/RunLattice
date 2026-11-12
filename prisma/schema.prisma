@@ -44,6 +44,7 @@ model User {
   members       Member[]
   invitations   Invitation[]  @relation("InvitationInviter")
   googleOAuthStates GoogleOAuthState[]
+  slackOAuthStates  SlackOAuthState[]
 }
 
 model Session {
@@ -127,6 +128,7 @@ model Organization {
   billingSubscription BillingSubscription?
   stripeEvents        StripeEvent[]
   googleOAuthStates   GoogleOAuthState[]
+  slackOAuthStates    SlackOAuthState[]
 }
 
 model Member {
@@ -222,6 +224,21 @@ model GoogleOAuthState {
   createdAt                DateTime     @default(now())
   user                     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([organizationId, createdAt])
+}
+
+model SlackOAuthState {
+  id             String       @id @default(cuid())
+  stateHash      String       @unique
+  userId         String
+  organizationId String
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([expiresAt])
   @@index([organizationId, createdAt])
