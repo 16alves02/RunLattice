@@ -42,10 +42,14 @@ describe("integration registry", () => {
     const http = getIntegrationAction("http", "request");
     expect(http?.configuration.map((field) => field.id)).toEqual(["method", "url", "body", "responsePath"]);
     expect(http?.outputs.find((output) => output.path === "responseValue")?.availability).toBe("when_configured");
+
+    const gmail = getIntegrationAction("gmail", "send_email");
+    expect(gmail?.configuration.map((field) => field.id)).toEqual(["to", "subject", "body"]);
+    expect(gmail?.connectionProvider).toBe("google");
   });
 
   it("does not advertise roadmap capabilities as executable actions or triggers", () => {
-    for (const id of ["gmail", "slack", "google-sheets", "google-drive", "shopify", "stripe", "github"]) {
+    for (const id of ["slack", "google-sheets", "google-drive", "shopify", "stripe", "github"]) {
       const integration = getIntegration(id);
       expect(integration?.status).toBe("planned");
       expect(integration?.actions).toEqual([]);
@@ -58,7 +62,7 @@ describe("integration registry", () => {
     expect(getIntegration("discord")?.name).toBe("Discord");
     expect(getIntegrationAction("discord", "send_message")?.status).toBe("available");
     expect(isIntegrationActionAvailable("http", "request")).toBe(true);
-    expect(isIntegrationActionAvailable("gmail", "send_email")).toBe(false);
+    expect(isIntegrationActionAvailable("gmail", "send_email")).toBe(true);
     expect(isIntegrationActionAvailable("discord", "unknown")).toBe(false);
     expect(getIntegration("unknown")).toBeUndefined();
   });
@@ -68,10 +72,12 @@ describe("integration registry", () => {
       { id: "trigger", kind: "trigger", title: "Manual", detail: "", x: 0, y: 0 },
       { id: "discord", kind: "action", title: "Notify", detail: "", config: { integrationId: "discord", actionId: "send_message", connectionId: "conn-discord", message: "hello" }, x: 100, y: 0 },
       { id: "http", kind: "action", title: "Request", detail: "", config: { integrationId: "http", actionId: "request", connectionId: "conn-http", method: "GET", url: "https://api.example.com" }, x: 200, y: 0 },
+      { id: "gmail", kind: "action", title: "Email", detail: "", config: { integrationId: "gmail", actionId: "send_email", connectionId: "conn-google", to: "a@example.com", subject: "Hello", body: "Message" }, x: 300, y: 0 },
     ];
     expect(getRequiredIntegrationConnections(nodes)).toEqual([
       { id: "conn-discord", provider: "discord" },
       { id: "conn-http", provider: "http" },
+      { id: "conn-google", provider: "google" },
     ]);
   });
 
