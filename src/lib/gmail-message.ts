@@ -1,10 +1,10 @@
 export function buildGmailRawMessage(toValue: string, subject: string, body: string) {
   const recipients = toValue.split(",").map((recipient) => recipient.trim()).filter(Boolean);
   if (recipients.length === 0 || recipients.length > 20
-    || recipients.some((recipient) => !/^[^\\s@,<>]+@[^\\s@,<>]+\\.[^\\s@,<>]+$/.test(recipient))) {
+    || recipients.some((recipient) => !/^[^\s@,<>]+@[^\s@,<>]+\.[^\s@,<>]+$/.test(recipient))) {
     throw new Error("Gmail recipients must contain between 1 and 20 valid comma-separated email addresses.");
   }
-  if (!subject.trim() || subject.length > 500 || /[\\r\\n]/.test(subject)) {
+  if (!subject.trim() || subject.length > 500 || /[\r\n]/.test(subject)) {
     throw new Error("The Gmail subject is empty or contains invalid line breaks.");
   }
   if (!body.trim() || body.length > 100_000) throw new Error("The Gmail message body is empty or too long.");
@@ -18,6 +18,6 @@ export function buildGmailRawMessage(toValue: string, subject: string, body: str
     "Content-Transfer-Encoding: base64",
     "",
     Buffer.from(body, "utf8").toString("base64"),
-  ].join("\\r\\n");
+  ].join("\r\n");
   return Buffer.from(mimeMessage, "utf8").toString("base64url");
 }
