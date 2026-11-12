@@ -1,6 +1,6 @@
 # Google OAuth setup
 
-RunLattice currently supports one Google Workspace operation: **Gmail → Send email**. Google Sheets and Gmail event triggers are not enabled.
+RunLattice supports Gmail **Send email** and Google Sheets **Read rows** and **Append rows**. Google Sheets uses the same Google OAuth connection as Gmail.
 
 ## 1. Configure Google Cloud
 
@@ -11,7 +11,8 @@ RunLattice currently supports one Google Workspace operation: **Gmail → Send e
 5. Add the exact RunLattice callback URL to **Authorized redirect URIs**:
    `https://YOUR-RUNLATTICE-HOST/api/integrations/google/callback`
 6. Request only the Gmail send scope used by the app:
-   `https://www.googleapis.com/auth/gmail.send`
+   `https://www.googleapis.com/auth/gmail.send
+   `https://www.googleapis.com/auth/spreadsheets``
 
 The `gmail.send` scope is classified by Google as **sensitive**, so an external public app must complete Google's OAuth verification before broad production use. Because this implementation requests only a sensitive scope (not a restricted Gmail scope), Google's current guidance does not require the restricted-scope third-party security assessment. A testing consent screen is suitable only for configured test users; refresh tokens issued while an external app remains in testing can expire after seven days.
 
@@ -56,7 +57,7 @@ Apply migrations through the existing deployment/migration process after reviewi
 2. Open **Integrations → Gmail → Connect Google account**.
 3. Complete Google's consent flow.
 4. Return to Integrations and confirm the account appears under Workspace connections.
-5. In Workflow Builder, select **Gmail · Send email**, choose the connected account, and configure recipients, subject and plain-text message.
+5. In Workflow Builder, select **Gmail · Send email**, **Google Sheets · Read rows**, or **Google Sheets · Append rows**. Choose the connected Google account and configure the operation. If the account was connected before the Sheets permission was introduced, disconnect and reconnect it to grant the additional scope.
 
 The worker refreshes expired access tokens using the encrypted refresh token. Disconnecting a Google account first asks Google to revoke the refresh token; if revocation cannot be confirmed, RunLattice keeps the connection saved and reports the failure.
 
@@ -68,4 +69,6 @@ The worker refreshes expired access tokens using the encrypted refresh token. Di
 - OAuth callbacks re-check the initiating user's current workspace administrator membership.
 - Workspace integration quotas apply to new Google connections.
 - Access tokens and refresh tokens are never returned to the browser or written to application logs.
+- Sheets reads are limited to 1,000 rows and 100 columns per run; appends are limited to 1,000 rows and 10,000 cells.
+- Sheets append uses RAW input values to prevent spreadsheet formulas from being executed. A timeout after the request begins is treated as an unknown outcome and is not automatically retried.
 - Gmail sends are treated as outcome-unknown if the network times out after the request starts; RunLattice does not automatically resend that email.
