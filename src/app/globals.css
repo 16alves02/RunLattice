@@ -283,3 +283,35 @@ h1 { font-size:27px; line-height:1.2; letter-spacing:-1px; margin:0 0 8px; }
 
 .consent-settings { position:fixed; z-index:60; right:16px; bottom:16px; padding:8px 11px; border:1px solid var(--border); border-radius:8px; background:#191d22; color:#b7bdc5; font-size:10px; cursor:pointer; }
 @media(max-width:720px) { .consent-settings { bottom:78px; right:10px; } }
+
+
+/* Workflow builder: Simple and Advanced editing modes. */
+.builder-toolbar { display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px; }
+.builder-identity { display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0; }
+.builder-mode { display:inline-flex;gap:3px;padding:3px;border:1px solid var(--border);border-radius:9px;background:#101215; }
+.builder-mode button { border:0;border-radius:6px;background:transparent;color:var(--muted);padding:8px 12px;font-size:10px;font-weight:800;cursor:pointer; }
+.builder-mode button.active { background:var(--accent-soft);color:var(--accent); }
+.workflow-node { cursor:grab;touch-action:none;user-select:none;text-align:left; }
+.workflow-node.dragging { cursor:grabbing;z-index:5;box-shadow:0 18px 36px rgba(0,0,0,.4); }
+.workflow-node:focus-visible { outline:2px solid var(--accent);outline-offset:3px; }
+.advanced-node-meta { display:grid;grid-template-columns:1fr 1fr;gap:0 10px;margin-top:12px;padding:10px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.02); }
+.advanced-node-meta .field-label { margin-top:5px; }
+.advanced-config { margin-top:14px;border-top:1px solid var(--border);padding-top:12px;color:var(--muted);font-size:10px; }
+.advanced-config summary { cursor:pointer;font-weight:800; }
+.advanced-config pre { white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;padding:10px;border-radius:7px;background:#101215;color:#d4d8de;font-size:10px; }
+.connection-editor { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:14px;align-items:end; }
+.connection-editor .field-label { margin-top:0; }
+.connection-editor .btn { min-height:36px; }
+.connection-list { display:grid;gap:7px;padding:0 14px 14px; }
+.connection-row { display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:10px; }
+.connection-row > span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.connection-arrow { color:var(--accent);font-weight:800;text-align:center; }
+.connection-row .btn { padding:6px 8px; }
+@media(max-width:720px) {
+  .builder-toolbar,.builder-identity { align-items:stretch; }
+  .builder-identity { width:100%; }
+  .builder-identity .field-input { max-width:none!important;flex:1 1 100%; }
+  .builder-mode { align-self:flex-start; }
+  .connection-editor { grid-template-columns:1fr; }
+  .connection-row { grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:6px;font-size:9px; }
+}
