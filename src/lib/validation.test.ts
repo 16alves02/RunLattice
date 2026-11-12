@@ -16,6 +16,31 @@ describe("workflow definition validation", () => {
 
 
 
+  it("accepts a configured Gmail send email action", () => {
+    const definition = {
+      nodes: [
+        validDefinition.nodes[0],
+        {
+          ...validDefinition.nodes[1],
+          config: {
+            integrationId: "gmail",
+            actionId: "send_email",
+            connectionId: "google-connection",
+            to: "customer@example.com",
+            subject: "Order update",
+            body: "Your order is ready.",
+          },
+        },
+      ],
+      edges: validDefinition.edges,
+    };
+    expect(workflowDefinitionSchema.safeParse(definition).success).toBe(true);
+    expect(workflowDefinitionSchema.safeParse({
+      ...definition,
+      nodes: [validDefinition.nodes[0], { ...definition.nodes[1], config: { ...definition.nodes[1].config, to: "x".repeat(1001) } }],
+    }).success).toBe(false);
+  });
+
   it("accepts a configured HTTP request action", () => {
     const definition = {
       nodes: [
