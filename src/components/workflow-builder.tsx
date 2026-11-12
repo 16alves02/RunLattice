@@ -7,7 +7,7 @@ import { ArrowLeft, Circle, GitBranch, Plus, Save, Settings2, Sparkles, Webhook,
 import { AppShell } from "@/components/app-shell";
 import { ManualRunInput } from "@/components/manual-run-input";
 import { demoDefinition } from "@/lib/demo-data";
-import type { ConditionConfig, DiscordActionConfig, GmailActionConfig, HttpActionConfig, TriggerConfig, WorkflowDefinition, WorkflowNode } from "@/lib/types";
+import type { ConditionConfig, DiscordActionConfig, GmailActionConfig, GoogleSheetsAppendConfig, GoogleSheetsReadConfig, HttpActionConfig, TriggerConfig, WorkflowDefinition, WorkflowNode } from "@/lib/types";
 import { connectWorkflowNodes, getWorkflowCanvasSize, moveWorkflowNode } from "@/lib/workflow-graph";
 import { getWorkflowMappingOptions, type WorkflowMappingOption } from "@/lib/workflow-mapping";
 import { integrationCatalog } from "@/lib/integrations";
@@ -59,6 +59,9 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const selectedActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "discord" ? selectedNode.config : undefined;
   const selectedHttpActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "http" ? selectedNode.config : undefined;
   const selectedGmailActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "gmail" ? selectedNode.config : undefined;
+  const selectedSheetsReadConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "google-sheets" && selectedNode.config.actionId === "read_rows" ? selectedNode.config : undefined;
+  const selectedSheetsAppendConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "google-sheets" && selectedNode.config.actionId === "append_rows" ? selectedNode.config : undefined;
+  const selectedActionOperation = selectedNode?.config && "integrationId" in selectedNode.config ? `${selectedNode.config.integrationId}:${selectedNode.config.actionId}` : "discord:send_message";
   const selectedConditionConfig = selectedNode?.config && "operator" in selectedNode.config ? selectedNode.config : undefined;
   const selectedTriggerConfig = selectedNode?.config && "triggerType" in selectedNode.config ? selectedNode.config : undefined;
   const hasCondition = nodes.some((node) => node.kind === "condition");
@@ -220,6 +223,31 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
     updateSelected({ config });
   }
 
+  function updateSelectedGoogleSheetsReadConfig(patch: Partial<GoogleSheetsReadConfig>) {
+    if (!selectedNode || selectedNode.kind !== "action") return;
+    const existing = selectedNode.config && "integrationId" in selectedNode.config
+      && selectedNode.config.integrationId === "google-sheets" && selectedNode.config.actionId === "read_rows" ? selectedNode.config : undefined;
+    const config: GoogleSheetsReadConfig = {
+      integrationId: "google-sheets", actionId: "read_rows",
+      connectionId: existing?.connectionId ?? "", spreadsheetId: existing?.spreadsheetId ?? "", range: existing?.range ?? "Sheet1!A1:D100",
+      ...existing, ...patch,
+    };
+    updateSelected({ config });
+  }
+
+  function updateSelectedGoogleSheetsAppendConfig(patch: Partial<GoogleSheetsAppendConfig>) {
+    if (!selectedNode || selectedNode.kind !== "action") return;
+    const existing = selectedNode.config && "integrationId" in selectedNode.config
+      && selectedNode.config.integrationId === "google-sheets" && selectedNode.config.actionId === "append_rows" ? selectedNode.config : undefined;
+    const config: GoogleSheetsAppendConfig = {
+      integrationId: "google-sheets", actionId: "append_rows",
+      connectionId: existing?.connectionId ?? "", spreadsheetId: existing?.spreadsheetId ?? "", range: existing?.range ?? "Sheet1!A:D",
+      valuesJson: existing?.valuesJson ?? '[["{{input.name}}","{{input.email}}"]]',
+      ...existing, ...patch,
+    };
+    updateSelected({ config });
+  }
+
   function updateSelectedHttpActionConfig(patch: Partial<HttpActionConfig>) {
     if (!selectedNode || selectedNode.kind !== "action") return;
     const existingConfig = selectedNode.config && "integrationId" in selectedNode.config
@@ -362,15 +390,49 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
           </select><label className="field-label" htmlFor="condition-operator">Comparison</label><select id="condition-operator" className="field-input" value={selectedConditionConfig.operator} onChange={(event) => updateSelectedConditionConfig({ operator: event.target.value as ConditionConfig["operator"], ...(event.target.value === "exists" ? { value: undefined } : {}) })}><option value="equals">Equals</option><option value="not_equals">Does not equal</option><option value="contains">Contains</option><option value="greater_than">Greater than</option><option value="less_than">Less than</option><option value="exists">Exists</option></select>{selectedConditionConfig.operator !== "exists" && <><label className="field-label" htmlFor="condition-value">Compare value</label><input id="condition-value" className="field-input" value={String(selectedConditionConfig.value ?? "")} onChange={(event) => updateSelectedConditionConfig({ value: ["greater_than", "less_than"].includes(selectedConditionConfig.operator) ? Number(event.target.value) : event.target.value })} placeholder="Value"/></>}<div className="editor-help">Only the matching true or false branch executes. Conditions read the manual run input and do not execute custom code.</div></>}{selectedNode.kind === "action" && <>
           <label className="field-label" htmlFor="action-provider">Action type</label>
           <select id="action-provider" className="field-input"
-            value={selectedActionIntegrationId}
-            onChange={(event) => updateSelected({ config: event.target.value === "http"
-              ? { integrationId: "http", actionId: "request", method: "POST", url: "", connectionId: "", body: "" }
-              : event.target.value === "gmail"
-                ? { integrationId: "gmail", actionId: "send_email", connectionId: "", to: "", subject: "", body: "" }
-                : { integrationId: "discord", actionId: "send_message", connectionId: "", message: "" } })}>
-            {integrationCatalog.filter((integration) => integration.status === "available").flatMap((integration) => integration.operations.filter((operation) => operation.status === "available").map((operation) => <option key={`${integration.id}:${operation.id}`} value={integration.id}>{integration.name} · {operation.name}</option>))}
+            value={selectedActionOperation}
+            onChange={(event) => {
+              const [integrationId, actionId] = event.target.value.split(":");
+              if (integrationId === "google-sheets" && actionId === "read_rows") updateSelected({ config: { integrationId, actionId, connectionId: "", spreadsheetId: "", range: "Sheet1!A1:D100" } });
+              else if (integrationId === "google-sheets" && actionId === "append_rows") updateSelected({ config: { integrationId, actionId, connectionId: "", spreadsheetId: "", range: "Sheet1!A:D", valuesJson: '[["{{input.name}}","{{input.email}}"]]' } });
+              else if (integrationId === "http") updateSelected({ config: { integrationId, actionId, method: "POST", url: "", connectionId: "", body: "" } });
+              else if (integrationId === "gmail") updateSelected({ config: { integrationId, actionId, connectionId: "", to: "", subject: "", body: "" } });
+              else updateSelected({ config: { integrationId: "discord", actionId: "send_message", connectionId: "", message: "" } });
+            }}>
+            {integrationCatalog.filter((integration) => integration.status === "available").flatMap((integration) => integration.operations.filter((operation) => operation.status === "available").map((operation) => <option key={`${integration.id}:${operation.id}`} value={`${integration.id}:${operation.id}`}>{integration.name} · {operation.name}</option>))}
           </select>
-          {selectedGmailActionConfig ? <>
+          {selectedSheetsReadConfig || selectedSheetsAppendConfig ? <>
+            <label className="field-label" htmlFor="sheets-connection">Google account</label>
+            <select id="sheets-connection" className="field-input" value={(selectedSheetsReadConfig ?? selectedSheetsAppendConfig)?.connectionId ?? ""}
+              onChange={(event) => selectedSheetsReadConfig
+                ? updateSelectedGoogleSheetsReadConfig({ connectionId: event.target.value })
+                : updateSelectedGoogleSheetsAppendConfig({ connectionId: event.target.value })}>
+              <option value="">Choose a connected Google account</option>
+              {connections.filter((connection) => connection.provider === "google").map((connection) => <option key={connection.id} value={connection.id}>{connection.name}</option>)}
+            </select>
+            <label className="field-label" htmlFor="sheets-id">Spreadsheet ID</label>
+            <input id="sheets-id" className="field-input" value={(selectedSheetsReadConfig ?? selectedSheetsAppendConfig)?.spreadsheetId ?? ""}
+              onChange={(event) => selectedSheetsReadConfig
+                ? updateSelectedGoogleSheetsReadConfig({ spreadsheetId: event.target.value })
+                : updateSelectedGoogleSheetsAppendConfig({ spreadsheetId: event.target.value })}
+              placeholder="ID from the Google Sheets URL" maxLength={200}/>
+            <label className="field-label" htmlFor="sheets-range">A1 range</label>
+            <input id="sheets-range" className="field-input" value={(selectedSheetsReadConfig ?? selectedSheetsAppendConfig)?.range ?? ""}
+              onChange={(event) => selectedSheetsReadConfig
+                ? updateSelectedGoogleSheetsReadConfig({ range: event.target.value })
+                : updateSelectedGoogleSheetsAppendConfig({ range: event.target.value })}
+              placeholder={selectedSheetsReadConfig ? "Sheet1!A1:D100" : "Sheet1!A:D"} maxLength={200}/>
+            {selectedSheetsAppendConfig && <>
+              <label className="field-label" htmlFor="sheets-values">Rows (JSON)</label>
+              <textarea id="sheets-values" className="field-input" rows={6} maxLength={65536}
+                value={selectedSheetsAppendConfig.valuesJson}
+                onChange={(event) => updateSelectedGoogleSheetsAppendConfig({ valuesJson: event.target.value })}
+                placeholder={'[["{{input.name}}","{{input.email}}"]]'} />
+              <div className="editor-help">Use a two-dimensional JSON array. For dynamic cells, place mappings without surrounding quotes, for example: [["{{input.name}}","{{input.email}}"]]. Values are written as RAW data, so formulas are not executed.</div>
+            </>}
+            <div className="editor-help">{selectedSheetsReadConfig ? "Reads up to 1,000 rows and 100 columns from the selected range." : "Appends up to 1,000 rows and 10,000 cells per execution. A network timeout may leave the result unknown; the action is not automatically retried."} Reconnect the Google account if it was authorized before the Sheets permission was added.</div>
+            {connections.filter((connection) => connection.provider === "google").length === 0 && <Link href="/integrations" className="editor-help">Connect a Google account in Integrations first.</Link>}
+          </> : selectedGmailActionConfig ? <>
             <label className="field-label" htmlFor="gmail-connection">Google account</label>
             <select id="gmail-connection" className="field-input" value={selectedGmailActionConfig.connectionId ?? ""}
               onChange={(event) => updateSelectedGmailActionConfig({ connectionId: event.target.value })}>
