@@ -54,53 +54,72 @@ export async function DELETE(request: Request, context: RouteContext) {
     }
 
     if (connection.provider === "slack") {
-      let credentials: unknown;
-      try {
-        credentials = JSON.parse(decryptSecret(connection.credentialsCiphertext, `${access.context.organizationId}:slack`));
-      } catch {
-        return NextResponse.json({ error: "The Slack connection could not be decrypted. It was not removed." }, { status: 503 });
-      }
-      if (!credentials || typeof credentials !== "object"
-        || !("accessToken" in credentials) || typeof credentials.accessToken !== "string" || !credentials.accessToken) {
-        return NextResponse.json({ error: "The stored Slack credentials are invalid. The connection was not removed." }, { status: 503 });
-      }
-
-      async function revokeSlackToken(token: string) {
-        const response = await fetch("https://slack.com/api/auth.revoke", {
-          method: "POST",
-          headers: { authorization: `Bearer ${token}`, "content-type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams(),
-          redirect: "error",
-          signal: AbortSignal.timeout(10_000),
+      const slackResult = await prisma.$transaction(async (transaction) => {
+        await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 0))`;
+        const current = await transaction.integrationConnection.findFirst({
+          where: { id, organizationId: access.context.organizationId, provider: "slack" },
+          select: { id: true, credentialsCiphertext: true },
         });
-        if (!response.ok) return false;
-        const result: unknown = await response.json();
-        return Boolean(result && typeof result === "object" && "ok" in result && result.ok === true
-          && "revoked" in result && result.revoked === true);
-      }
+        if (!current) return { ok: false as const, status: 404, error: "Integration connection not found." };
 
-      if ("refreshToken" in credentials && typeof credentials.refreshToken === "string" && credentials.refreshToken) {
-        let refreshRevoked = false;
-        try { refreshRevoked = await revokeSlackToken(credentials.refreshToken); } catch { refreshRevoked = false; }
-        if (!refreshRevoked) {
-          return NextResponse.json({ error: "Slack refresh-token revocation could not be confirmed. The connection remains saved." }, { status: 503 });
+        let credentials: unknown;
+        try {
+          credentials = JSON.parse(decryptSecret(current.credentialsCiphertext, `${access.context.organizationId}:slack`));
+        } catch {
+          return { ok: false as const, status: 503, error: "The Slack connection could not be decrypted. It was not removed." };
         }
-        const { refreshToken: _revokedRefreshToken, ...remainingCredentials } = credentials;
-        await prisma.integrationConnection.updateMany({
-          where: { id: connection.id, organizationId: access.context.organizationId, provider: "slack", credentialsCiphertext: connection.credentialsCiphertext },
-          data: { credentialsCiphertext: encryptSecret(JSON.stringify(remainingCredentials), `${access.context.organizationId}:slack`) },
+        if (!credentials || typeof credentials !== "object"
+          || !("accessToken" in credentials) || typeof credentials.accessToken !== "string" || !credentials.accessToken) {
+          return { ok: false as const, status: 503, error: "The stored Slack credentials are invalid. The connection was not removed." };
+        }
+
+        async function revokeSlackToken(token: string) {
+          const response = await fetch("https://slack.com/api/auth.revoke", {
+            method: "POST",
+            headers: { authorization: `Bearer ${token}`, "content-type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams(),
+            redirect: "error",
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!response.ok) return false;
+          const result: unknown = await response.json();
+          if (result && typeof result === "object" && "ok" in result && result.ok === true
+            && "revoked" in result && result.revoked === true) return true;
+          return Boolean(result && typeof result === "object" && "error" in result && result.error === "invalid_auth");
+        }
+
+        if ("refreshToken" in credentials && typeof credentials.refreshToken === "string" && credentials.refreshToken) {
+          let refreshRevoked = false;
+          try { refreshRevoked = await revokeSlackToken(credentials.refreshToken); } catch { refreshRevoked = false; }
+          if (!refreshRevoked) {
+            return { ok: false as const, status: 503, error: "Slack refresh-token revocation could not be confirmed. The connection remains saved." };
+          }
+          const { refreshToken: _revokedRefreshToken, ...remainingCredentials } = credentials;
+          await transaction.integrationConnection.updateMany({
+            where: { id: current.id, organizationId: access.context.organizationId, provider: "slack" },
+            data: { credentialsCiphertext: encryptSecret(JSON.stringify(remainingCredentials), `${access.context.organizationId}:slack`) },
+          });
+          credentials = remainingCredentials;
+        }
+
+        const accessTokenExpired = "expiresAt" in credentials && typeof credentials.expiresAt === "string"
+          && Number.isFinite(Date.parse(credentials.expiresAt)) && Date.parse(credentials.expiresAt) <= Date.now();
+        if (!accessTokenExpired) {
+          let accessRevoked = false;
+          try { accessRevoked = await revokeSlackToken(credentials.accessToken); } catch { accessRevoked = false; }
+          if (!accessRevoked) {
+            return { ok: false as const, status: 503, error: "Slack access-token revocation could not be confirmed. The connection remains saved." };
+          }
+        }
+
+        await transaction.integrationConnection.deleteMany({
+          where: { id: current.id, organizationId: access.context.organizationId, provider: "slack" },
         });
-      }
+        return { ok: true as const };
+      }, { maxWait: 10_000, timeout: 30_000 });
 
-      const accessTokenExpired = "expiresAt" in credentials && typeof credentials.expiresAt === "string"
-        && Number.isFinite(Date.parse(credentials.expiresAt)) && Date.parse(credentials.expiresAt) <= Date.now();
-      if (!accessTokenExpired) {
-        let accessRevoked = false;
-        try { accessRevoked = await revokeSlackToken(credentials.accessToken); } catch { accessRevoked = false; }
-        if (!accessRevoked) {
-          return NextResponse.json({ error: "Slack access-token revocation could not be confirmed. The connection remains saved." }, { status: 503 });
-        }
-      }
+      if (!slackResult.ok) return NextResponse.json({ error: slackResult.error }, { status: slackResult.status });
+      return NextResponse.json({ success: true });
     }
 
     const result = await prisma.integrationConnection.deleteMany({
