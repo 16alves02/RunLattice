@@ -9,11 +9,14 @@ export const runtime = "nodejs";
 function getOAuthConfig() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const redirectUri = process.env.GOOGLE_REDIRECT_URI;
-  if (!clientId || !redirectUri) return null;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL;
+  if (!clientId || !redirectUri || !appUrl) return null;
   try {
     const callback = new URL(redirectUri);
+    const application = new URL(appUrl);
     if (callback.protocol !== "https:" && process.env.NODE_ENV === "production") return null;
-    if (callback.username || callback.password || callback.search || callback.hash) return null;
+    if (callback.origin !== application.origin || callback.pathname !== "/api/integrations/google/callback"
+      || callback.username || callback.password || callback.search || callback.hash) return null;
   } catch {
     return null;
   }
