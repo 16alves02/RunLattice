@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret } from "@/lib/secrets";
+import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
 
 export const runtime = "nodejs";
 
@@ -93,49 +94,66 @@ export async function GET(request: Request) {
       return redirectToIntegrations("error", "unverified_google_account");
     }
     const email = profile.email.trim().toLowerCase();
-    const existing = await prisma.integrationConnection.findFirst({
-      where: { organizationId: oauthState.organizationId, provider: "google", name: email },
-      select: { id: true, credentialsCiphertext: true },
-    });
+    const saved = await prisma.$transaction(async (transaction) => {
+      await transaction.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${oauthState.organizationId}, 0))`;
+      const existing = await transaction.integrationConnection.findFirst({
+        where: { organizationId: oauthState.organizationId, provider: "google", name: email },
+        select: { id: true, credentialsCiphertext: true },
+      });
 
-    let refreshToken = typeof tokenData.refresh_token === "string" && tokenData.refresh_token
-      ? tokenData.refresh_token
-      : undefined;
-    if (!refreshToken && existing) {
-      try {
-        const previous: unknown = JSON.parse(decryptSecret(existing.credentialsCiphertext, `${oauthState.organizationId}:google`));
-        if (previous && typeof previous === "object" && "refreshToken" in previous && typeof previous.refreshToken === "string") {
-          refreshToken = previous.refreshToken;
+      let refreshToken = typeof tokenData.refresh_token === "string" && tokenData.refresh_token
+        ? tokenData.refresh_token
+        : undefined;
+      if (!refreshToken && existing) {
+        try {
+          const previous: unknown = JSON.parse(decryptSecret(existing.credentialsCiphertext, `${oauthState.organizationId}:google`));
+          if (previous && typeof previous === "object" && "refreshToken" in previous && typeof previous.refreshToken === "string") {
+            refreshToken = previous.refreshToken;
+          }
+        } catch {
+          throw new Error("The stored Google connection is invalid.");
         }
-      } catch {
-        return redirectToIntegrations("error", "stored_connection_invalid");
       }
-    }
-    if (!refreshToken) return redirectToIntegrations("error", "refresh_token_missing");
+      if (!refreshToken) throw new Error("Google did not provide an offline refresh token.");
 
-    const credentialsCiphertext = encryptSecret(JSON.stringify({
-      accessToken: tokenData.access_token,
-      refreshToken,
-      expiresAt: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
-      scope: tokenData.scope,
-      email,
-    }), `${oauthState.organizationId}:google`);
+      if (!existing) {
+        const subscription = await transaction.billingSubscription.findUnique({
+          where: { organizationId: oauthState.organizationId },
+          select: { plan: true, status: true, currentPeriodEnd: true },
+        });
+        const limit = PLAN_LIMITS[resolveEntitledPlan(subscription)].integrations;
+        const used = await transaction.integrationConnection.count({
+          where: { organizationId: oauthState.organizationId },
+        });
+        if (used >= limit) return false;
+      }
 
-    if (existing) {
-      await prisma.integrationConnection.updateMany({
-        where: { id: existing.id, organizationId: oauthState.organizationId, provider: "google" },
-        data: { credentialsCiphertext },
-      });
-    } else {
-      await prisma.integrationConnection.create({
-        data: {
-          organizationId: oauthState.organizationId,
-          provider: "google",
-          name: email,
-          credentialsCiphertext,
-        },
-      });
-    }
+      const credentialsCiphertext = encryptSecret(JSON.stringify({
+        accessToken: tokenData.access_token,
+        refreshToken,
+        expiresAt: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+        scope: tokenData.scope,
+        email,
+      }), `${oauthState.organizationId}:google`);
+
+      if (existing) {
+        await transaction.integrationConnection.updateMany({
+          where: { id: existing.id, organizationId: oauthState.organizationId, provider: "google" },
+          data: { credentialsCiphertext },
+        });
+      } else {
+        await transaction.integrationConnection.create({
+          data: {
+            organizationId: oauthState.organizationId,
+            provider: "google",
+            name: email,
+            credentialsCiphertext,
+          },
+        });
+      }
+      return true;
+    });
+    if (!saved) return redirectToIntegrations("error", "connection_limit_reached");
     return redirectToIntegrations("connected");
   } catch {
     return redirectToIntegrations("error", "connection_failed");
