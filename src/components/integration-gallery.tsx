@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { integrationCatalog } from "@/lib/integrations";
+import { integrationCatalog, type IntegrationDefinition } from "@/lib/integrations";
 
 const categories = ["All", "Communication", "Productivity", "E-commerce", "Payments", "Development"];
 
@@ -17,6 +17,7 @@ export function IntegrationGallery() {
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
   const [connections, setConnections] = useState<IntegrationConnection[]>([]);
+  const [catalog, setCatalog] = useState<IntegrationDefinition[]>(integrationCatalog);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [canManage, setCanManage] = useState(false);
@@ -39,6 +40,7 @@ export function IntegrationGallery() {
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.error ?? "Integrations could not be loaded.");
         setConnections(Array.isArray(result.connections) ? result.connections : []);
+        if (Array.isArray(result.data)) setCatalog(result.data as IntegrationDefinition[]);
         setCanManage(Boolean(result.canManage));
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -53,11 +55,11 @@ export function IntegrationGallery() {
     return () => controller.abort();
   }, []);
 
-  const visible = useMemo(() => integrationCatalog.filter((item) => {
+  const visible = useMemo(() => catalog.filter((item) => {
     const matchesCategory = category === "All" || item.category === category;
     const search = `${item.name} ${item.description} ${item.category}`.toLowerCase();
     return matchesCategory && search.includes(query.toLowerCase());
-  }), [category, query]);
+  }), [catalog, category, query]);
 
   async function connectDiscord() {
     setSaving(true);
@@ -144,7 +146,11 @@ export function IntegrationGallery() {
         <div className="integration-card-head"><div className="quick-icon">{item.name.slice(0, 1)}</div><span className="tag">{item.status === "available" ? "Available" : "Planned"}</span></div>
         <h2>{item.name}</h2><p>{item.description}</p>
         <div className="activity-meta">Authentication: {item.auth}</div>
-        <div className="integration-capabilities"><div><strong>Triggers</strong><span>{item.triggers.length ? item.triggers.join(" · ") : "Manual workflow start"}</span></div><div><strong>Actions</strong><span>{item.actions.join(" · ")}</span></div></div>
+        <div className="integration-capabilities"><div><strong>Executable triggers</strong><span>{item.triggers.length ? item.triggers.join(" · ") : "No native triggers yet"}</span></div><div><strong>Executable actions</strong><span>{item.actions.length ? item.actions.join(" · ") : "No executable actions yet"}</span></div></div>
+        {(item.plannedTriggers.length > 0 || item.plannedActions.length > 0) && <div className="integration-roadmap">
+          <strong>Planned capabilities</strong>
+          <span>{[...item.plannedTriggers, ...item.plannedActions].join(" · ")}</span>
+        </div>}
         {item.id === "http" && item.status === "available" ? <>
           <div className="activity-meta">{connected.length} connection(s) in this workspace</div>
           {canManage && <button className="btn btn-primary" onClick={() => setShowHttpForm((value) => !value)}>{showHttpForm ? "Close form" : "Connect API key"}</button>}
