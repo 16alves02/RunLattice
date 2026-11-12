@@ -1,7 +1,7 @@
 import { hashSlackOAuthState } from "@/lib/slack-oauth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { encryptSecret } from "@/lib/secrets";
+import { decryptSecret, encryptSecret } from "@/lib/secrets";
 import { PLAN_LIMITS, resolveEntitledPlan } from "@/lib/billing-core";
 import { canManageWorkspace } from "@/lib/workspace";
 
@@ -103,7 +103,7 @@ export async function GET(request: Request) {
       if (!refreshToken && existing) {
         try {
           const previous: unknown = JSON.parse(
-            (await import("@/lib/secrets")).decryptSecret(existing.credentialsCiphertext, `${oauthState.organizationId}:slack`),
+            decryptSecret(existing.credentialsCiphertext, `${oauthState.organizationId}:slack`),
           );
           if (previous && typeof previous === "object" && "refreshToken" in previous
             && typeof previous.refreshToken === "string") refreshToken = previous.refreshToken;
