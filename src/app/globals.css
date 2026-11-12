@@ -325,3 +325,21 @@ h1 { font-size:27px; line-height:1.2; letter-spacing:-1px; margin:0 0 8px; }
   .mapping-insert-row { align-items:stretch;flex-direction:column; }
   .mapping-insert-row .btn { justify-content:center; }
 }
+
+
+.integration-roadmap {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.integration-roadmap strong {
+  color: var(--text);
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.integration-roadmap span { line-height: 1.55; }
