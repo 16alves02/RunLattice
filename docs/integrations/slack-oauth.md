@@ -59,7 +59,7 @@ Messages support workflow input and previous-step mappings. A timeout after Slac
 - Workspace administrator membership is checked again during the OAuth callback.
 - Bot access tokens are encrypted at rest and never returned to the browser or written to application logs.
 - When token rotation is enabled, the worker refreshes expiring tokens and atomically saves each new refresh token. Slack refresh tokens are single-use.
-- Removing a Slack connection asks Slack to uninstall the app from that workspace, revoking all tokens. If Slack cannot confirm uninstall, RunLattice keeps the connection saved and reports the failure. In that case, remove RunLattice from the Slack workspace's app management settings first.
+- Removing a Slack connection asks Slack to revoke the stored refresh token (when token rotation is enabled) and the current access token before deleting the encrypted connection. The app installation may remain visible in Slack's workspace app list, but those credentials are revoked. If Slack cannot confirm revocation, RunLattice keeps the connection saved and reports the failure.
 
 Official references:
 - [Installing with OAuth](https://docs.slack.dev/authentication/installing-with-oauth/)
