@@ -11,6 +11,18 @@ describe("Gmail message encoding", () => {
     expect(decoded).toContain(Buffer.from("A sua encomenda está pronta.", "utf8").toString("base64"));
   });
 
+  it("wraps long subjects and base64 bodies within MIME line limits", () => {
+    const messageBody = "Long message content ".repeat(100);
+    const raw = buildGmailRawMessage("person@example.com", "Update ".repeat(40), messageBody);
+    const decoded = Buffer.from(raw, "base64url").toString("utf8");
+    const [headers, encodedBody] = decoded.split("\\r\\n\\r\\n");
+    const encodedWords = headers.match(/=\\?UTF-8\\?B\\?.*?\\?=/g) ?? [];
+    expect(encodedWords.length).toBeGreaterThan(1);
+    expect(encodedWords.every((word) => word.length <= 75)).toBe(true);
+    expect(encodedBody.split("\\r\\n").every((line) => line.length <= 76)).toBe(true);
+    expect(Buffer.from(encodedBody.replaceAll("\\r\\n", ""), "base64").toString("utf8")).toBe(messageBody);
+  });
+
   it("accepts up to twenty valid recipients", () => {
     expect(() => buildGmailRawMessage(Array.from({ length: 20 }, (_, i) => `user${i}@example.com`).join(", "), "Update", "Body")).not.toThrow();
     expect(() => buildGmailRawMessage(Array.from({ length: 21 }, (_, i) => `user${i}@example.com`).join(", "), "Update", "Body")).toThrow(/20 valid/);
