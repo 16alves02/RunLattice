@@ -27,3 +27,67 @@ export function formatExecutionData(value: unknown, maximumLength = 12_000): str
   if (serialized.length <= maximumLength) return serialized;
   return `${serialized.slice(0, maximumLength)}\n… Output truncated for display.`;
 }
+
+
+import type { WorkflowDefinition } from "@/lib/types";
+
+export interface ExecutionTraceRecord {
+  id: string;
+  nodeId: string;
+  title: string;
+  kind: string;
+  attempt: number;
+  status: string;
+  startedAt: Date | string | null;
+  finishedAt: Date | string | null;
+  result: unknown;
+  error: string | null;
+}
+
+export interface ExecutionTraceItem extends ExecutionTraceRecord {
+  detail?: string;
+  decision?: "true" | "false";
+  enteredThroughBranch?: "true" | "false";
+}
+
+/**
+ * Enriches persisted execution steps with the actual configured node details
+ * and the branch selected by each executed condition. It never displays
+ * unexecuted nodes as if they had run.
+ */
+export function buildExecutionTrace(
+  definition: WorkflowDefinition | undefined,
+  records: readonly ExecutionTraceRecord[],
+): ExecutionTraceItem[] {
+  return records.map((record, index) => {
+    const node = definition?.nodes.find((candidate) => candidate.id === record.nodeId);
+    const result = record.result && typeof record.result === "object" && !Array.isArray(record.result)
+      ? record.result as Record<string, unknown>
+      : undefined;
+    const decision = record.kind === "condition" && typeof result?.condition === "boolean"
+      ? result.condition ? "true" : "false"
+      : undefined;
+
+    let enteredThroughBranch: "true" | "false" | undefined;
+    const previous = records[index - 1];
+    if (previous?.kind === "condition") {
+      const previousResult = previous.result && typeof previous.result === "object" && !Array.isArray(previous.result)
+        ? previous.result as Record<string, unknown>
+        : undefined;
+      if (typeof previousResult?.condition === "boolean") {
+        const selectedBranch = previousResult.condition ? "true" : "false";
+        const matchingEdge = definition?.edges.some((edge) =>
+          edge.from === previous.nodeId && edge.to === record.nodeId && edge.branch === selectedBranch,
+        );
+        if (matchingEdge) enteredThroughBranch = selectedBranch;
+      }
+    }
+
+    return {
+      ...record,
+      ...(node?.detail ? { detail: node.detail } : {}),
+      ...(decision ? { decision } : {}),
+      ...(enteredThroughBranch ? { enteredThroughBranch } : {}),
+    };
+  });
+}
