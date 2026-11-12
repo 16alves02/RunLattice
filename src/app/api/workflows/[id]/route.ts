@@ -3,6 +3,7 @@ import { WorkflowStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { workflowDefinitionSchema } from "@/lib/validation";
 import { validateExecutableWorkflow } from "@/lib/execution";
+import { getRequiredIntegrationConnections } from "@/lib/integrations";
 import { inferTriggerType, getTriggerConfig } from "@/lib/trigger-type";
 import { syncWorkflowSchedule } from "@/lib/schedule";
 import type { WorkflowDefinition } from "@/lib/types";
@@ -122,25 +123,31 @@ export async function PATCH(request: Request, context: RouteContext) {
         return NextResponse.json({ error: error instanceof Error ? error.message : "The workflow cannot be activated." }, { status: 400 });
       }
 
-      const connectionIds = [...new Set(executablePath
-        .filter((node) => node.kind === "action")
-        .map((node) => node.config && "integrationId" in node.config ? node.config.connectionId : undefined)
-        .filter((connectionId): connectionId is string => Boolean(connectionId)))];
-      if (connectionIds.length > 0) {
-        let availableConnections = 0;
+      let connectionRequirements: ReturnType<typeof getRequiredIntegrationConnections>;
+      try {
+        connectionRequirements = getRequiredIntegrationConnections(executablePath);
+      } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : "Workflow integration connections are invalid." }, { status: 400 });
+      }
+      if (connectionRequirements.length > 0) {
+        let availableConnections: Array<{ id: string; provider: string }>;
         try {
-          availableConnections = await prisma.integrationConnection.count({
+          availableConnections = await prisma.integrationConnection.findMany({
             where: {
-              id: { in: connectionIds },
+              id: { in: connectionRequirements.map((connection) => connection.id) },
               organizationId: access.context.organizationId,
-              provider: "discord",
             },
+            select: { id: true, provider: true },
           });
         } catch {
           return NextResponse.json({ error: "Integration connections could not be verified." }, { status: 503 });
         }
-        if (availableConnections !== connectionIds.length) {
-          return NextResponse.json({ error: "One or more workflow actions reference a connection outside this workspace or a connection that no longer exists." }, { status: 400 });
+        const availableById = new Map(availableConnections.map((connection) => [connection.id, connection.provider]));
+        const allConnectionsMatch = connectionRequirements.every(
+          (required) => availableById.get(required.id) === required.provider,
+        );
+        if (!allConnectionsMatch) {
+          return NextResponse.json({ error: "One or more workflow actions reference a connection outside this workspace, a connection that no longer exists, or a connection for a different provider." }, { status: 400 });
         }
       }
     }
