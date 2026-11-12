@@ -3,7 +3,7 @@ import { IntegrationGallery } from "@/components/integration-gallery";
 
 export const metadata: Metadata = {
   title: "Integrations",
-  description: "Explore the services planned for the RunLattice integration library.",
+  description: "Connect services and manage workspace integration credentials.",
 };
 
 export default function IntegrationsPage() {
