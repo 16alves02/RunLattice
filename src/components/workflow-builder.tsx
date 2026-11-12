@@ -7,7 +7,7 @@ import { ArrowLeft, Circle, GitBranch, Plus, Save, Settings2, Sparkles, Webhook,
 import { AppShell } from "@/components/app-shell";
 import { ManualRunInput } from "@/components/manual-run-input";
 import { demoDefinition } from "@/lib/demo-data";
-import type { ConditionConfig, DiscordActionConfig, HttpActionConfig, TriggerConfig, WorkflowDefinition, WorkflowNode } from "@/lib/types";
+import type { ConditionConfig, DiscordActionConfig, GmailActionConfig, HttpActionConfig, TriggerConfig, WorkflowDefinition, WorkflowNode } from "@/lib/types";
 import { connectWorkflowNodes, getWorkflowCanvasSize, moveWorkflowNode } from "@/lib/workflow-graph";
 import { getWorkflowMappingOptions, type WorkflowMappingOption } from "@/lib/workflow-mapping";
 import { integrationCatalog } from "@/lib/integrations";
@@ -58,6 +58,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const selectedActionIntegrationId = selectedNode?.config && "integrationId" in selectedNode.config ? selectedNode.config.integrationId : "discord";
   const selectedActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "discord" ? selectedNode.config : undefined;
   const selectedHttpActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "http" ? selectedNode.config : undefined;
+  const selectedGmailActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "gmail" ? selectedNode.config : undefined;
   const selectedConditionConfig = selectedNode?.config && "operator" in selectedNode.config ? selectedNode.config : undefined;
   const selectedTriggerConfig = selectedNode?.config && "triggerType" in selectedNode.config ? selectedNode.config : undefined;
   const hasCondition = nodes.some((node) => node.kind === "condition");
@@ -196,6 +197,23 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
       actionId: "send_message",
       connectionId: existingConfig?.connectionId ?? "",
       message: existingConfig?.message ?? "",
+      ...existingConfig,
+      ...patch,
+    };
+    updateSelected({ config });
+  }
+
+  function updateSelectedGmailActionConfig(patch: Partial<GmailActionConfig>) {
+    if (!selectedNode || selectedNode.kind !== "action") return;
+    const existingConfig = selectedNode.config && "integrationId" in selectedNode.config
+      && selectedNode.config.integrationId === "gmail" ? selectedNode.config : undefined;
+    const config: GmailActionConfig = {
+      integrationId: "gmail",
+      actionId: "send_email",
+      connectionId: existingConfig?.connectionId ?? "",
+      to: existingConfig?.to ?? "",
+      subject: existingConfig?.subject ?? "",
+      body: existingConfig?.body ?? "",
       ...existingConfig,
       ...patch,
     };
@@ -347,10 +365,34 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
             value={selectedActionIntegrationId}
             onChange={(event) => updateSelected({ config: event.target.value === "http"
               ? { integrationId: "http", actionId: "request", method: "POST", url: "", connectionId: "", body: "" }
-              : { integrationId: "discord", actionId: "send_message", connectionId: "", message: "" } })}>
+              : event.target.value === "gmail"
+                ? { integrationId: "gmail", actionId: "send_email", connectionId: "", to: "", subject: "", body: "" }
+                : { integrationId: "discord", actionId: "send_message", connectionId: "", message: "" } })}>
             {integrationCatalog.filter((integration) => integration.status === "available").flatMap((integration) => integration.operations.filter((operation) => operation.status === "available").map((operation) => <option key={`${integration.id}:${operation.id}`} value={integration.id}>{integration.name} · {operation.name}</option>))}
           </select>
-          {selectedHttpActionConfig ? <>
+          {selectedGmailActionConfig ? <>
+            <label className="field-label" htmlFor="gmail-connection">Google account</label>
+            <select id="gmail-connection" className="field-input" value={selectedGmailActionConfig.connectionId ?? ""}
+              onChange={(event) => updateSelectedGmailActionConfig({ connectionId: event.target.value })}>
+              <option value="">Choose a connected Google account</option>
+              {connections.filter((connection) => connection.provider === "google").map((connection) => <option key={connection.id} value={connection.id}>{connection.name}</option>)}
+            </select>
+            <label className="field-label" htmlFor="gmail-to">Recipients</label>
+            <input id="gmail-to" className="field-input" value={selectedGmailActionConfig.to}
+              onChange={(event) => updateSelectedGmailActionConfig({ to: event.target.value })} placeholder="name@example.com, another@example.com"/>
+            <MappingInsert value={selectedGmailActionConfig.to} onChange={(value) => updateSelectedGmailActionConfig({ to: value })} options={mappingOptions}/>
+            <label className="field-label" htmlFor="gmail-subject">Subject</label>
+            <input id="gmail-subject" className="field-input" value={selectedGmailActionConfig.subject}
+              onChange={(event) => updateSelectedGmailActionConfig({ subject: event.target.value })} maxLength={500} placeholder="Your update"/>
+            <MappingInsert value={selectedGmailActionConfig.subject} onChange={(value) => updateSelectedGmailActionConfig({ subject: value })} options={mappingOptions}/>
+            <label className="field-label" htmlFor="gmail-body">Plain-text message</label>
+            <textarea id="gmail-body" className="field-input" rows={6} maxLength={100000}
+              value={selectedGmailActionConfig.body} onChange={(event) => updateSelectedGmailActionConfig({ body: event.target.value })}
+              placeholder="Write your email…"/>
+            <MappingInsert value={selectedGmailActionConfig.body} onChange={(value) => updateSelectedGmailActionConfig({ body: value })} options={mappingOptions}/>
+            <div className="editor-help">Sends plain-text email through the connected Google account. Supports up to 20 recipients and workflow input mappings. Google access tokens are refreshed by the worker and never exposed to the browser.</div>
+            {connections.filter((connection) => connection.provider === "google").length === 0 && <Link href="/integrations" className="editor-help">Connect a Google account in Integrations first.</Link>}
+          </> : selectedHttpActionConfig ? <>
             <label className="field-label" htmlFor="http-connection">API connection</label>
             <select id="http-connection" className="field-input" value={selectedHttpActionConfig.connectionId ?? ""}
               onChange={(event) => updateSelectedHttpActionConfig({ connectionId: event.target.value })}>
