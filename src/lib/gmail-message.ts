@@ -12,7 +12,7 @@ export function buildGmailRawMessage(toValue: string, subject: string, body: str
   const encodedSubject = (Buffer.from(subject, "utf8").toString("base64").match(/.{1,60}/g) ?? [])
     .map((chunk) => `=?UTF-8?B?${chunk}?=`)
     .join(" ");
-  const encodedBody = (Buffer.from(body, "utf8").toString("base64").match(/.{1,76}/g) ?? []).join("\\r\\n");
+  const encodedBody = (Buffer.from(body, "utf8").toString("base64").match(/.{1,76}/g) ?? []).join("\r\n");
   const mimeMessage = [
     `To: ${recipients.join(", ")}`,
     `Subject: ${encodedSubject}`,
