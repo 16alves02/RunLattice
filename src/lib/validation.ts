@@ -16,12 +16,31 @@ const gmailActionConfigSchema = z.object({
   body: z.string().max(100_000),
 });
 
+function googleSheetsColumnNumber(value: string) {
+  return value.toUpperCase().split("").reduce((total, character) => total * 26 + character.charCodeAt(0) - 64, 0);
+}
+
+function isBoundedGoogleSheetsReadRange(value: string) {
+  const match = /^(?:'((?:[^']|'')+)'|([A-Za-z0-9_]+))!\\$?([A-Z]{1,3})\\$?([1-9]\\d*):\\$?([A-Z]{1,3})\\$?([1-9]\\d*)$/i.exec(value);
+  if (!match) return false;
+  const startColumn = googleSheetsColumnNumber(match[3]);
+  const endColumn = googleSheetsColumnNumber(match[5]);
+  const startRow = Number(match[4]);
+  const endRow = Number(match[6]);
+  return endColumn >= startColumn && endRow >= startRow
+    && endColumn - startColumn + 1 <= 100 && endRow - startRow + 1 <= 1_000;
+}
+
+function isValidGoogleSheetsAppendRange(value: string) {
+  return /^(?:'(?:[^']|'')+'|[A-Za-z0-9_]+)!\\$?[A-Z]{1,3}(?:\\$?[1-9]\\d*)?:\\$?[A-Z]{1,3}(?:\\$?[1-9]\\d*)?$/i.test(value);
+}
+
 const googleSheetsReadActionConfigSchema = z.object({
   integrationId: z.literal("google-sheets"),
   actionId: z.literal("read_rows"),
   connectionId: z.string().max(80).optional(),
   spreadsheetId: z.string().trim().min(20).max(200).regex(/^[A-Za-z0-9_-]+$/),
-  range: z.string().trim().min(1).max(200).refine((value) => !/[\\x00-\\x1f\\x7f]/.test(value), "Range cannot contain control characters."),
+  range: z.string().trim().min(1).max(200).refine(isBoundedGoogleSheetsReadRange, "Use a bounded A1 range of at most 1,000 rows and 100 columns, for example Sheet1!A1:D100."),
 });
 
 const googleSheetsAppendActionConfigSchema = z.object({
@@ -29,7 +48,7 @@ const googleSheetsAppendActionConfigSchema = z.object({
   actionId: z.literal("append_rows"),
   connectionId: z.string().max(80).optional(),
   spreadsheetId: z.string().trim().min(20).max(200).regex(/^[A-Za-z0-9_-]+$/),
-  range: z.string().trim().min(1).max(200).refine((value) => !/[\\x00-\\x1f\\x7f]/.test(value), "Range cannot contain control characters."),
+  range: z.string().trim().min(1).max(200).refine(isValidGoogleSheetsAppendRange, "Use a valid A1 append range, for example Sheet1!A:D."),
   valuesJson: z.string().trim().min(2).max(65_536),
 });
 
