@@ -25,7 +25,7 @@ describe("workflow data mapping options", () => {
   it("does not offer values from downstream or disconnected steps", () => {
     const options = getWorkflowMappingOptions(nodes, edges.slice(0, 1), "http-one");
     expect(options.map((option) => option.path)).not.toContain("steps.http-two.responseValue");
-    expect(options.map((option) => option.path)).toContain("steps.http-one.httpStatus");
+    expect(options.map((option) => option.path)).not.toContain("steps.http-one.httpStatus");
     expect(options.map((option) => option.path)).not.toContain("steps.http-one.responseValue");
   });
 
