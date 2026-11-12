@@ -11,7 +11,7 @@ import { renderInputTemplate } from "../src/lib/template";
 import { resolveNextExecutionNode, validateExecutableWorkflow } from "../src/lib/execution";
 import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
-import type { DiscordActionConfig, GmailActionConfig, GoogleSheetsAppendConfig, GoogleSheetsReadConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
+import type { DiscordActionConfig, SlackActionConfig, GmailActionConfig, GoogleSheetsAppendConfig, GoogleSheetsReadConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
 import { ActionOutcomeUnknownError, isWithinAllowedHttpsBase, requestPublicHttps } from "../src/lib/safe-http";
 import { extractJsonResponseValue, toPersistableHttpActionResult } from "../src/lib/http-response";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
@@ -202,6 +202,124 @@ async function getGoogleAccessToken(connectionId: string, organizationId: string
   return refreshed.access_token;
 }
 
+async function getSlackAccessToken(connectionId: string, organizationId: string) {
+  const connection = await prisma.integrationConnection.findFirst({
+    where: { id: connectionId, organizationId, provider: "slack" },
+    select: { id: true, credentialsCiphertext: true },
+  });
+  if (!connection) throw new Error("The Slack workspace connection is unavailable in this workspace.");
+
+  let credentials: unknown;
+  try { credentials = JSON.parse(decryptSecret(connection.credentialsCiphertext, `${organizationId}:slack`)); }
+  catch { throw new Error("The stored Slack workspace credentials could not be decrypted."); }
+  if (!credentials || typeof credentials !== "object"
+    || !("accessToken" in credentials) || typeof credentials.accessToken !== "string" || !credentials.accessToken
+    || !("scope" in credentials) || typeof credentials.scope !== "string"
+    || !("teamId" in credentials) || typeof credentials.teamId !== "string") {
+    throw new Error("The stored Slack workspace credentials are invalid.");
+  }
+  if (!credentials.scope.split(",").map((scope) => scope.trim()).includes("chat:write")) {
+    throw new Error("The Slack app has not granted chat:write. Reconnect the Slack workspace.");
+  }
+
+  const expiresAt = "expiresAt" in credentials && typeof credentials.expiresAt === "string"
+    ? Date.parse(credentials.expiresAt) : Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(expiresAt) && expiresAt !== Number.POSITIVE_INFINITY) {
+    throw new Error("The stored Slack token expiry is invalid.");
+  }
+  if (expiresAt > Date.now() + 60_000) return credentials.accessToken;
+  if (!("refreshToken" in credentials) || typeof credentials.refreshToken !== "string" || !credentials.refreshToken) {
+    throw new Error("The Slack bot token has expired. Reconnect the Slack workspace.");
+  }
+
+  const clientId = process.env.SLACK_CLIENT_ID;
+  const clientSecret = process.env.SLACK_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("Slack OAuth client credentials are not configured on the worker.");
+  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64");
+  let response: Response;
+  try {
+    response = await fetch("https://slack.com/api/oauth.v2.access", {
+      method: "POST",
+      headers: { authorization: `Basic ${basicAuth}`, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: credentials.refreshToken }),
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new Error("Slack could not refresh the workspace access token.");
+  }
+  if (!response.ok) throw new Error("Slack rejected the workspace token refresh. Reconnect the Slack workspace.");
+  const refreshed: unknown = await response.json();
+  if (!refreshed || typeof refreshed !== "object" || !("ok" in refreshed) || refreshed.ok !== true
+    || !("access_token" in refreshed) || typeof refreshed.access_token !== "string" || !refreshed.access_token
+    || !("expires_in" in refreshed) || typeof refreshed.expires_in !== "number"
+    || refreshed.expires_in < 60 || refreshed.expires_in > 86_400
+    || !("refresh_token" in refreshed) || typeof refreshed.refresh_token !== "string" || !refreshed.refresh_token) {
+    throw new Error("Slack returned an invalid rotated access token.");
+  }
+
+  const updatedCredentials = {
+    ...credentials,
+    accessToken: refreshed.access_token,
+    refreshToken: refreshed.refresh_token,
+    expiresAt: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+  };
+  const updatedCiphertext = encryptSecret(JSON.stringify(updatedCredentials), `${organizationId}:slack`);
+  const updated = await prisma.integrationConnection.updateMany({
+    where: { id: connection.id, organizationId, provider: "slack", credentialsCiphertext: connection.credentialsCiphertext },
+    data: { credentialsCiphertext: updatedCiphertext },
+  });
+  if (updated.count === 1) return refreshed.access_token;
+
+  const latest = await prisma.integrationConnection.findFirst({
+    where: { id: connection.id, organizationId, provider: "slack" },
+    select: { credentialsCiphertext: true },
+  });
+  if (!latest) throw new Error("The Slack workspace connection was removed during token refresh.");
+  try {
+    const latestCredentials: unknown = JSON.parse(decryptSecret(latest.credentialsCiphertext, `${organizationId}:slack`));
+    if (latestCredentials && typeof latestCredentials === "object"
+      && "accessToken" in latestCredentials && typeof latestCredentials.accessToken === "string"
+      && "expiresAt" in latestCredentials && typeof latestCredentials.expiresAt === "string"
+      && Date.parse(latestCredentials.expiresAt) > Date.now() + 60_000) return latestCredentials.accessToken;
+  } catch {
+    throw new Error("The refreshed Slack workspace credentials could not be read.");
+  }
+  throw new Error("Slack token refresh conflicted with another worker. Retry the workflow.");
+}
+
+async function executeSlackAction(config: SlackActionConfig, organizationId: string, input: unknown) {
+  if (!config.connectionId) throw new Error("The Slack action is missing its workspace connection.");
+  const channel = renderInputTemplate(config.channel, input, 40);
+  if (!/^[CDG][A-Z0-9]{8,39}$/.test(channel)) throw new Error("Enter a valid Slack channel ID, such as C0123456789.");
+  const message = renderInputTemplate(config.message, input, 40_000);
+  if (!message.trim()) throw new Error("The Slack message cannot be empty.");
+  const accessToken = await getSlackAccessToken(config.connectionId, organizationId);
+
+  let response: Response;
+  try {
+    response = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ channel, text: message, unfurl_links: false, unfurl_media: false }),
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new ActionOutcomeUnknownError("Slack did not respond within the 15-second send timeout; message delivery may be unknown. RunLattice will not automatically resend it.");
+  }
+  if (!response.ok) throw new Error(`Slack rejected the message with HTTP ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== "object" || !("ok" in payload) || payload.ok !== true
+    || !("channel" in payload) || typeof payload.channel !== "string"
+    || !("ts" in payload) || typeof payload.ts !== "string") {
+    const reason = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+      ? payload.error : "invalid_response";
+    throw new Error(`Slack could not post the message (${reason}). Check that the app is a member of the selected channel.`);
+  }
+  return { channel: payload.channel, ts: payload.ts };
+}
+
 async function executeGmailAction(config: GmailActionConfig, organizationId: string, input: unknown) {
   if (!config.connectionId) throw new Error("The Gmail action is missing its Google account connection.");
   const toValue = renderInputTemplate(config.to, input, 1_000);
@@ -346,6 +464,9 @@ async function executeAction(node: WorkflowDefinition["nodes"][number], organiza
   if (node.config.integrationId === "discord" && node.config.actionId === "send_message") {
     if (!node.config.message?.trim()) throw new Error("The Discord action is missing its message.");
     return executeDiscordAction(node.config, organizationId, input);
+  }
+  if (node.config.integrationId === "slack" && node.config.actionId === "send_message") {
+    return executeSlackAction(node.config, organizationId, input);
   }
   if (node.config.integrationId === "gmail" && node.config.actionId === "send_email") {
     return executeGmailAction(node.config, organizationId, input);
