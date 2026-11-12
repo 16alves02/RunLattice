@@ -5,7 +5,8 @@ import { ArrowLeft, CheckCircle2, Clock3, XCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { prisma } from "@/lib/prisma";
 import { requireServerWorkspace } from "@/lib/workspace";
-import { formatExecutionData } from "@/lib/execution-inspector";
+import { buildExecutionTrace, formatExecutionData } from "@/lib/execution-inspector";
+import { workflowDefinitionSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -46,7 +47,7 @@ export default async function ExecutionInspectorPage({ params }: PageProps) {
       createdAt: true,
       startedAt: true,
       finishedAt: true,
-      workflow: { select: { id: true, name: true } },
+      workflow: { select: { id: true, name: true, definition: true } },
       steps: {
         orderBy: { startedAt: "asc" },
         select: {
@@ -66,6 +67,9 @@ export default async function ExecutionInspectorPage({ params }: PageProps) {
   });
 
   if (!run) notFound();
+
+  const parsedDefinition = workflowDefinitionSchema.safeParse(run.workflow.definition);
+  const executionTrace = buildExecutionTrace(parsedDefinition.success ? parsedDefinition.data : undefined, run.steps);
 
   return <AppShell active="Execution history"><div className="page">
     <div className="page-heading">
@@ -93,16 +97,19 @@ export default async function ExecutionInspectorPage({ params }: PageProps) {
     <section className="panel" style={{ marginBottom: 16 }}>
       <div className="panel-heading"><div><div className="panel-title">Execution path</div><div className="panel-subtitle">Steps recorded by the worker, in execution order</div></div><span className="tag">{run.steps.length} steps</span></div>
       {run.steps.length === 0 ? <div className="empty-state">No step records are available yet.</div> : <div style={{ display: "grid", gap: 10, padding: 16 }}>
-        {run.steps.map((step, index) => <article key={step.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 14 }}>
+        {executionTrace.map((step, index) => <article key={step.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span className="node-symbol">{index + 1}</span>
             <div style={{ flex: 1, minWidth: 150 }}>
               <div style={{ fontWeight: 800, fontSize: 13 }}>{step.title}</div>
               <div style={{ color: "var(--muted)", fontSize: 10, marginTop: 3 }}>{step.kind} · {step.nodeId} · attempt {step.attempt}</div>
+              {step.detail && <div style={{ color: "var(--muted)", fontSize: 10, marginTop: 3 }}>{step.detail}</div>}
             </div>
             <span className={`status ${step.status === "SUCCEEDED" ? "status-active" : step.status === "FAILED" || step.status === "OUTCOME_UNKNOWN" ? "status-paused" : "status-draft"}`} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
               {statusIcon(step.status)} {step.status.toLowerCase().replaceAll("_", " ")}
             </span>
+            {step.decision && <span className="tag">Condition → {step.decision.toUpperCase()}</span>}
+            {step.enteredThroughBranch && <span className="tag">Entered {step.enteredThroughBranch.toUpperCase()} branch</span>}
           </div>
           <div style={{ color: "var(--muted)", fontSize: 10, marginTop: 10 }}>
             {formatDate(step.startedAt)} · {formatDuration(step.startedAt, step.finishedAt)}
