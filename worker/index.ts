@@ -11,7 +11,7 @@ import { renderInputTemplate } from "../src/lib/template";
 import { resolveNextExecutionNode, validateExecutableWorkflow } from "../src/lib/execution";
 import { evaluateCondition } from "../src/lib/condition";
 import { workflowDefinitionSchema, createIntegrationConnectionSchema } from "../src/lib/validation";
-import type { DiscordActionConfig, GmailActionConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
+import type { DiscordActionConfig, GmailActionConfig, GoogleSheetsAppendConfig, GoogleSheetsReadConfig, HttpActionConfig, WorkflowDefinition } from "../src/lib/types";
 import { ActionOutcomeUnknownError, isWithinAllowedHttpsBase, requestPublicHttps } from "../src/lib/safe-http";
 import { extractJsonResponseValue, toPersistableHttpActionResult } from "../src/lib/http-response";
 import { getScheduleQueue, syncWorkflowSchedule } from "../src/lib/schedule";
@@ -129,7 +129,7 @@ async function executeDiscordAction(config: DiscordActionConfig, organizationId:
   return { httpStatus: response.status };
 }
 
-async function getGoogleAccessToken(connectionId: string, organizationId: string) {
+async function getGoogleAccessToken(connectionId: string, organizationId: string, requiredScope: string) {
   const connection = await prisma.integrationConnection.findFirst({
     where: { id: connectionId, organizationId, provider: "google" },
     select: { id: true, credentialsCiphertext: true },
@@ -146,8 +146,12 @@ async function getGoogleAccessToken(connectionId: string, organizationId: string
     || !("accessToken" in credentials) || typeof credentials.accessToken !== "string"
     || !("refreshToken" in credentials) || typeof credentials.refreshToken !== "string"
     || !("expiresAt" in credentials) || typeof credentials.expiresAt !== "string"
+    || !("scope" in credentials) || typeof credentials.scope !== "string"
     || !credentials.refreshToken) {
     throw new Error("The stored Google account credentials are invalid.");
+  }
+  if (!credentials.scope.split(" ").includes(requiredScope)) {
+    throw new Error("This Google account has not granted the permission required for this action. Reconnect it from Integrations.");
   }
 
   const expiresAt = Date.parse(credentials.expiresAt);
@@ -203,7 +207,7 @@ async function executeGmailAction(config: GmailActionConfig, organizationId: str
   const subject = renderInputTemplate(config.subject, input, 500);
   const body = renderInputTemplate(config.body, input, 100_000);
   const raw = buildGmailRawMessage(toValue, subject, body);
-  const accessToken = await getGoogleAccessToken(config.connectionId, organizationId);
+  const accessToken = await getGoogleAccessToken(config.connectionId, organizationId, "https://www.googleapis.com/auth/gmail.send");
 
   let response: Response;
   try {
@@ -222,6 +226,69 @@ async function executeGmailAction(config: GmailActionConfig, organizationId: str
   }
   if (!response.ok) throw new Error(`Gmail rejected the email with HTTP ${response.status}. Reconnect the account if Google reports an authorization error.`);
   return { httpStatus: response.status };
+}
+
+async function executeGoogleSheetsRead(config: GoogleSheetsReadConfig, organizationId: string) {
+  if (!config.connectionId) throw new Error("The Google Sheets action is missing its Google account connection.");
+  const accessToken = await getGoogleAccessToken(config.connectionId, organizationId, "https://www.googleapis.com/auth/spreadsheets");
+  const url = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(config.spreadsheetId)}/values/${encodeURIComponent(config.range)}`);
+  url.searchParams.set("majorDimension", "ROWS");
+  let response: Response;
+  try {
+    response = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` }, redirect: "error", signal: AbortSignal.timeout(15_000) });
+  } catch {
+    throw new ActionOutcomeUnknownError("Google Sheets did not respond within the 15-second read timeout.");
+  }
+  if (!response.ok) throw new Error(`Google Sheets rejected the read request with HTTP ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== "object" || !("values" in payload)) return { rowCount: 0, values: [] };
+  if (!Array.isArray(payload.values) || payload.values.length > 1_000
+    || payload.values.some((row) => !Array.isArray(row) || row.length > 100
+      || row.some((cell) => !["string", "number", "boolean"].includes(typeof cell)))) {
+    throw new Error("Google Sheets returned an unsupported or oversized cell range. Limit reads to 1,000 rows and 100 columns.");
+  }
+  return { rowCount: payload.values.length, values: payload.values };
+}
+
+async function executeGoogleSheetsAppend(config: GoogleSheetsAppendConfig, organizationId: string, input: unknown) {
+  if (!config.connectionId) throw new Error("The Google Sheets action is missing its Google account connection.");
+  const rendered = renderInputTemplate(config.valuesJson, input, 65_536, true);
+  let values: unknown;
+  try { values = JSON.parse(rendered); }
+  catch { throw new Error("Google Sheets rows must be valid JSON after workflow mappings are resolved."); }
+  if (!Array.isArray(values) || values.length < 1 || values.length > 1_000
+    || values.some((row) => !Array.isArray(row) || row.length < 1 || row.length > 100
+      || row.some((cell) => !["string", "number", "boolean"].includes(typeof cell) || (typeof cell === "string" && cell.length > 10_000)))) {
+    throw new Error("Google Sheets rows must be a two-dimensional array containing 1-1,000 rows and 1-100 scalar cells per row.");
+  }
+  const cellCount = values.reduce((total, row) => total + row.length, 0);
+  if (cellCount > 10_000) throw new Error("Google Sheets append is limited to 10,000 cells per execution.");
+  const accessToken = await getGoogleAccessToken(config.connectionId, organizationId, "https://www.googleapis.com/auth/spreadsheets");
+  const url = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(config.spreadsheetId)}/values/${encodeURIComponent(config.range)}:append`);
+  url.searchParams.set("valueInputOption", "RAW");
+  url.searchParams.set("insertDataOption", "INSERT_ROWS");
+  url.searchParams.set("includeValuesInResponse", "false");
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ majorDimension: "ROWS", values }),
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new ActionOutcomeUnknownError("Google Sheets did not respond within the 15-second append timeout; rows may have been added. RunLattice will not automatically retry this operation.");
+  }
+  if (!response.ok) throw new Error(`Google Sheets rejected the append request with HTTP ${response.status}.`);
+  const payload: unknown = await response.json();
+  const updates = payload && typeof payload === "object" && "updates" in payload ? payload.updates : undefined;
+  if (!updates || typeof updates !== "object" || !("updatedRange" in updates)
+    || typeof updates.updatedRange !== "string" || !("updatedRows" in updates)
+    || typeof updates.updatedRows !== "number") {
+    throw new Error("Google Sheets returned an invalid append confirmation.");
+  }
+  return { updatedRange: updates.updatedRange, updatedRows: updates.updatedRows };
 }
 
 async function executeHttpAction(config: HttpActionConfig, organizationId: string, input: unknown) {
@@ -302,6 +369,12 @@ async function executeAction(node: WorkflowDefinition["nodes"][number], organiza
   }
   if (node.config.integrationId === "gmail" && node.config.actionId === "send_email") {
     return executeGmailAction(node.config, organizationId, input);
+  }
+  if (node.config.integrationId === "google-sheets" && node.config.actionId === "read_rows") {
+    return executeGoogleSheetsRead(node.config, organizationId);
+  }
+  if (node.config.integrationId === "google-sheets" && node.config.actionId === "append_rows") {
+    return executeGoogleSheetsAppend(node.config, organizationId, input);
   }
   if (node.config.integrationId === "http" && node.config.actionId === "request") {
     return executeHttpAction(node.config, organizationId, input);
