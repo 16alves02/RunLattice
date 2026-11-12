@@ -45,12 +45,19 @@ export function getWorkflowMappingOptions(
   for (const node of nodes) {
     if (!ancestors.has(node.id) || node.kind !== "action" || !node.config
       || !("integrationId" in node.config) || node.config.integrationId !== "http"
-      || !node.config.responsePath?.trim()) continue;
+      || !/^[A-Za-z0-9_-]+$/.test(node.id)) continue;
     options.push({
-      label: `${node.title} · HTTP response value`,
-      path: `steps.${node.id}.responseValue`,
+      label: `${node.title} · HTTP status`,
+      path: `steps.${node.id}.httpStatus`,
       source: "step",
     });
+    if (node.config.responsePath?.trim()) {
+      options.push({
+        label: `${node.title} · HTTP response value`,
+        path: `steps.${node.id}.responseValue`,
+        source: "step",
+      });
+    }
   }
   return options;
 }
