@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { decryptSecret } from "../src/lib/secrets";
 import { recoverStaleWorkflowRuns } from "../src/lib/run-recovery";
+import { createRunStepIfLeaseOwned } from "../src/lib/run-lease";
 import { dispatchPendingWorkflowRuns } from "../src/lib/outbox";
 import { createQuotaBoundWorkflowRun } from "../src/lib/run-quota";
 import { PLAN_LIMITS, resolveEntitledPlan } from "../src/lib/billing-core";
@@ -410,23 +411,12 @@ const worker = new Worker<WorkflowJob>("workflow-runs", async (job: Job<Workflow
       const startedAt = new Date().toISOString();
       if (!(await ownsLease())) throw new Error("Execution lease was lost; this worker stopped.");
       await job.updateProgress({ currentNode: node.id, completed: steps.length, total: definition.nodes.length });
-      // Lock the run row while checking the fencing token and creating the
-      // ledger entry. Recovery uses the same row lock through its status update,
-      // so it cannot mark the run stale between lease validation and step creation.
-      const ledgerStep = await prisma.$transaction(async (transaction) => {
-        const leaseRows = await transaction.$queryRaw<Array<{ id: string }>>`
-          SELECT "id"
-          FROM "WorkflowRun"
-          WHERE "id" = ${runId}
-            AND "status" = 'RUNNING'
-            AND "leaseToken" = ${leaseToken}
-          FOR UPDATE
-        `;
-        if (leaseRows.length === 0) return null;
-
-        return transaction.workflowRunStep.create({
-          data: { runId, nodeId: node.id, title: node.title, kind: node.kind, status: "RUNNING" },
-        });
+      const ledgerStep = await createRunStepIfLeaseOwned(prisma, {
+        runId,
+        leaseToken,
+        nodeId: node.id,
+        title: node.title,
+        kind: node.kind,
       });
       if (!ledgerStep) {
         throw new Error("Execution lease was lost before the step record could be created.");
