@@ -60,7 +60,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
     definition: {
       nodes: [
         { id: "trigger-manual", kind: "trigger", title: "Manual start", detail: "Trigger · Run on demand", config: { triggerType: "MANUAL" }, x: 70, y: 90 },
-        { id: "action-gmail", kind: "action", title: "Send Gmail email", detail: "Action · Gmail", config: { integrationId: "gmail", actionId: "send_email", to: "{{input.email}}", subject: "A message from RunLattice", body: "Hello {{input.name}},\\n\\nThis message was sent by an automated workflow." }, x: 360, y: 90 },
+        { id: "action-gmail", kind: "action", title: "Send Gmail email", detail: "Action · Gmail", config: { integrationId: "gmail", actionId: "send_email", to: "{{input.email}}", subject: "A message from RunLattice", body: "Hello {{input.name}},\n\nThis message was sent by an automated workflow." }, x: 360, y: 90 },
       ],
       edges: [{ id: "edge-manual-gmail", from: "trigger-manual", to: "action-gmail" }],
     },
