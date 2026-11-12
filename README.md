@@ -24,10 +24,10 @@ AI-generated workflows are drafts. They must be reviewed and saved by the user; 
 - Organization-based workspaces with owner, admin and member roles.
 - Workspace-scoped workflow CRUD and execution history.
 - Visual workflow builder and searchable workflow templates.
-- Integration catalog, with Discord webhook as the first live provider.
-- AES-256-GCM encryption for Discord webhook credentials.
+- Integration catalog with live Discord, HTTP / REST API, Gmail, Google Sheets and Slack operations; other providers remain clearly marked as planned.
+- AES-256-GCM encryption for workspace-scoped integration credentials, including Discord, HTTP, Google and Slack tokens.
 - Redis/BullMQ background execution with atomic run claiming.
-- Real Discord message delivery from a supported workflow, including safe `{{input.path}}` message templates.
+- Real Discord and Slack channel message delivery, Gmail email sending, Google Sheets range reads and row appends, and secured HTTPS API requests from workflows; supported text and JSON fields accept safe `{{input.path}}` mappings.
 - Signed inbound webhook triggers using timestamped HMAC-SHA256 signatures and replay-window validation.
 - Cron-based scheduled triggers managed by BullMQ with IANA timezone support and worker-side reconciliation.
 - AI workflow planning with OpenAI, Anthropic and Google Gemini adapters, encrypted workspace BYOK keys, disabled by default and returning reviewable drafts.
@@ -38,13 +38,13 @@ AI-generated workflows are drafts. They must be reviewed and saved by the user; 
 
 ## Current execution limits
 
-The worker currently supports manual, signed-webhook and cron-scheduled runs with exactly one trigger and at most one condition node. Condition nodes evaluate input data and route execution through an explicit true or false branch; only the selected path runs. The only live external action is sending a message to a connected Discord webhook. Arbitrary code execution and additional provider actions are not implemented.
+The worker currently supports manual, signed-webhook and cron-scheduled runs with exactly one trigger and at most one condition node. Condition nodes evaluate input data and route execution through an explicit true or false branch; only the selected path runs. Live external actions are limited to the operations explicitly marked available in the integration catalog: Discord message, Slack message, Gmail send email, Google Sheets read/append, and secured HTTP request. Other providers, triggers and actions are not implemented. Arbitrary code execution is not supported.
 
-Automatic BullMQ retries are disabled for the Discord action because it is non-idempotent. The worker refreshes a database heartbeat while a run is active; a separate recovery sweep marks runs with an expired five-minute heartbeat as FAILED. It does not replay the run because an external action may already have happened. Step checkpoints are persisted, but resuming from a checkpoint and exactly-once delivery are not supported.
+Workflow action failures are persisted without automatically replaying the run. Non-idempotent sends and appends can have an unknown external outcome after a network timeout; RunLattice does not automatically resend them. The worker refreshes a database heartbeat while a run is active; a separate recovery sweep marks runs with an expired five-minute heartbeat as FAILED. It does not replay the run because an external action may already have happened. Step checkpoints are persisted, but resuming from a checkpoint and exactly-once delivery are not supported.
 
 ## Integration security
 
-Discord webhook URLs are accepted only for the official Discord HTTPS webhook hosts, encrypted at rest and never returned by the API. The worker revalidates the stored destination, blocks redirects and applies a 10-second timeout. Set `INTEGRATION_ENCRYPTION_KEY` to a unique base64-encoded 32-byte key in both the web and worker environments. Generate one with:
+Provider credentials are encrypted at rest and never returned by the API. Google and Slack use workspace-scoped OAuth authorization with short-lived, single-use state. Google uses PKCE; Slack bot access tokens support token rotation when enabled in the Slack app. HTTP API connections are restricted to their configured HTTPS origin and base path. External requests block redirects and apply bounded timeouts. Set `INTEGRATION_ENCRYPTION_KEY` to a unique base64-encoded 32-byte key in both the web and worker environments. Generate one with:
 
 ```bash
 openssl rand -base64 32
@@ -85,7 +85,7 @@ npm install
 cp .env.example .env
 ```
 
-Configure `DATABASE_URL`, `DIRECT_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` and `BETTER_AUTH_TRUSTED_ORIGINS`. Configure `INTEGRATION_ENCRYPTION_KEY` before saving provider credentials. Configure Resend and Stripe only when testing those features. Never commit real credentials.
+Configure `DATABASE_URL`, `DIRECT_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` and `BETTER_AUTH_TRUSTED_ORIGINS`. Configure `INTEGRATION_ENCRYPTION_KEY` before saving provider credentials. For Gmail and Google Sheets, also configure the Google OAuth variables. For Slack, configure the Slack OAuth variables. Configure Resend and Stripe only when testing those features. Never commit real credentials.
 
 ### 3. Start PostgreSQL and Redis
 
@@ -134,7 +134,11 @@ docker compose down
 | --- | --- | --- |
 | GET | `/api/health` | Web, PostgreSQL, Redis and worker readiness check |
 | GET | `/api/integrations` | List the catalog and workspace connections |
-| POST | `/api/integrations` | Save an encrypted Discord webhook |
+| POST | `/api/integrations` | Save an encrypted Discord webhook or HTTP API connection |
+| GET | `/api/integrations/google/connect` | Start Google OAuth |
+| GET | `/api/integrations/google/callback` | Complete Google OAuth |
+| GET | `/api/integrations/slack/connect` | Start Slack OAuth |
+| GET | `/api/integrations/slack/callback` | Complete Slack OAuth |
 | DELETE | `/api/integrations/:id` | Remove a workspace connection |
 | GET | `/api/workflows` | List workspace workflows |
 | POST | `/api/workflows` | Create a workflow |
