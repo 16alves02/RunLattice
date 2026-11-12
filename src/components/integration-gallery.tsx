@@ -34,8 +34,12 @@ export function IntegrationGallery() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const googleStatus = params.get("google");
-    if (googleStatus === "connected") setNotice("Google account connected securely. Gmail actions are being prepared and are not executable yet.");
-    if (googleStatus === "error") setNotice("Google authorization could not be completed (" + (params.get("reason") ?? "unknown_error") + "). Check the Google OAuth configuration and try again.");
+    const googleNotice = googleStatus === "connected"
+      ? "Google account connected securely. Gmail actions are being prepared and are not executable yet."
+      : googleStatus === "error"
+        ? "Google authorization could not be completed (" + (params.get("reason") ?? "unknown_error") + "). Check the Google OAuth configuration and try again."
+        : "";
+    if (googleNotice) queueMicrotask(() => setNotice(googleNotice));
     if (googleStatus) window.history.replaceState({}, "", window.location.pathname);
   }, []);
 
@@ -161,7 +165,7 @@ export function IntegrationGallery() {
         </div>}
         {item.id === "gmail" ? <>
           <div className="activity-meta">{connected.length} Google account(s) connected to this workspace</div>
-          {canManage && <button className="btn btn-primary" onClick={() => window.location.assign("/api/integrations/google/connect")}>Connect Google account</button>}
+          {canManage && <form action="/api/integrations/google/connect" method="get"><button className="btn btn-primary" type="submit">Connect Google account</button></form>}
           <p className="editor-help">Authorization uses Google OAuth 2.0 with PKCE. The Gmail send action remains unavailable until its worker executor is completed.</p>
         </> : item.id === "http" && item.status === "available" ? <>
           <div className="activity-meta">{connected.length} connection(s) in this workspace</div>
