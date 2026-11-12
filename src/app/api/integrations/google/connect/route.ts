@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createGoogleOAuthProof } from "@/lib/google-oauth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret } from "@/lib/secrets";
@@ -36,10 +36,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const state = randomBytes(32).toString("base64url");
-    const stateHash = createHash("sha256").update(state).digest("hex");
-    const verifier = randomBytes(48).toString("base64url");
-    const challenge = createHash("sha256").update(verifier).digest("base64url");
+    const { state, stateHash, verifier, challenge } = createGoogleOAuthProof();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     await prisma.googleOAuthState.create({
