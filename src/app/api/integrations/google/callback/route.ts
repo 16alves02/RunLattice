@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { hashGoogleOAuthState } from "@/lib/google-oauth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret } from "@/lib/secrets";
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const providerError = requestUrl.searchParams.get("error");
   if (!state || state.length > 200) return redirectToIntegrations("error", "invalid_state");
 
-  const stateHash = createHash("sha256").update(state).digest("hex");
+  const stateHash = hashGoogleOAuthState(state);
   const now = new Date();
   try {
     const oauthState = await prisma.googleOAuthState.findUnique({ where: { stateHash } });
