@@ -10,6 +10,7 @@ import { demoDefinition } from "@/lib/demo-data";
 import type { ConditionConfig, DiscordActionConfig, HttpActionConfig, TriggerConfig, WorkflowDefinition, WorkflowNode } from "@/lib/types";
 import { connectWorkflowNodes, getWorkflowCanvasSize, moveWorkflowNode } from "@/lib/workflow-graph";
 import { getWorkflowMappingOptions, type WorkflowMappingOption } from "@/lib/workflow-mapping";
+import { integrationCatalog } from "@/lib/integrations";
 
 type WorkflowBuilderProps = { workflowId?: string };
 type IntegrationConnection = { id: string; provider: string; name: string };
@@ -54,6 +55,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const [connectionTo, setConnectionTo] = useState("");
   const [connectionBranch, setConnectionBranch] = useState<"true" | "false">("true");
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selected), [nodes, selected]);
+  const selectedActionIntegrationId = selectedNode?.config && "integrationId" in selectedNode.config ? selectedNode.config.integrationId : "discord";
   const selectedActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "discord" ? selectedNode.config : undefined;
   const selectedHttpActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "http" ? selectedNode.config : undefined;
   const selectedConditionConfig = selectedNode?.config && "operator" in selectedNode.config ? selectedNode.config : undefined;
@@ -342,12 +344,11 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
           </select><label className="field-label" htmlFor="condition-operator">Comparison</label><select id="condition-operator" className="field-input" value={selectedConditionConfig.operator} onChange={(event) => updateSelectedConditionConfig({ operator: event.target.value as ConditionConfig["operator"], ...(event.target.value === "exists" ? { value: undefined } : {}) })}><option value="equals">Equals</option><option value="not_equals">Does not equal</option><option value="contains">Contains</option><option value="greater_than">Greater than</option><option value="less_than">Less than</option><option value="exists">Exists</option></select>{selectedConditionConfig.operator !== "exists" && <><label className="field-label" htmlFor="condition-value">Compare value</label><input id="condition-value" className="field-input" value={String(selectedConditionConfig.value ?? "")} onChange={(event) => updateSelectedConditionConfig({ value: ["greater_than", "less_than"].includes(selectedConditionConfig.operator) ? Number(event.target.value) : event.target.value })} placeholder="Value"/></>}<div className="editor-help">Only the matching true or false branch executes. Conditions read the manual run input and do not execute custom code.</div></>}{selectedNode.kind === "action" && <>
           <label className="field-label" htmlFor="action-provider">Action type</label>
           <select id="action-provider" className="field-input"
-            value={selectedHttpActionConfig ? "http" : "discord"}
+            value={selectedActionIntegrationId}
             onChange={(event) => updateSelected({ config: event.target.value === "http"
               ? { integrationId: "http", actionId: "request", method: "POST", url: "", connectionId: "", body: "" }
               : { integrationId: "discord", actionId: "send_message", connectionId: "", message: "" } })}>
-            <option value="discord">Discord message</option>
-            <option value="http">HTTP / REST API request</option>
+            {integrationCatalog.filter((integration) => integration.status === "available").flatMap((integration) => integration.operations.filter((operation) => operation.status === "available").map((operation) => <option key={`${integration.id}:${operation.id}`} value={integration.id}>{integration.name} · {operation.name}</option>))}
           </select>
           {selectedHttpActionConfig ? <>
             <label className="field-label" htmlFor="http-connection">API connection</label>
