@@ -1,3 +1,5 @@
+import type { WorkflowNode } from "@/lib/types";
+
 export type IntegrationCategory = "Communication" | "Productivity" | "E-commerce" | "Payments" | "Development";
 
 export interface IntegrationDefinition {
@@ -9,6 +11,36 @@ export interface IntegrationDefinition {
   triggers: string[];
   actions: string[];
   status: "available" | "planned";
+}
+
+export interface RequiredIntegrationConnection {
+  id: string;
+  provider: "discord" | "http";
+}
+
+/**
+ * Resolves the provider expected by each configured action connection.
+ * A connection ID cannot safely represent two different providers in one workflow.
+ */
+export function getRequiredIntegrationConnections(
+  nodes: readonly WorkflowNode[],
+): RequiredIntegrationConnection[] {
+  const requirements = new Map<string, "discord" | "http">();
+
+  for (const node of nodes) {
+    if (node.kind !== "action" || !node.config || !("integrationId" in node.config) || !node.config.connectionId) {
+      continue;
+    }
+
+    const provider = node.config.integrationId;
+    const existingProvider = requirements.get(node.config.connectionId);
+    if (existingProvider && existingProvider !== provider) {
+      throw new Error("A workflow connection cannot be used with different integration providers.");
+    }
+    requirements.set(node.config.connectionId, provider);
+  }
+
+  return [...requirements].map(([id, provider]) => ({ id, provider }));
 }
 
 export const integrationCatalog: IntegrationDefinition[] = [
