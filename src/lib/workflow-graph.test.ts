@@ -29,6 +29,16 @@ describe("workflow graph editing helpers", () => {
     expect(connectWorkflowNodes(nodes, first.edges, "trigger", "action-a")).toMatchObject({ ok: false });
   });
 
+  it("prevents incoming edges to triggers and multiple incoming edges", () => {
+    expect(connectWorkflowNodes(nodes, [], "action-a", "trigger")).toMatchObject({ ok: false });
+    const first = connectWorkflowNodes(nodes, [], "trigger", "action-a");
+    if (!first.ok) throw new Error(first.error);
+    expect(connectWorkflowNodes(nodes, first.edges, "action-b", "action-a")).toMatchObject({
+      ok: false,
+      error: "A node can only have one incoming connection.",
+    });
+  });
+
   it("prevents graph cycles", () => {
     const first = connectWorkflowNodes(nodes, [], "trigger", "action-a");
     if (!first.ok) throw new Error(first.error);
