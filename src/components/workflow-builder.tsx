@@ -7,7 +7,7 @@ import { ArrowLeft, Circle, GitBranch, Plus, Save, Settings2, Sparkles, Webhook,
 import { AppShell } from "@/components/app-shell";
 import { ManualRunInput } from "@/components/manual-run-input";
 import { demoDefinition } from "@/lib/demo-data";
-import type { ConditionConfig, DiscordActionConfig, GmailActionConfig, GoogleSheetsAppendConfig, GoogleSheetsReadConfig, HttpActionConfig, TriggerConfig, WorkflowDefinition, WorkflowNode } from "@/lib/types";
+import type { ConditionConfig, DiscordActionConfig, SlackActionConfig, GmailActionConfig, GoogleSheetsAppendConfig, GoogleSheetsReadConfig, HttpActionConfig, TriggerConfig, WorkflowDefinition, WorkflowNode } from "@/lib/types";
 import { connectWorkflowNodes, getWorkflowCanvasSize, moveWorkflowNode } from "@/lib/workflow-graph";
 import { getWorkflowMappingOptions, type WorkflowMappingOption } from "@/lib/workflow-mapping";
 import { integrationCatalog } from "@/lib/integrations";
@@ -58,6 +58,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const selectedActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "discord" ? selectedNode.config : undefined;
   const selectedHttpActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "http" ? selectedNode.config : undefined;
   const selectedGmailActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "gmail" ? selectedNode.config : undefined;
+  const selectedSlackActionConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "slack" ? selectedNode.config : undefined;
   const selectedSheetsReadConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "google-sheets" && selectedNode.config.actionId === "read_rows" ? selectedNode.config : undefined;
   const selectedSheetsAppendConfig = selectedNode?.config && "integrationId" in selectedNode.config && selectedNode.config.integrationId === "google-sheets" && selectedNode.config.actionId === "append_rows" ? selectedNode.config : undefined;
   const selectedActionOperation = selectedNode?.config && "integrationId" in selectedNode.config ? `${selectedNode.config.integrationId}:${selectedNode.config.actionId}` : "discord:send_message";
@@ -218,6 +219,18 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
       body: existingConfig?.body ?? "",
       ...existingConfig,
       ...patch,
+    };
+    updateSelected({ config });
+  }
+
+  function updateSelectedSlackActionConfig(patch: Partial<SlackActionConfig>) {
+    if (!selectedNode || selectedNode.kind !== "action") return;
+    const existing = selectedNode.config && "integrationId" in selectedNode.config
+      && selectedNode.config.integrationId === "slack" ? selectedNode.config : undefined;
+    const config: SlackActionConfig = {
+      integrationId: "slack", actionId: "send_message",
+      connectionId: existing?.connectionId ?? "", channel: existing?.channel ?? "", message: existing?.message ?? "",
+      ...existing, ...patch,
     };
     updateSelected({ config });
   }
@@ -392,7 +405,8 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
             value={selectedActionOperation}
             onChange={(event) => {
               const [integrationId, actionId] = event.target.value.split(":");
-              if (integrationId === "google-sheets" && actionId === "read_rows") updateSelected({ config: { integrationId, actionId, connectionId: "", spreadsheetId: "", range: "Sheet1!A1:D100" } });
+              if (integrationId === "slack" && actionId === "send_message") updateSelected({ config: { integrationId, actionId: "send_message", connectionId: "", channel: "", message: "" } });
+              else if (integrationId === "google-sheets" && actionId === "read_rows") updateSelected({ config: { integrationId, actionId, connectionId: "", spreadsheetId: "", range: "Sheet1!A1:D100" } });
               else if (integrationId === "google-sheets" && actionId === "append_rows") updateSelected({ config: { integrationId, actionId, connectionId: "", spreadsheetId: "", range: "Sheet1!A:D", valuesJson: '[["{{input.name}}","{{input.email}}"]]' } });
               else if (integrationId === "http") updateSelected({ config: { integrationId, actionId: "request", method: "POST", url: "", connectionId: "", body: "" } });
               else if (integrationId === "gmail") updateSelected({ config: { integrationId, actionId: "send_email", connectionId: "", to: "", subject: "", body: "" } });
@@ -431,6 +445,25 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
             </>}
             <div className="editor-help">{selectedSheetsReadConfig ? "Reads up to 1,000 rows and 100 columns from the selected range." : "Appends up to 1,000 rows and 10,000 cells per execution. A network timeout may leave the result unknown; the action is not automatically retried."} Reconnect the Google account if it was authorized before the Sheets permission was added.</div>
             {connections.filter((connection) => connection.provider === "google").length === 0 && <Link href="/integrations" className="editor-help">Connect a Google account in Integrations first.</Link>}
+          </> : selectedSlackActionConfig ? <>
+            <label className="field-label" htmlFor="slack-connection">Slack workspace</label>
+            <select id="slack-connection" className="field-input" value={selectedSlackActionConfig.connectionId ?? ""}
+              onChange={(event) => updateSelectedSlackActionConfig({ connectionId: event.target.value })}>
+              <option value="">Choose a connected Slack workspace</option>
+              {connections.filter((connection) => connection.provider === "slack").map((connection) => <option key={connection.id} value={connection.id}>{connection.name}</option>)}
+            </select>
+            <label className="field-label" htmlFor="slack-channel">Channel ID</label>
+            <input id="slack-channel" className="field-input" value={selectedSlackActionConfig.channel}
+              onChange={(event) => updateSelectedSlackActionConfig({ channel: event.target.value.trim() })}
+              placeholder="C0123456789" maxLength={40}/>
+            <label className="field-label" htmlFor="slack-message">Message</label>
+            <textarea id="slack-message" className="field-input" rows={6} maxLength={40000}
+              value={selectedSlackActionConfig.message}
+              onChange={(event) => updateSelectedSlackActionConfig({ message: event.target.value })}
+              placeholder="Write a Slack message…"/>
+            <MappingInsert value={selectedSlackActionConfig.message} onChange={(value) => updateSelectedSlackActionConfig({ message: value })} options={mappingOptions}/>
+            <div className="editor-help">The bot needs to be invited to the target channel. Use the channel ID, not its display name. Messages are sent once; if Slack times out after accepting a request, delivery may be unknown and RunLattice will not resend automatically.</div>
+            {connections.filter((connection) => connection.provider === "slack").length === 0 && <Link href="/integrations" className="editor-help">Connect a Slack workspace in Integrations first.</Link>}
           </> : selectedGmailActionConfig ? <>
             <label className="field-label" htmlFor="gmail-connection">Google account</label>
             <select id="gmail-connection" className="field-input" value={selectedGmailActionConfig.connectionId ?? ""}
