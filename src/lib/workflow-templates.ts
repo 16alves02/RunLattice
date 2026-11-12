@@ -6,7 +6,7 @@ export interface WorkflowTemplate {
   description: string;
   category: "Communication" | "Development";
   integrations: string[];
-  icon: "discord" | "http";
+  icon: "discord" | "http" | "gmail";
   setupInstructions: string;
   definition: WorkflowDefinition;
 }
@@ -47,6 +47,22 @@ export const workflowTemplates: WorkflowTemplate[] = [
         { id: "action-discord", kind: "action", title: "Send Discord message", detail: "Action · Discord", config: { integrationId: "discord", actionId: "send_message", message: "This workflow was started manually." }, x: 360, y: 90 },
       ],
       edges: [{ id: "edge-manual-discord", from: "trigger-manual", to: "action-discord" }],
+    },
+  },
+  {
+    id: "manual-gmail-email",
+    name: "Send a Gmail email",
+    description: "Send a plain-text email to a recipient supplied when the workflow runs.",
+    category: "Communication",
+    integrations: ["Manual trigger", "Gmail"],
+    icon: "gmail",
+    setupInstructions: "Connect a Google account in Integrations, select it in the Gmail action, then provide an email address and optional name in the manual run input.",
+    definition: {
+      nodes: [
+        { id: "trigger-manual", kind: "trigger", title: "Manual start", detail: "Trigger · Run on demand", config: { triggerType: "MANUAL" }, x: 70, y: 90 },
+        { id: "action-gmail", kind: "action", title: "Send Gmail email", detail: "Action · Gmail", config: { integrationId: "gmail", actionId: "send_email", to: "{{input.email}}", subject: "A message from RunLattice", body: "Hello {{input.name}},\\n\\nThis message was sent by an automated workflow." }, x: 360, y: 90 },
+      ],
+      edges: [{ id: "edge-manual-gmail", from: "trigger-manual", to: "action-gmail" }],
     },
   },
   {
