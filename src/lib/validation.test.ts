@@ -54,6 +54,29 @@ describe("workflow definition validation", () => {
     }).success).toBe(false);
   });
 
+  it("accepts Google Sheets read and append actions with safe identifiers and bounded ranges", () => {
+    const read = {
+      nodes: [validDefinition.nodes[0], { ...validDefinition.nodes[1], config: {
+        integrationId: "google-sheets", actionId: "read_rows", connectionId: "google-connection",
+        spreadsheetId: "abcdefghijklmnopqrstuv", range: "Sheet1!A1:D100",
+      } }],
+      edges: validDefinition.edges,
+    };
+    const append = {
+      nodes: [validDefinition.nodes[0], { ...validDefinition.nodes[1], config: {
+        integrationId: "google-sheets", actionId: "append_rows", connectionId: "google-connection",
+        spreadsheetId: "abcdefghijklmnopqrstuv", range: "Sheet1!A:D", valuesJson: '[["{{input.name}}","{{input.email}}"]]',
+      } }],
+      edges: validDefinition.edges,
+    };
+    expect(workflowDefinitionSchema.safeParse(read).success).toBe(true);
+    expect(workflowDefinitionSchema.safeParse(append).success).toBe(true);
+    for (const spreadsheetId of ["short", "bad/id", "x".repeat(201)]) {
+      expect(workflowDefinitionSchema.safeParse({ ...read, nodes: [read.nodes[0], { ...read.nodes[1], config: { ...read.nodes[1].config, spreadsheetId } }] }).success).toBe(false);
+    }
+    expect(workflowDefinitionSchema.safeParse({ ...append, nodes: [append.nodes[0], { ...append.nodes[1], config: { ...append.nodes[1].config, valuesJson: "x".repeat(65_537) } }] }).success).toBe(false);
+  });
+
   it("accepts a configured HTTP request action", () => {
     const definition = {
       nodes: [
