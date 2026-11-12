@@ -1,5 +1,6 @@
 import { evaluateCondition } from "@/lib/condition";
 import type { WorkflowDefinition, WorkflowNode } from "@/lib/types";
+import { getIntegrationAction } from "@/lib/integrations";
 
 function getOutgoingEdges(definition: WorkflowDefinition, nodeId: string) {
   return definition.edges.filter((edge) => edge.from === nodeId);
@@ -132,6 +133,9 @@ export function validateExecutableWorkflow(definition: WorkflowDefinition): Work
       const config = node.config;
       if (!config || !("integrationId" in config) || !config.connectionId) {
         throw new Error(`Action "${node.title}" requires a connected integration before activation.`);
+      }
+      if (!getIntegrationAction(config.integrationId, config.actionId)) {
+        throw new Error(`Action "${node.title}" uses an integration operation that is not available.`);
       }
       if (config.integrationId === "discord" && !config.message?.trim()) {
         throw new Error(`Action "${node.title}" requires a Discord message before activation.`);
