@@ -1,3 +1,5 @@
+> **Idioma / Language:** [English](README.md) · [Português (Portugal)](README.pt-PT.md)
+
 <div align="center">
 
 # RunLattice
